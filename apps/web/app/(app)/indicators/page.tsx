@@ -148,6 +148,7 @@ interface IndicatorRow {
   accumulation?: string | null;
   formula: string | null;
   source: string | null;
+  formTemplateId?: string | null;
   status: string;
   weight: number;
   yellowToleranceP: number;
@@ -213,6 +214,8 @@ type IndicatorForm = {
   accumulation: string;
   formula: string;
   source: string;
+  /** Formulário/checklist cujas inspeções alimentam este indicador. */
+  formTemplateId: string;
   status: string;
   weight: string;
   yellowToleranceP: string;
@@ -260,6 +263,7 @@ const EMPTY_FORM: IndicatorForm = {
   accumulation: 'AVERAGE',
   formula: '',
   source: '',
+  formTemplateId: '',
   status: 'ACTIVE',
   weight: '1',
   yellowToleranceP: '10',
@@ -520,6 +524,7 @@ export default function IndicatorsPage() {
         accumulation: form.accumulation,
         formula: form.formula || null,
         source: form.source || null,
+        formTemplateId: form.formTemplateId || null,
         status: form.status,
         weight: numberOrUndefined(form.weight),
         yellowToleranceP: numberOrUndefined(form.yellowToleranceP),
@@ -577,6 +582,7 @@ export default function IndicatorsPage() {
       accumulation: indicator.accumulation ?? 'AVERAGE',
       formula: indicator.formula ?? '',
       source: indicator.source ?? '',
+      formTemplateId: indicator.formTemplateId ?? '',
       status: indicator.status,
       weight: String(indicator.weight ?? 1),
       yellowToleranceP: String(indicator.yellowToleranceP ?? 10),
@@ -1642,6 +1648,13 @@ function IndicatorFormDialog({
   isSaving: boolean;
   onSave: () => void;
 }) {
+  // Formulários disponíveis para alimentar o indicador automaticamente.
+  const formTemplatesQuery = useQuery<Array<{ id: string; title: string; version: string | null }>>({
+    queryKey: ['indicator-form-templates'],
+    queryFn: () => api('/forms?status=ACTIVE'),
+    staleTime: 5 * 60 * 1000,
+  });
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl">
@@ -1776,6 +1789,21 @@ function IndicatorFormDialog({
           )}
           <Field label="Fonte dos dados">
             <Input value={form.source} onChange={(e) => patchForm(setForm, { source: e.target.value })} placeholder="ERP, planilha, sistema interno" />
+          </Field>
+          {/* Vínculo direto formulário → indicador. (área, setor) não basta:
+              um setor pode ter vários indicadores diferentes. */}
+          <Field label="Alimentado pelo formulário" className="md:col-span-2">
+            <NativeSelect value={form.formTemplateId} onChange={(e) => patchForm(setForm, { formTemplateId: e.target.value })}>
+              <option value="">Lançamento manual (sem formulário)</option>
+              {(formTemplatesQuery.data ?? []).map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.title}{template.version ? ` - rev ${template.version}` : ''}
+                </option>
+              ))}
+            </NativeSelect>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Ao concluir uma inspeção deste formulário nesta área/setor, o sistema lança a média de conformidade do mês neste indicador.
+            </p>
           </Field>
           <Field label="Formula de cálculo" className="md:col-span-2">
             <Input value={form.formula} onChange={(e) => patchForm(setForm, { formula: e.target.value })} placeholder="Ex.: (faltas / horas previstas) * 100" />
