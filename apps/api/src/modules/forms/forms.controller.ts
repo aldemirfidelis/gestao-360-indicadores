@@ -169,6 +169,13 @@ export class FormsController {
     return this.service.updateSubmission(me, submissionId, body);
   }
 
+  /** Dados do participante pela matrícula, para o cabeçalho/rodapé. */
+  @Get('participants/lookup')
+  @RequirePermissions('forms:view')
+  lookupParticipant(@CurrentUser() me: AuthPayload, @Query('matricula') matricula: string) {
+    return this.service.lookupParticipant(me, matricula);
+  }
+
   /** Foto tirada na hora da inspeção (câmera do aparelho). */
   @Post('submissions/:submissionId/photo')
   @RequirePermissions('forms:evidence')

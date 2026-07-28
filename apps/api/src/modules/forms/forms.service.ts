@@ -1300,6 +1300,7 @@ export class FormsService {
           source: this.nullableText(body?.source) ?? 'WEB',
           originEntityType: this.nullableText(body?.originEntityType) ?? null,
           originEntityId: this.nullableText(body?.originEntityId) ?? null,
+          participants: this.json(body?.participants),
           deviceInfo: this.json(body?.deviceInfo),
           location: this.json(body?.location),
           snapshot: this.templateSnapshot(template) as Prisma.InputJsonValue,
@@ -1620,6 +1621,38 @@ export class FormsService {
    * O binário vai para o disco e a evidência guarda só a chave — base64 no
    * banco incharia a linha e tornaria a listagem lenta.
    */
+  /**
+   * Participante da inspeção pela matrícula.
+   *
+   * Lê do cadastro funcional (OrgEmployee) — nada de cadastro paralelo de
+   * pessoas. Traz cargo/função e o gestor responsável já resolvidos, que é o
+   * que o rodapé do formulário precisa mostrar.
+   */
+  async lookupParticipant(me: AuthPayload, registrationId: string) {
+    const matricula = String(registrationId ?? '').trim();
+    if (!matricula) throw new BadRequestException('Informe a matricula.');
+
+    const employee = await this.prisma.orgEmployee.findFirst({
+      where: { companyId: me.companyId, registrationId: matricula, status: 'ACTIVE' },
+      select: {
+        id: true,
+        registrationId: true,
+        name: true,
+        job: { select: { name: true } },
+        superior: { select: { name: true } },
+      },
+    });
+    if (!employee) throw new NotFoundException(`Nenhum colaborador ativo com a matricula ${matricula}.`);
+
+    return {
+      employeeId: employee.id,
+      registrationId: employee.registrationId,
+      name: employee.name,
+      jobTitle: employee.job?.name ?? null,
+      managerName: employee.superior?.name ?? null,
+    };
+  }
+
   async addPhoto(me: AuthPayload, submissionId: string, body: any) {
     const saved = await this.storage.savePhoto(me.companyId, {
       contentBase64: body?.contentBase64,

@@ -4307,6 +4307,9 @@ model FormSubmission {
   deviceInfo       Json?
   location         Json?
   snapshot         Json?
+  /// Quem participou da inspeção: [{ registrationId, name, jobTitle, managerName }].
+  /// Vem do cadastro funcional (OrgEmployee) pela matrícula — sem cadastro paralelo.
+  participants     Json?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
   deletedAt        DateTime?
