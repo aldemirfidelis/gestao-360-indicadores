@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { VacancyDetail } from '@/components/careers/vacancy-detail';
 import { internalApiBaseUrl, publicSiteUrl } from '@/lib/internal-api';
 import { CONTRACT_LABEL, WORK_MODE_LABEL, labelOf } from '@/lib/careers';
@@ -17,19 +18,54 @@ interface VacancyPayload {
 }
 
 /**
+ * Empresa a partir do subdomínio (`empresa.gestao360.org`).
+ *
+ * A API resolve a empresa pelo host OU por `?empresa=`, mas a busca aqui é
+ * servidor-a-servidor e chega na API com host interno — então o subdomínio
+ * precisa virar parâmetro explícito.
+ */
+function companyFromHost(host?: string | null): string | undefined {
+  const parts = String(host ?? '').split(':')[0].split('.');
+  if (parts.length >= 3 && !['www', 'app'].includes(parts[0])) return parts[0];
+  return undefined;
+}
+
+/** A vaga muda pouco; robô de link bate várias vezes na mesma URL. */
+const CACHE = { next: { revalidate: 3600 } } as const;
+
+/**
  * Busca a vaga no servidor só para montar o cartão de compartilhamento.
  * Falha aqui nunca pode derrubar a página: sem dados, cai na metadata padrão.
  */
 async function loadVacancy(slug: string, empresa?: string): Promise<VacancyPayload | null> {
+  const base = internalApiBaseUrl();
+  if (empresa) {
+    const scoped = await fetchJson<VacancyPayload>(`${base}/careers/vacancies/${encodeURIComponent(slug)}?empresa=${encodeURIComponent(empresa)}`);
+    if (scoped?.vacancy?.title) return scoped;
+  }
+
+  // Sem empresa (link direto, sem subdomínio) a rota por empresa devolve 404.
+  // O catálogo global tem a vaga e a empresa dela — melhor um card correto do
+  // que o genérico do site.
+  const global = await fetchJson<{ vacancies?: Array<VacancyPayload['vacancy'] & { slug?: string; company?: VacancyPayload['company'] }> }>(
+    `${base}/careers/global`,
+  );
+  const found = global?.vacancies?.find((item) => item?.slug === slug);
+  if (!found) return null;
+  const { company, ...vacancy } = found;
+
+  // Descoberta a empresa, busca a marca dela: é o banner que faz o card sair
+  // com cara de vaga em vez de link seco.
+  const brand = company?.slug
+    ? await fetchJson<{ careerPage?: VacancyPayload['careerPage'] }>(`${base}/careers/company?empresa=${encodeURIComponent(company.slug)}`)
+    : null;
+  return { company, vacancy, careerPage: brand?.careerPage };
+}
+
+async function fetchJson<T>(url: string): Promise<T | null> {
   try {
-    const query = empresa ? `?empresa=${encodeURIComponent(empresa)}` : '';
-    const response = await fetch(`${internalApiBaseUrl()}/careers/vacancies/${encodeURIComponent(slug)}${query}`, {
-      // A vaga muda pouco; revalidar de hora em hora evita ir à API a cada
-      // rastreamento de link (LinkedIn, WhatsApp e Google batem várias vezes).
-      next: { revalidate: 3600 },
-    });
-    if (!response.ok) return null;
-    return (await response.json()) as VacancyPayload;
+    const response = await fetch(url, CACHE);
+    return response.ok ? ((await response.json()) as T) : null;
   } catch {
     return null;
   }
@@ -52,7 +88,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const query = await searchParams;
-  const empresa = typeof query.empresa === 'string' ? query.empresa : undefined;
+  const host = (await headers()).get('host');
+  const empresa = (typeof query.empresa === 'string' ? query.empresa : undefined) ?? companyFromHost(host);
 
   const data = await loadVacancy(slug, empresa);
   const vacancy = data?.vacancy;
@@ -72,7 +109,10 @@ export async function generateMetadata({
   });
 
   const site = publicSiteUrl();
-  const canonical = `${site}/carreiras/vagas/${encodeURIComponent(slug)}${empresa ? `?empresa=${encodeURIComponent(empresa)}` : ''}`;
+  // Sem `empresa` na URL, usa o slug da empresa descoberta: o link do card tem
+  // de abrir a vaga com a empresa resolvida, senão a página não carrega.
+  const companySlug = empresa ?? data?.company?.slug ?? null;
+  const canonical = `${site}/carreiras/vagas/${encodeURIComponent(slug)}${companySlug ? `?empresa=${encodeURIComponent(companySlug)}` : ''}`;
   // O banner é servido pela API pública; precisa ser absoluto para o robô do
   // LinkedIn conseguir baixar.
   const banner = data?.careerPage?.bannerUrl ?? data?.careerPage?.logoUrl;
