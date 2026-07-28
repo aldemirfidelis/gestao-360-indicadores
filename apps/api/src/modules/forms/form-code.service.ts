@@ -90,15 +90,7 @@ export class FormCodeService {
           }),
         ),
       ),
-      Promise.all(
-        DEFAULT_FOLDERS.map((name) =>
-          tx.formFolder.upsert({
-            where: { companyId_name_parentId: { companyId, name, parentId: null } },
-            update: { active: true },
-            create: { companyId, name, createdById: userId },
-          }),
-        ),
-      ),
+      Promise.all(DEFAULT_FOLDERS.map((name) => this.ensureRootFolder(tx, companyId, name, userId))),
       Promise.all(
         DEFAULT_TAGS.map(([name, color]) =>
           tx.formTag.upsert({
@@ -110,6 +102,24 @@ export class FormCodeService {
       ),
     ]);
     return { types, categories, folders, tags };
+  }
+
+  /**
+   * Pasta raiz (sem pai) do acervo de formulários.
+   *
+   * Não dá para usar `upsert` pela única composta `companyId_name_parentId`:
+   * `parentId` é opcional, e o Prisma recusa `null` numa chave única composta —
+   * com razão, porque em SQL `NULL` não é igual a `NULL` e a coluna nem entra
+   * na unicidade de fato. Passar `parentId: null` ali derrubava a criação de
+   * QUALQUER formulário com 500, já que `ensureDefaults` roda em toda criação.
+   */
+  private async ensureRootFolder(tx: Tx, companyId: string, name: string, userId?: string) {
+    const existing = await tx.formFolder.findFirst({ where: { companyId, name, parentId: null } });
+    if (existing) {
+      // Reativa a pasta padrão se alguém a tiver desativado.
+      return existing.active ? existing : tx.formFolder.update({ where: { id: existing.id }, data: { active: true } });
+    }
+    return tx.formFolder.create({ data: { companyId, name, createdById: userId } });
   }
 
   async nextTemplateNumber(tx: Tx, companyId: string) {

@@ -47,9 +47,12 @@ function makeService(opts?: {
       upsert: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: `cat-${args.create.name}`, ...args.create })),
     },
     formFolder: {
+      // Pasta raiz não usa upsert: `parentId` é nullable e o Prisma recusa null
+      // em chave única composta (ver form-code.service.spec.ts).
       findFirst: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
-      upsert: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: `folder-${args.create.name}`, ...args.create })),
+      create: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: `folder-${args.data.name}`, active: true, ...args.data })),
+      update: vi.fn().mockImplementation((args: any) => Promise.resolve({ id: args.where.id, active: true })),
     },
     formTag: {
       findMany: vi.fn().mockResolvedValue([]),
