@@ -1,4 +1,10 @@
-/** Escolha de Área → Setor → Formulário na execução de um checklist. */
+/**
+ * Escolha de Área → Setor no preenchimento de um checklist.
+ *
+ * O formulário não entra aqui: quem chega nesta tela já clicou em "Preencher"
+ * no modelo, e repetir a escolha só permitia divergir do que está sendo
+ * respondido.
+ */
 
 export interface OrgNodeOption {
   id: string;
@@ -7,28 +13,9 @@ export interface OrgNodeOption {
   parentId?: string | null;
 }
 
-export interface FormOption {
-  id: string;
-  title: string;
-  code?: string | null;
-  version?: string | null;
-  status?: string | null;
-  type?: string | null;
-}
-
 export interface ExecuteSelection {
   areaId: string;
   sectorId: string;
-  templateId: string;
-}
-
-/**
- * Rótulo do formulário na escolha do executor.
- * Ex.: "ISSMA - Atividades Diversas com Equipamento - rev 2026".
- */
-export function formOptionLabel(form: FormOption): string {
-  const revisao = form.version?.trim() ? ` - rev ${form.version.trim()}` : '';
-  return `${form.title}${revisao}`;
 }
 
 /** Setores são os filhos diretos da área escolhida na árvore organizacional. */

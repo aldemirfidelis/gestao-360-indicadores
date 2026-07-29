@@ -156,6 +156,32 @@ describe('FormsService - formularios e checklists', () => {
     expect(res.withoutFields).toBe(1);
   });
 
+  it('listAllSubmissions: registros de todos os modelos, escopados por empresa e area', async () => {
+    const { service, prisma } = makeService({ listAreaFilter: ['areaA'] });
+    await service.listAllSubmissions(me);
+    const args = prisma.formSubmission.findMany.mock.calls[0][0];
+    expect(args.where.companyId).toBe('companyA');
+    expect(args.where.deletedAt).toBeNull();
+    // Sem templateId: e a lista geral, e nao a de um modelo selecionado.
+    expect(args.where.templateId).toBeUndefined();
+    expect(args.where.AND[0].OR).toContainEqual({ orgNodeId: { in: ['areaA'] } });
+  });
+
+  it('listAllSubmissions: filtra por modelo, busca e periodo pela data de conclusao', async () => {
+    const { service, prisma } = makeService();
+    await service.listAllSubmissions(me, { templateId: 'f1', search: 'colheita', from: '2026-07-01', to: '2026-07-31' });
+    const where = prisma.formSubmission.findMany.mock.calls[0][0].where;
+    expect(where.templateId).toBe('f1');
+    expect(where.AND[0].OR[0].code).toEqual({ contains: 'colheita', mode: 'insensitive' });
+    const periodo = where.AND[1].OR;
+    // Datas do input do navegador sao interpretadas no fuso local: "de 01/07"
+    // comeca a 00h do dia 1, e "ate 31/07" vai ate 23h59 do dia 31 — senao um
+    // preenchimento das 14h do dia 31 ficaria de fora.
+    expect(periodo[0].completedAt.gte).toEqual(new Date(2026, 6, 1, 0, 0, 0, 0));
+    expect(periodo[0].completedAt.lte).toEqual(new Date(2026, 6, 31, 23, 59, 59, 999));
+    expect(periodo[1].completedAt).toBeNull();
+  });
+
   it('getById: formulario de outra empresa -> NotFound', async () => {
     const { service, prisma } = makeService({ template: null });
     await expect(service.getById(me, 'f-outra')).rejects.toBeInstanceOf(NotFoundException);
@@ -262,6 +288,102 @@ describe('FormsService - formularios e checklists', () => {
       fields: [baseField({ id: 'field-1', label: 'Extintor dentro da validade?', type: 'CONFORMITY', required: false })],
     });
 
+  it('createSubmission: a nota de cada pergunta define o resultado e fica congelada na resposta', async () => {
+    // Notas 30 / 30 / 40; só a de 40 reprovada => 60 de 100 = 60%.
+    const template = baseTemplate({
+      status: 'ACTIVE',
+      fields: [
+        baseField({ id: 'field-1', label: 'EPI completo?', type: 'CONFORMITY', required: false, weight: 30 }),
+        baseField({ id: 'field-2', label: 'Área sinalizada?', type: 'CONFORMITY', required: false, weight: 30 }),
+        baseField({ id: 'field-3', label: 'Extintor na validade?', type: 'CONFORMITY', required: false, weight: 40 }),
+      ],
+    });
+    const { service, prisma } = makeService({ template });
+    await service.createSubmission(me, 'f1', {
+      answers: [
+        { fieldId: 'field-1', value: 'Conforme' },
+        { fieldId: 'field-2', value: 'Conforme' },
+        { fieldId: 'field-3', value: 'Não conforme' },
+      ],
+    });
+
+    const data = prisma.formSubmission.create.mock.calls[0][0].data;
+    expect(data.score).toBe(60);
+    const respostas = data.answers.create;
+    // Nota congelada + pontos obtidos por item: a conferência do PDF sai daqui.
+    expect(respostas.map((a: any) => a.weight)).toEqual([30, 30, 40]);
+    expect(respostas.map((a: any) => a.score)).toEqual([30, 30, 0]);
+  });
+
+  it('createSubmission: pergunta sem nota é gravada, mas fica fora do resultado', async () => {
+    // Checklist misto: duas perguntas pontuadas e uma de verificação sem nota.
+    const template = baseTemplate({
+      status: 'ACTIVE',
+      fields: [
+        baseField({ id: 'field-1', label: 'EPI completo?', type: 'CONFORMITY', required: false, weight: 70 }),
+        baseField({ id: 'field-2', label: 'Área sinalizada?', type: 'CONFORMITY', required: false, weight: 30 }),
+        baseField({ id: 'field-3', label: 'Rádio funcionando?', type: 'CONFORMITY', required: false, weight: null }),
+      ],
+    });
+    const { service, prisma } = makeService({ template });
+    await service.createSubmission(me, 'f1', {
+      answers: [
+        { fieldId: 'field-1', value: 'Conforme' },
+        { fieldId: 'field-2', value: 'Não conforme' },
+        // Reprovada, mas sem nota: não pode derrubar o percentual.
+        { fieldId: 'field-3', value: 'Não conforme' },
+      ],
+    });
+
+    const data = prisma.formSubmission.create.mock.calls[0][0].data;
+    expect(data.score).toBe(70);
+    const respostas = data.answers.create;
+    // A resposta sem nota é gravada normalmente, só não pontua.
+    expect(respostas).toHaveLength(3);
+    expect(respostas[2].value).toBe('Não conforme');
+    expect(respostas[2].weight).toBeNull();
+    expect(respostas[2].score).toBeNull();
+  });
+
+  it('createSubmission: sem nota nenhuma, o checklist pontua por item conforme', async () => {
+    const template = baseTemplate({
+      status: 'ACTIVE',
+      fields: [
+        baseField({ id: 'field-1', label: 'Item 1', type: 'CONFORMITY', required: false }),
+        baseField({ id: 'field-2', label: 'Item 2', type: 'CONFORMITY', required: false }),
+      ],
+    });
+    const { service, prisma } = makeService({ template });
+    await service.createSubmission(me, 'f1', {
+      answers: [
+        { fieldId: 'field-1', value: 'Conforme' },
+        { fieldId: 'field-2', value: 'Não conforme' },
+      ],
+    });
+    expect(prisma.formSubmission.create.mock.calls[0][0].data.score).toBe(50);
+  });
+
+  it('createSubmission: item não aplicável devolve os pontos ao total', async () => {
+    const template = baseTemplate({
+      status: 'ACTIVE',
+      fields: [
+        baseField({ id: 'field-1', label: 'EPI completo?', type: 'CONFORMITY', required: false, weight: 60 }),
+        baseField({ id: 'field-2', label: 'Guarda-corpo?', type: 'CONFORMITY', required: false, weight: 40 }),
+      ],
+    });
+    const { service, prisma } = makeService({ template });
+    await service.createSubmission(me, 'f1', {
+      answers: [
+        { fieldId: 'field-1', value: 'Conforme' },
+        { fieldId: 'field-2', value: 'Não aplicável' },
+      ],
+    });
+    // Disputaram-se só 60 pontos, e todos foram obtidos.
+    expect(prisma.formSubmission.create.mock.calls[0][0].data.score).toBe(100);
+    // Item fora da conta não recebe pontos (null ≠ "perdeu tudo").
+    expect(prisma.formSubmission.create.mock.calls[0][0].data.answers.create[1].score).toBeNull();
+  });
+
   it('checklist reprovado com gatilho habilitado -> cria NC e registra na timeline', async () => {
     const template = conformityTemplate({ autoNonconformity: { enabled: true } });
     const { service, prisma, nonconformities } = makeService({ template });
@@ -366,6 +488,9 @@ function baseField(overrides: Record<string, unknown> = {}) {
     required: false,
     options: null,
     helpText: null,
+    // Pergunta nova nasce SEM nota: o checklist só vira pontuado quando o autor
+    // escreve alguma nota.
+    weight: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

@@ -11,6 +11,22 @@
  * - Questão não respondida também não entra: o percentual reflete o que foi
  *   avaliado, e o preenchimento incompleto é tratado pela obrigatoriedade.
  * - Só campos de avaliação contam. Texto, foto e data são registro, não nota.
+ *
+ * ## Nota por pergunta
+ *
+ * O autor pode dar uma nota a cada pergunta ("esta vale 30"). Nem toda pergunta
+ * precisa de nota — há itens que se verifica mas não se pontua. Daí a regra ser
+ * do MODELO, e não da pergunta isolada:
+ *
+ * - **Nenhuma pergunta tem nota** → todas valem igual, e o resultado é o
+ *   percentual de itens conformes. É o checklist comum, e o comportamento de
+ *   sempre.
+ * - **Alguma pergunta tem nota** → o checklist é pontuado, e só as perguntas
+ *   COM nota entram no resultado. As sem nota continuam sendo respondidas e
+ *   registradas; apenas não somam nem subtraem pontos.
+ *
+ * Sem essa regra, uma pergunta deixada em branco num checklist pontuado valeria
+ * 1 ponto escondido — diluindo as notas que o autor escreveu.
  */
 
 /** Respostas que valem como conformidade. */
@@ -36,8 +52,51 @@ export type ConformityVerdict = 'CONFORME' | 'NAO_CONFORME' | 'NAO_APLICAVEL' | 
 export interface ScorableAnswer {
   fieldType?: string | null;
   value?: string | null;
-  /** Peso do item; itens críticos costumam pesar mais. Padrão 1. */
+  /** Nota da pergunta. `null`/ausente = pergunta sem nota. */
   weight?: number | null;
+  /** Item marcado como crítico no modelo. */
+  critical?: boolean | null;
+}
+
+/** A pergunta tem nota? (número positivo; em branco ou zero é "sem nota") */
+export function hasNote(weight?: number | null): boolean {
+  const parsed = Number(weight);
+  return Number.isFinite(parsed) && parsed > 0;
+}
+
+/** Nota da pergunta, ou `null` quando ela não tem nota. */
+export function noteOf(weight?: number | null): number | null {
+  return hasNote(weight) ? Number(weight) : null;
+}
+
+/**
+ * Quanto o item pesa na conta.
+ *
+ * Com nota, vale a nota. Sem nota (checklist não pontuado, em que todos valem
+ * igual), o item crítico pesa 3 — comportamento antigo, quando "crítico" era a
+ * única forma de um item pesar mais. Os dois juntos fariam um crítico de nota
+ * 30 valer 90 sem ninguém ter pedido.
+ */
+export function effectiveWeight(weight?: number | null, critical?: boolean | null): number {
+  const nota = noteOf(weight);
+  if (nota !== null) return nota;
+  return critical ? 3 : 1;
+}
+
+/** O checklist é pontuado? (alguma pergunta recebeu nota) */
+export function isScoredSheet(answers: ScorableAnswer[]): boolean {
+  return answers.some((answer) => hasNote(answer.weight));
+}
+
+/** Resultado de um item, na ordem em que ele foi respondido. */
+export interface ScoredItem {
+  /** Pontos obtidos, ou `null` quando o item não disputa pontos. */
+  points: number | null;
+  /** Nota congelada do item, ou `null` quando a pergunta não tem nota. */
+  note: number | null;
+  verdict: ConformityVerdict;
+  /** Ficou de fora por não ter nota num checklist pontuado. */
+  outOfScore: boolean;
 }
 
 export interface ConformityResult {
@@ -48,9 +107,14 @@ export interface ConformityResult {
   naoAplicaveis: number;
   /** Itens que entraram na conta (conformes + não conformes). */
   avaliados: number;
-  /** Soma dos pesos dos conformes / soma dos pesos avaliados. */
+  /** Pontos obtidos (soma das notas dos conformes). */
   pesoConforme: number;
+  /** Pontos em disputa (soma das notas dos itens avaliados). */
   pesoAvaliado: number;
+  /** O autor pontuou este checklist? (define se a tela fala de pontos) */
+  usaNotas: boolean;
+  /** Perguntas respondidas que ficaram fora do resultado por não ter nota. */
+  semNota: number;
 }
 
 function normalize(value?: string | null): string {
@@ -75,43 +139,99 @@ export function classifyAnswer(answer: ScorableAnswer): ConformityVerdict {
   return 'IGNORADO';
 }
 
-/** Percentual de conformidade do preenchimento. */
-export function conformityScore(answers: ScorableAnswer[]): ConformityResult {
+/**
+ * Apuração completa: o resultado do preenchimento e o de cada item, na mesma
+ * passada. Uma função só para que a ficha, o PDF e o percentual gravado nunca
+ * discordem entre si.
+ */
+export function scoreSheet(answers: ScorableAnswer[]): { result: ConformityResult; items: ScoredItem[] } {
+  // Checklist pontuado = alguém escreveu nota em alguma pergunta. A partir daí,
+  // pergunta sem nota é registro: responde, mas não soma nem subtrai ponto.
+  const pontuado = isScoredSheet(answers);
+
+  const items: ScoredItem[] = [];
   let conformes = 0;
   let naoConformes = 0;
   let naoAplicaveis = 0;
+  let semNota = 0;
   let pesoConforme = 0;
   let pesoAvaliado = 0;
+  let notaDiferenteDeUm = false;
 
   for (const answer of answers) {
-    const peso = Number.isFinite(Number(answer.weight)) && Number(answer.weight) > 0 ? Number(answer.weight) : 1;
-    switch (classifyAnswer(answer)) {
+    const verdict = classifyAnswer(answer);
+    const note = noteOf(answer.weight);
+    if (note !== null && note !== 1) notaDiferenteDeUm = true;
+
+    if (pontuado && note === null) {
+      // Respondida, mas fora da pontuação — só conta como "sem nota" se era um
+      // item de avaliação (texto e foto nunca foram candidatos a ponto).
+      if (verdict !== 'IGNORADO') semNota += 1;
+      items.push({ points: null, note: null, verdict, outOfScore: true });
+      continue;
+    }
+
+    const peso = effectiveWeight(answer.weight, answer.critical);
+    switch (verdict) {
       case 'CONFORME':
         conformes += 1;
         pesoConforme += peso;
         pesoAvaliado += peso;
+        items.push({ points: peso, note, verdict, outOfScore: false });
         break;
       case 'NAO_CONFORME':
         naoConformes += 1;
         pesoAvaliado += peso;
+        items.push({ points: 0, note, verdict, outOfScore: false });
         break;
       case 'NAO_APLICAVEL':
         naoAplicaveis += 1;
+        items.push({ points: null, note, verdict, outOfScore: false });
         break;
       default:
+        items.push({ points: null, note, verdict, outOfScore: false });
         break;
     }
   }
 
   const avaliados = conformes + naoConformes;
   const percent = pesoAvaliado > 0 ? Math.round((pesoConforme / pesoAvaliado) * 1000) / 10 : null;
-  return { percent, conformes, naoConformes, naoAplicaveis, avaliados, pesoConforme, pesoAvaliado };
+  // "Pontuado" para a tela é quando o autor de fato configurou algo: notas
+  // diferentes de 1, ou perguntas deliberadamente fora do resultado. Modelo
+  // antigo (tudo com nota 1, nada de fora) segue sendo checklist comum.
+  const usaNotas = pontuado && (notaDiferenteDeUm || semNota > 0);
+  return {
+    result: { percent, conformes, naoConformes, naoAplicaveis, avaliados, pesoConforme, pesoAvaliado, usaNotas, semNota },
+    items,
+  };
 }
 
-/** Resumo curto para cabeçalho de relatório: "97,1% — 33 de 34 conformes". */
+/** Percentual de conformidade do preenchimento. */
+export function conformityScore(answers: ScorableAnswer[]): ConformityResult {
+  return scoreSheet(answers).result;
+}
+
+/**
+ * Resumo curto para cabeçalho de relatório.
+ *
+ * Sem notas: "97,1% — 33 de 34 conformes" (contagem de itens é o que importa).
+ * Com notas: "70% — 70 de 100 pontos", porque aí o que o usuário conferiu foi a
+ * pontuação, e "3 de 4 conformes" não explicaria o 70%.
+ */
 export function conformitySummary(result: ConformityResult): string {
   if (result.percent === null) return 'Sem itens avaliáveis';
   const percent = result.percent.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
   const naoAplicavel = result.naoAplicaveis > 0 ? ` · ${result.naoAplicaveis} não aplicável${result.naoAplicaveis > 1 ? 'is' : ''}` : '';
+  if (result.usaNotas) {
+    // Cita as perguntas fora da nota: sem isso, "3 de 4 pontos" num checklist
+    // de 10 perguntas parece conta errada.
+    const fora = result.semNota > 0 ? ` · ${result.semNota} sem nota` : '';
+    return `${percent}% — ${formatPontos(result.pesoConforme)} de ${formatPontos(result.pesoAvaliado)} pontos${naoAplicavel}${fora}`;
+  }
   return `${percent}% — ${result.conformes} de ${result.avaliados} conformes${naoAplicavel}`;
+}
+
+/** Pontos em pt-BR, sem casa decimal inútil ("30" e não "30,0"). */
+export function formatPontos(value: number): string {
+  return value.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 }

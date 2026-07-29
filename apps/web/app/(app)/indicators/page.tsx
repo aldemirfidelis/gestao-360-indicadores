@@ -1649,10 +1649,14 @@ function IndicatorFormDialog({
   onSave: () => void;
 }) {
   // Formulários disponíveis para alimentar o indicador automaticamente.
-  const formTemplatesQuery = useQuery<Array<{ id: string; title: string; version: string | null }>>({
+  // Não dá para filtrar por um status só: um formulário aceita preenchimento
+  // quando está PUBLISHED, APPROVED **ou** ACTIVE — pedir `?status=ACTIVE`
+  // deixava a lista vazia justamente para os formulários publicados.
+  const formTemplatesQuery = useQuery<Array<{ id: string; title: string; version: string | null; status: string }>>({
     queryKey: ['indicator-form-templates'],
-    queryFn: () => api('/forms?status=ACTIVE'),
+    queryFn: () => api('/forms'),
     staleTime: 5 * 60 * 1000,
+    select: (rows) => rows.filter((row) => ['PUBLISHED', 'APPROVED', 'ACTIVE'].includes(row.status)),
   });
 
   return (
@@ -1802,7 +1806,9 @@ function IndicatorFormDialog({
               ))}
             </NativeSelect>
             <p className="mt-1 text-xs text-muted-foreground">
-              Ao concluir uma inspeção deste formulário nesta área/setor, o sistema lança a média de conformidade do mês neste indicador.
+              {formTemplatesQuery.data?.length === 0
+                ? 'Nenhum formulário publicado ainda. Publique o modelo em Formulários e Checklists para poder vinculá-lo aqui.'
+                : 'Ao concluir uma inspeção deste formulário nesta área/setor, o sistema lança a média de conformidade do mês neste indicador.'}
             </p>
           </Field>
           <Field label="Formula de cálculo" className="md:col-span-2">

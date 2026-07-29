@@ -3,26 +3,28 @@
 import { useMemo } from 'react';
 import { Info } from 'lucide-react';
 import { NativeSelect } from '@/components/ui/select';
-import { type ExecuteSelection, type FormOption, type OrgNodeOption, areasOf, formOptionLabel, sectorsOf } from '@/lib/forms/execute';
+import { type ExecuteSelection, type OrgNodeOption, areasOf, sectorsOf } from '@/lib/forms/execute';
 
 /**
- * Escolha do que vai ser inspecionado: Área → Setor → Formulário.
+ * Onde a inspeção está sendo feita: Área → Setor.
+ *
+ * O formulário NÃO é escolhido aqui: quem abre esta tela já clicou em
+ * "Preencher" no modelo, então repetir a escolha só confundia (e permitia
+ * divergir do formulário que está sendo respondido logo abaixo).
  *
  * O setor é filtrado pela área porque a árvore organizacional já diz quem é
  * filho de quem — oferecer todos os setores obrigaria o executor a saber de cor
  * a que área cada um pertence, e um setor errado joga o resultado no indicador
  * da área errada.
  */
-export type { ExecuteSelection, FormOption, OrgNodeOption };
+export type { ExecuteSelection, OrgNodeOption };
 
 export function ExecutePicker({
   nodes,
-  forms,
   value,
   onChange,
 }: {
   nodes: OrgNodeOption[];
-  forms: FormOption[];
   value: ExecuteSelection;
   onChange: (value: ExecuteSelection) => void;
 }) {
@@ -30,7 +32,7 @@ export function ExecutePicker({
   const setores = useMemo(() => sectorsOf(nodes, value.areaId), [nodes, value.areaId]);
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-3 sm:grid-cols-2">
       <label className="block text-sm">
         <span className="mb-1 block font-medium">Área</span>
         <NativeSelect
@@ -66,17 +68,7 @@ export function ExecutePicker({
         )}
       </label>
 
-      <label className="block text-sm">
-        <span className="mb-1 block font-medium">Formulário</span>
-        <NativeSelect value={value.templateId} onChange={(event) => onChange({ ...value, templateId: event.target.value })}>
-          <option value="">Selecione o formulário</option>
-          {forms.map((form) => (
-            <option key={form.id} value={form.id}>{formOptionLabel(form)}</option>
-          ))}
-        </NativeSelect>
-      </label>
-
-      <p className="flex items-start gap-1.5 rounded-lg bg-muted/50 p-2.5 text-xs text-muted-foreground">
+      <p className="flex items-start gap-1.5 rounded-lg bg-muted/50 p-2.5 text-xs text-muted-foreground sm:col-span-2">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         O resultado desta inspeção entra na média do setor no mês, para o indicador de conformidade.
       </p>

@@ -48,6 +48,25 @@ export class FormsController {
     return this.service.options(me);
   }
 
+  /**
+   * Registros preenchidos de TODOS os formulários.
+   *
+   * Precisa vir antes de `@Get(':id')`: o Nest casa as rotas na ordem de
+   * declaração, e "submissions" seria engolido como se fosse um id.
+   */
+  @Get('submissions')
+  @RequirePermissions('forms:view')
+  allSubmissions(
+    @CurrentUser() me: AuthPayload,
+    @Query('templateId') templateId?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.service.listAllSubmissions(me, { templateId, status, search, from, to });
+  }
+
   @Get('executions')
   @RequirePermissions('forms:execute')
   executions(
@@ -144,8 +163,10 @@ export class FormsController {
     return this.service.listSubmissions(me, id);
   }
 
+  // `forms:fill` é a permissão do técnico de campo — quem só preenche não
+  // precisa de `forms:update`, que libera editar a estrutura do modelo.
   @Post(':id/submissions')
-  @RequirePermissions('forms:update')
+  @RequirePermissions('forms:fill', 'forms:update')
   createSubmission(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body(new ZodValidationPipe(formSubmissionWriteSchema)) body: any) {
     return this.service.createSubmission(me, id, body);
   }
@@ -178,7 +199,7 @@ export class FormsController {
 
   /** Foto tirada na hora da inspeção (câmera do aparelho). */
   @Post('submissions/:submissionId/photo')
-  @RequirePermissions('forms:evidence')
+  @RequirePermissions('forms:fill', 'forms:evidence')
   addPhoto(@CurrentUser() me: AuthPayload, @Param('submissionId') submissionId: string, @Body() body: any) {
     return this.service.addPhoto(me, submissionId, body);
   }
@@ -197,7 +218,7 @@ export class FormsController {
   }
 
   @Post('submissions/:submissionId/signatures')
-  @RequirePermissions('forms:execute')
+  @RequirePermissions('forms:fill', 'forms:execute', 'forms:approve')
   sign(@CurrentUser() me: AuthPayload, @Param('submissionId') submissionId: string, @Body() body: any) {
     return this.service.signSubmission(me, submissionId, body);
   }

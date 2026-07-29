@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { areasOf, formOptionLabel, sectorsOf } from './execute';
+import { areasOf, sectorsOf } from './execute';
 
 const ARVORE = [
   { id: 'agricola', name: 'Agrícola', parentId: null },
@@ -32,18 +32,5 @@ describe('sectorsOf', () => {
 
   it('área sem filhos devolve vazio (a tela avisa)', () => {
     expect(sectorsOf(ARVORE, 'colheita')).toEqual([]);
-  });
-});
-
-describe('formOptionLabel', () => {
-  it('mostra título com a revisão, como o executor reconhece', () => {
-    expect(formOptionLabel({ id: '1', title: 'ISSMA - Atividades Diversas com Equipamento', version: '2026' })).toBe(
-      'ISSMA - Atividades Diversas com Equipamento - rev 2026',
-    );
-  });
-
-  it('sem versão, só o título — nada de "rev" solto', () => {
-    expect(formOptionLabel({ id: '1', title: 'Checklist de rota' })).toBe('Checklist de rota');
-    expect(formOptionLabel({ id: '1', title: 'Checklist de rota', version: '  ' })).toBe('Checklist de rota');
   });
 });

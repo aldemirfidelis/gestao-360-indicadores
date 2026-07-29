@@ -24,7 +24,7 @@ import { logSwallowed } from '../../common/logging/swallow';
 import { FormCodeService } from './form-code.service';
 import { FormIndicatorService } from './form-indicator.service';
 import { sortSections } from './form-header.logic';
-import { conformityScore } from './form-scoring.logic';
+import { conformityScore, conformitySummary, noteOf, scoreSheet } from './form-scoring.logic';
 import { FormStorageService } from './form-storage.service';
 import { randomUUID } from 'node:crypto';
 
@@ -56,6 +56,55 @@ type ExecutionFilters = {
   assignedToId?: string;
   search?: string;
 };
+
+/** Uma resposta pronta para gravar em FormAnswer. */
+type AnswerRow = {
+  fieldId: string;
+  sectionId: string | null;
+  fieldCode: string | null;
+  fieldLabel: string;
+  fieldType: string;
+  fieldOrder: number;
+  value: string | null;
+  valueJson: Prisma.InputJsonValue | undefined;
+  valueNumber: number | undefined;
+  valueDate: Date | undefined;
+  weight: number | null;
+  score: number | null;
+  critical: boolean;
+  requiresEvidence: boolean;
+  rowIndex: number | undefined;
+};
+
+type SubmissionFilters = {
+  templateId?: string;
+  status?: string;
+  search?: string;
+  from?: string;
+  to?: string;
+};
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Limite do filtro de período, no fuso do servidor.
+ *
+ * O input de data do navegador manda só "AAAA-MM-DD", e `new Date('2026-07-31')`
+ * é meia-noite **UTC** — que no Brasil ainda é dia 30 às 21h. Sem tratar, "até
+ * 31/07" cortava justamente os preenchimentos do dia 31.
+ */
+function dayBoundary(value: string | undefined, edge: 'start' | 'end'): Date | undefined {
+  const text = value?.trim();
+  if (!text) return undefined;
+  if (!DATE_ONLY.test(text)) {
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+  const [year, month, day] = text.split('-').map(Number);
+  return edge === 'start'
+    ? new Date(year, month - 1, day, 0, 0, 0, 0)
+    : new Date(year, month - 1, day, 23, 59, 59, 999);
+}
 
 type LinkInput = {
   orgNodeId?: string | null;
@@ -192,8 +241,17 @@ export class FormsService {
   private enrichSubmission(submission: any) {
     const answers = submission.answers ?? [];
     const issues = submission.issues ?? [];
+    // Pontuação recalculada das respostas gravadas (cada uma com a nota
+    // congelada no preenchimento) — é o que a ficha e o PDF mostram.
+    const scoring = conformityScore(
+      answers.map((answer: any) => ({ fieldType: answer.fieldType, value: answer.value, weight: answer.weight, critical: answer.critical })),
+    );
     return {
       ...submission,
+      points: scoring.pesoConforme,
+      pointsTotal: scoring.pesoAvaliado,
+      usesWeights: scoring.usaNotas,
+      scoreSummary: conformitySummary(scoring),
       answersCount: answers.length,
       evidenceCount: submission.evidence?.length ?? 0,
       signaturesCount: submission.signatures?.length ?? 0,
@@ -493,7 +551,8 @@ export class FormsService {
         maxValue: this.float(field?.maxValue),
         minLength: this.int(field?.minLength),
         maxLength: this.int(field?.maxLength),
-        weight: this.float(field?.weight) ?? 1,
+        // Nota da pergunta: ausente/inválida = sem nota (fora da pontuação).
+        weight: noteOf(this.float(field?.weight)),
         score: this.float(field?.score),
         criticality: this.nullableText(field?.criticality) ?? null,
         validation: this.json(field?.validation),
@@ -1055,6 +1114,70 @@ export class FormsService {
     return submissions.map((submission) => this.enrichSubmission(submission));
   }
 
+  /**
+   * Registros preenchidos de todos os formulários da empresa.
+   *
+   * A aba Registros antes só mostrava os preenchimentos do modelo selecionado
+   * na aba Modelos — quem preenchia e ia conferir encontrava a tela vazia.
+   * Aqui a lista é a do usuário: tudo o que ele pode ver, com filtro.
+   */
+  async listAllSubmissions(me: AuthPayload, filters: SubmissionFilters = {}) {
+    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
+    const status = this.parseSubmissionStatus(filters.status);
+    const and: Prisma.FormSubmissionWhereInput[] = [];
+    const areaFilter = this.visibilityWhere(permitted);
+    if (areaFilter) and.push(areaFilter as Prisma.FormSubmissionWhereInput);
+    const term = filters.search?.trim();
+    if (term) {
+      and.push({
+        OR: [
+          { code: { contains: term, mode: 'insensitive' } },
+          { title: { contains: term, mode: 'insensitive' } },
+          { notes: { contains: term, mode: 'insensitive' } },
+          { template: { title: { contains: term, mode: 'insensitive' } } },
+          { orgNode: { name: { contains: term, mode: 'insensitive' } } },
+          { submittedBy: { name: { contains: term, mode: 'insensitive' } } },
+        ],
+      });
+    }
+    // Período pela data de conclusão, que é a que o usuário enxerga na lista;
+    // preenchimento ainda em rascunho cai no createdAt.
+    const from = dayBoundary(filters.from, 'start');
+    const to = dayBoundary(filters.to, 'end');
+    if (from || to) {
+      const range = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
+      and.push({ OR: [{ completedAt: range }, { completedAt: null, createdAt: range }] });
+    }
+
+    const submissions = await this.prisma.formSubmission.findMany({
+      where: {
+        companyId: me.companyId,
+        deletedAt: null,
+        ...(filters.templateId ? { templateId: filters.templateId } : {}),
+        ...(status ? { status } : {}),
+        ...(and.length ? { AND: and } : {}),
+      },
+      // Include enxuto: a ficha completa do modelo (com todos os campos) por
+      // registro multiplicaria a resposta por nada — a lista mostra respostas.
+      include: {
+        template: { select: { id: true, title: true, type: true, version: true, orgNodeId: true, processId: true, indicatorId: true } },
+        templateVersion: { select: { id: true, versionNumber: true, versionLabel: true, status: true } },
+        orgNode: { select: { id: true, name: true, type: true } },
+        process: { select: { orgNodeId: true, indicator: { select: { ownerNodeId: true } } } },
+        indicator: { select: { ownerNodeId: true } },
+        submittedBy: { select: { id: true, name: true, email: true } },
+        answers: { orderBy: [{ fieldOrder: 'asc' as const }, { createdAt: 'asc' as const }] },
+        evidence: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' as const } },
+        signatures: { orderBy: { signedAt: 'desc' as const } },
+        approvals: { orderBy: { createdAt: 'desc' as const } },
+        issues: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' as const } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 300,
+    });
+    return submissions.map((submission) => this.enrichSubmission(submission));
+  }
+
   /** Emite (ou reusa) um QR Code para um formulário. O token vira deep-link /scan?type=form. */
   async createTemplateQr(me: AuthPayload, templateId: string, body: any) {
     const template = await this.loadTemplate(templateId, me.companyId);
@@ -1104,13 +1227,31 @@ export class FormsService {
     };
   }
 
+  /**
+   * Respostas prontas para gravar, já com a nota e os pontos de cada item.
+   *
+   * A pontuação sai de `scoreSheet` — a mesma função que calcula o percentual
+   * do preenchimento —, para a soma dos itens sempre fechar com o total.
+   */
   private buildAnswers(template: any, rawAnswers: unknown) {
+    const linhas: AnswerRow[] = this.answerRows(template, rawAnswers);
+    const { items } = scoreSheet(linhas.map((linha) => ({ fieldType: linha.fieldType, value: linha.value, weight: linha.weight, critical: linha.critical })));
+    return linhas.map((linha, index) => ({
+      ...linha,
+      // Nota congelada: `null` quando a pergunta não tinha nota.
+      weight: items[index].note,
+      score: linha.score ?? items[index].points,
+    }));
+  }
+
+  private answerRows(template: any, rawAnswers: unknown): AnswerRow[] {
     const answers = Array.isArray(rawAnswers) ? rawAnswers : [];
     const byField = new Map(answers.map((answer: any) => [String(answer?.fieldId ?? answer?.fieldCode ?? ''), answer]));
     return (template.fields ?? []).map((field: any) => {
       const answer = byField.get(field.id) ?? byField.get(field.code ?? '');
       const parsed = this.answerValue(answer);
       if (field.required && !parsed.value) throw new BadRequestException(`Campo obrigatorio nao preenchido: ${field.label}`);
+      const critical = Boolean(answer?.critical) || String(field.criticality ?? '').toUpperCase() === 'CRITICAL';
       return {
         fieldId: field.id,
         sectionId: field.sectionId,
@@ -1122,8 +1263,10 @@ export class FormsService {
         valueJson: parsed.valueJson,
         valueNumber: parsed.valueNumber,
         valueDate: parsed.valueDate,
-        score: this.float(answer?.score ?? field.score),
-        critical: Boolean(answer?.critical) || String(field.criticality ?? '').toUpperCase() === 'CRITICAL',
+        // Nota do modelo; a pontuação em si é resolvida por buildAnswers.
+        weight: noteOf(field.weight),
+        score: this.float(answer?.score) ?? null,
+        critical,
         requiresEvidence: Boolean(field.evidenceRequired),
         rowIndex: this.int(answer?.rowIndex),
       };
@@ -1263,12 +1406,14 @@ export class FormsService {
     const answers = this.buildAnswers(template, body?.answers);
     // Conformidade do preenchimento: 100% quando todo item avaliavel esta
     // conforme. "Nao aplicavel" fica fora da conta (ver form-scoring.logic).
+    // `weight` é a nota que o autor escreveu na pergunta; `critical` só pesa
+    // quando não há nota (ver effectiveWeight em form-scoring.logic).
     const conformity = conformityScore(
-      answers.map((answer: { fieldType?: string | null; value?: string | null; critical?: boolean }) => ({
+      answers.map((answer: { fieldType?: string | null; value?: string | null; weight?: number | null; critical?: boolean }) => ({
         fieldType: answer.fieldType,
         value: answer.value,
-        // Item crítico pesa mais: reprovar um crítico derruba mais o resultado.
-        weight: answer.critical ? 3 : 1,
+        weight: answer.weight,
+        critical: answer.critical,
       })),
     );
     const submission = await this.prisma.$transaction(async (tx) => {
@@ -1401,6 +1546,14 @@ export class FormsService {
         const answers = this.buildAnswers(before.template, patch.answers);
         await tx.formAnswer.deleteMany({ where: { submissionId } });
         if (answers.length) await tx.formAnswer.createMany({ data: answers.map((answer: any) => ({ ...answer, submissionId })) });
+        // Trocar as respostas troca o resultado: sem recalcular, o percentual
+        // gravado continuaria o da versão anterior das respostas.
+        if (!('score' in (patch ?? {}))) {
+          const recalculado = conformityScore(
+            answers.map((answer: any) => ({ fieldType: answer.fieldType, value: answer.value, weight: answer.weight, critical: answer.critical })),
+          );
+          await tx.formSubmission.update({ where: { id: submissionId }, data: { score: recalculado.percent } });
+        }
       }
       const item = await tx.formSubmission.findUniqueOrThrow({ where: { id: submissionId }, include: this.submissionInclude() });
       if (COMPLETED_SUBMISSION_STATUSES.has(item.status) && !item.operationalRecord) await this.createRecordForSubmission(tx, item, item.template, me.sub);

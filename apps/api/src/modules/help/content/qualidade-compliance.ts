@@ -97,16 +97,42 @@ Assim ninguém altera um procedimento vigente por conta própria — toda mudan�
 ## Criar um modelo de formulário
 1. Clique em **Novo modelo**: dê um título e uma descrição.
 2. Adicione **perguntas** em cartões: cada uma com enunciado, **tipo de resposta** (texto, número, data, sim/não, conformidade, seleção única/múltipla…) e opções quando aplicável.
-3. Configure por pergunta: **obrigatoriedade**, **evidência obrigatória** (exige foto/arquivo) e **criticidade** (Normal ou Crítico).
+3. Configure por pergunta: **obrigatoriedade**, **evidência obrigatória** (exige foto/arquivo), **criticidade** (Normal ou Crítico) e **Nota** (veja abaixo).
 4. Reordene, duplique ou exclua perguntas pelos botões do cartão.
 5. **Publique** o modelo — publicações geram **versões** (as respostas antigas continuam ligadas à versão em que foram coletadas).
 
 Há também **sugestões por IA** para montar o checklist a partir do tema.
 
-## Executar/preencher
-- Os preenchimentos registram respostas, **evidências**, **assinatura eletrônica** e podem exigir **aprovação**;
+## Nota por pergunta (checklist pontuado)
+Cada pergunta de avaliação (Conformidade ou Sim/Não) tem um campo **Nota**: quanto ela vale no resultado. Ex.: pergunta 1 com **Nota 30**, pergunta 2 com **30** e pergunta 3 com **40** — se só a terceira for reprovada, o resultado é **60 de 100 = 60%**.
+
+### Nem toda pergunta precisa de nota
+A nota é **opcional pergunta a pergunta**, e a regra é do checklist inteiro:
+
+- **Nenhuma pergunta com nota** → todas valem igual, e o resultado é o percentual de itens conformes. É o checklist comum, e o comportamento de sempre;
+- **Alguma pergunta com nota** → o checklist vira pontuado, e **só as perguntas com nota entram no resultado**. As que você deixou em branco continuam sendo respondidas e registradas, mas não somam nem subtraem ponto — servem de verificação, não de nota.
+
+Assim dá para ter, no mesmo checklist, 5 perguntas que valem pontos e 20 que são apenas conferência. Na tela de preenchimento cada pergunta mostra **Nota 30** ou **Sem nota**, para o técnico saber o que muda o resultado.
+
+### Detalhes
+- O rodapé do construtor mostra o **total de pontos** e quantas perguntas ficaram **sem nota** enquanto você digita. Não é obrigatório fechar em 100: o resultado é sempre percentual (60 de 80 também é 75%);
+- **"Não aplicável" devolve os pontos ao total**: se a pergunta de nota 40 não se aplica no local, disputam-se só os 60 restantes e o inspetor pode chegar a 100%;
+- Nota só existe em pergunta de avaliação. Texto, foto e data são **registro** e nunca entram no percentual;
+- Em checklist **sem** notas, o item marcado como **Crítico** continua pesando 3×. Num checklist pontuado quem manda é a nota — um crítico de nota 30 vale 30 (não 90), e um crítico sem nota fica fora do resultado;
+- A nota fica **congelada no preenchimento**: repontuar o modelo depois não muda o resultado dos registros já gravados. O PDF e o Excel do registro trazem as colunas **Nota** e **Obtido** item a item, com "—" nas perguntas sem nota.
+
+## Preencher (campo) x Programar (planejamento)
+- **Preencher** responde o checklist agora — é o botão em destaque na aba **Modelos**, pensado para o celular/tablet do técnico. Basta escolher **Área** e **Setor**: o formulário já é o do cartão em que você clicou;
+- **Programar execução** é outra coisa: atribui o checklist a um responsável com prazo, e aparece na aba **Execuções** para acompanhamento;
+- Os preenchimentos registram respostas, **participantes** (por matrícula), **fotos**, **assinatura eletrônica** e podem exigir **aprovação**;
 - Cada envio vira um **registro operacional rastreável** com linha do tempo;
-- Respostas reprovadas podem **gerar Não Conformidade automaticamente** (veja o artigo específico).`,
+- Respostas reprovadas podem **gerar Não Conformidade automaticamente** (veja o artigo específico).
+
+## Conferir os registros
+Tudo o que foi preenchido aparece na aba **Registros**, independentemente do modelo selecionado, com filtro por formulário, período e busca. Cada registro abre a ficha completa (respostas, participantes, fotos) e tem **download em PDF e em Excel** para conferência e auditoria — e há ainda o Excel da lista inteira do filtro.
+
+## Quem faz o quê
+Criar, editar, publicar e copiar modelo é do analista (permissões \`forms:create\`, \`forms:update\`, \`forms:publish\`). Preencher é permissão à parte (\`forms:fill\`): o perfil **Técnico (Preenchimento de Checklist)** só enxerga formulários publicados e o botão **Preencher**, sem as ações de gestão.`,
     },
     {
       slug: 'como-gerar-qr-code-de-formulario',

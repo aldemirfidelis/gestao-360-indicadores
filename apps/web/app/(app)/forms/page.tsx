@@ -15,8 +15,8 @@ import {
   Copy,
   Edit,
   FileCheck,
+  FileDown,
   FileSpreadsheet,
-  Filter,
   FolderTree,
   History,
   LayoutTemplate,
@@ -60,9 +60,19 @@ import { NativeSelect } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
-import { api } from '@/lib/api';
+import { api, getAccessToken } from '@/lib/api';
 import { QrPrintDialog } from '@/components/qr/qr-print-dialog';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
+import {
+  type ExportableRecord,
+  type RecordEvidence,
+  type RecordParticipant,
+  exportRecordListXlsx,
+  exportRecordPdf,
+  exportRecordXlsx,
+} from './record-export';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 type TemplateType = string;
 type TemplateStatus = string;
@@ -139,11 +149,17 @@ interface FormSubmission {
   title: string | null;
   status: SubmissionStatus;
   notes: string | null;
+  createdAt?: string | null;
   submittedAt: string | null;
   completedAt?: string | null;
   reviewedAt: string | null;
   score?: number | null;
   classification?: string | null;
+  /** Modelo de origem, para a lista de registros mostrar o nome do checklist. */
+  template?: { id: string; title: string; type?: string; version?: string | null } | null;
+  orgNode?: { id: string; name: string; type?: string } | null;
+  /** [{ registrationId, name, jobTitle, managerName }] vindo do cadastro funcional. */
+  participants?: unknown;
   templateVersion?: { id: string; versionNumber: number; versionLabel: string; status: string } | null;
   execution?: { id: string; code: string; title: string; status: string; dueDate: string | null } | null;
   operationalRecord?: { id: string; code: string; title: string; status: string; recordDate: string } | null;
@@ -152,7 +168,13 @@ interface FormSubmission {
   signatures?: unknown[];
   approvals?: Array<{ id: string; decision: string; stage: string; decidedAt: string | null; approverUserId: string | null }>;
   issues?: Array<{ id: string; code: string; title: string; status: string; severity: string | null; dueDate: string | null }>;
-  answers: Array<{ id: string; fieldId: string | null; fieldCode?: string | null; fieldLabel: string; fieldType?: string | null; value: string | null }>;
+  answers: Array<{ id: string; fieldId: string | null; fieldCode?: string | null; fieldLabel: string; fieldType?: string | null; value: string | null; weight?: number | null; score?: number | null }>;
+  /** Pontos obtidos e em disputa, recalculados das respostas pelo backend. */
+  points?: number;
+  pointsTotal?: number;
+  /** O modelo usa nota por pergunta? Sem isso, a tela nem fala de pontos. */
+  usesWeights?: boolean;
+  scoreSummary?: string;
   answersCount: number;
   evidenceCount?: number;
   signaturesCount?: number;
@@ -244,6 +266,8 @@ interface FieldForm {
   evidenceRequired: boolean;
   commentRequired: boolean;
   criticality: string;
+  /** Nota da pergunta: quanto ela vale no resultado. Vazio = 1 (peso normal). */
+  weight: string;
   options: string;
   helpText: string;
 }
@@ -384,6 +408,13 @@ const STATUS_CLASS: Record<string, string> = {
 
 const FIELD_TYPES = ['TEXT', 'TEXTAREA', 'NUMBER', 'DATE', 'BOOLEAN', 'CONFORMITY', 'SELECT', 'MULTISELECT', 'PHOTO', 'ATTACHMENT', 'SIGNATURE', 'LOCATION'];
 
+/**
+ * Tipos que valem nota. Espelha TIPOS_AVALIAVEIS de form-scoring.logic.ts no
+ * backend: texto, foto e data são registro, não entram no percentual — então
+ * oferecer "Nota" neles seria prometer um ponto que nunca é contado.
+ */
+const SCORABLE_TYPES = new Set(['CONFORMITY', 'YES_NO', 'BOOLEAN']);
+
 const EMPTY_FIELD: FieldForm = {
   order: '1',
   displayNumber: '',
@@ -394,6 +425,7 @@ const EMPTY_FIELD: FieldForm = {
   evidenceRequired: false,
   commentRequired: false,
   criticality: '',
+  weight: '',
   options: '',
   helpText: '',
 };
@@ -433,14 +465,24 @@ export default function FormsPage() {
   const canDelete = hasPermission(['forms:delete']);
   const canBuilder = hasPermission(['forms:builder']);
   const canPublish = hasPermission(['forms:publish']);
+  // Preencher (campo, quase sempre no celular) é permissão própria: o técnico
+  // recebe só `forms:fill` e não enxerga criar/editar/publicar/copiar.
+  const canFill = hasPermission(['forms:fill', 'forms:update']);
   const canExecute = hasPermission(['forms:execute']);
   const canEvidence = hasPermission(['forms:evidence']);
   const canApprove = hasPermission(['forms:approve']);
   const canIssues = hasPermission(['forms:issues']);
   const canAi = hasPermission(['forms:ai']);
-  const [tab, setTab] = useState('dashboard');
+  const canDashboard = hasPermission(['forms:dashboard']);
+  // Quem só preenche não gerencia modelo: a lista some de detalhes e de ações.
+  const canManageTemplates = canCreate || canUpdate || canPublish || canDelete || canBuilder;
+  // O técnico cai direto na lista de formulários: sem o painel, "Painel Geral"
+  // seria uma tela vazia de KPIs que ele nem tem permissão de consultar.
+  const [tab, setTab] = useState(canDashboard ? 'dashboard' : 'templates');
   const [filters, setFilters] = useState({ search: '', status: '', type: '' });
   const [executionFilters, setExecutionFilters] = useState({ search: '', status: '' });
+  const [recordFilters, setRecordFilters] = useState({ search: '', templateId: '', from: '', to: '' });
+  const [recordDetail, setRecordDetail] = useState<FormSubmission | null>(null);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [submissionOpen, setSubmissionOpen] = useState(false);
   const [executionOpen, setExecutionOpen] = useState(false);
@@ -455,7 +497,7 @@ export default function FormsPage() {
   const [form, setForm] = useState<TemplateForm>(cloneTemplateForm());
   const [submissionNotes, setSubmissionNotes] = useState('');
   const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
-  const [execution, setExecution] = useState<ExecuteSelection>({ areaId: '', sectorId: '', templateId: '' });
+  const [execution, setExecution] = useState<ExecuteSelection>({ areaId: '', sectorId: '' });
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [executionForm, setExecutionForm] = useState({ title: '', assignedToId: '', dueDate: '', offlineEnabled: false });
@@ -465,11 +507,23 @@ export default function FormsPage() {
   const [issueForm, setIssueForm] = useState({ title: '', description: '', severity: 'MEDIUM', responsibleUserId: '', dueDate: '' });
 
   const listQuery = useQuery<FormTemplate[]>({ queryKey: ['forms', filters], queryFn: () => api<FormTemplate[]>(`/forms${toQueryString(filters)}`) });
-  const dashboardQuery = useQuery<FormsDashboard>({ queryKey: ['forms', 'dashboard'], queryFn: () => api<FormsDashboard>('/forms/dashboard') });
+  const dashboardQuery = useQuery<FormsDashboard>({ queryKey: ['forms', 'dashboard'], queryFn: () => api<FormsDashboard>('/forms/dashboard'), enabled: canDashboard });
   const optionsQuery = useQuery<FormsOptions>({ queryKey: ['forms', 'options'], queryFn: () => api<FormsOptions>('/forms/options'), staleTime: 60_000 });
-  const executionsQuery = useQuery<FormExecution[]>({ queryKey: ['forms', 'executions', executionFilters], queryFn: () => api<FormExecution[]>(`/forms/executions${toQueryString(executionFilters)}`) });
+  const executionsQuery = useQuery<FormExecution[]>({ queryKey: ['forms', 'executions', executionFilters], queryFn: () => api<FormExecution[]>(`/forms/executions${toQueryString(executionFilters)}`), enabled: canExecute });
+  // Registros de TODOS os formulários: quem preenche precisa achar o que
+  // acabou de gravar sem antes selecionar o modelo na aba Modelos.
+  const recordsQuery = useQuery<FormSubmission[]>({
+    queryKey: ['forms', 'records', recordFilters],
+    queryFn: () => api<FormSubmission[]>(`/forms/submissions${toQueryString(recordFilters)}`),
+  });
 
   const templates = useMemo(() => listQuery.data ?? [], [listQuery.data]);
+  // O técnico só vê o que dá para preencher — rascunho e obsoleto confundem.
+  const visibleTemplates = useMemo(
+    () => (canManageTemplates ? templates : templates.filter(isExecutable)),
+    [templates, canManageTemplates],
+  );
+  const records = useMemo(() => recordsQuery.data ?? [], [recordsQuery.data]);
   const dashboard = dashboardQuery.data;
   const options = optionsQuery.data;
   const selected = useMemo(() => templates.find((item) => item.id === selectedId) ?? null, [templates, selectedId]);
@@ -487,12 +541,6 @@ export default function FormsPage() {
     queryFn: () => api<BuilderPayload>(`/forms/${selectedId}/builder`),
     enabled: Boolean(selectedId && canBuilder),
   });
-  const submissionsQuery = useQuery<FormSubmission[]>({
-    queryKey: ['forms', selectedId, 'submissions'],
-    queryFn: () => api<FormSubmission[]>(`/forms/${selectedId}/submissions`),
-    enabled: Boolean(selectedId),
-  });
-
   useEffect(() => {
     const focus = searchParams.get('focus');
     if (!focus || !templates.length) return;
@@ -586,7 +634,9 @@ export default function FormsPage() {
     },
     onSuccess: ({ submission, falhas }) => {
       if (falhas > 0) toast.warning(`Registro salvo, mas ${falhas} foto(s) não subiram. Reenvie pela ficha.`);
-      else toast.success(typeof submission.score === 'number' ? `Preenchimento registrado — ${formatPercent(submission.score)} de conformidade` : 'Preenchimento registrado');
+      // Em checklist pontuado o resumo já vem em pontos ("70% — 70 de 100
+      // pontos"), que é o número que o técnico confere na hora.
+      else toast.success(submission.scoreSummary ? `Preenchimento registrado — ${submission.scoreSummary}` : 'Preenchimento registrado');
       setSubmissionOpen(false);
       setSubmissionNotes('');
       setAnswers({});
@@ -758,6 +808,7 @@ export default function FormsPage() {
             evidenceRequired: Boolean(field.evidenceRequired),
             commentRequired: Boolean(field.commentRequired),
             criticality: field.criticality ?? '',
+            weight: field.weight ? String(field.weight) : '',
             options: field.options ?? '',
             helpText: field.helpText ?? '',
           }))
@@ -770,7 +821,7 @@ export default function FormsPage() {
     setSelectedId(item.id);
     setSubmissionNotes('');
     setPhotos([]);
-    setExecution({ areaId: '', sectorId: '', templateId: item.id });
+    setExecution({ areaId: '', sectorId: '' });
     setParticipants([]);
     setAnswers(Object.fromEntries(item.fields.map((field) => [field.id, ''])));
     setSubmissionOpen(true);
@@ -828,7 +879,6 @@ export default function FormsPage() {
     });
   }
 
-  const selectedSubmissions = submissionsQuery.data ?? [];
   const selectedBuilder = builderQuery.data;
 
   return (
@@ -837,21 +887,22 @@ export default function FormsPage() {
         title="Formulários e Checklists"
         description="Modelos de listas de verificação, auditorias operacionais, registros digitais e evidências de conformidade."
         actions={
-          <div className="flex flex-wrap gap-2">
-            {selected && canExecute ? <Button variant="outline" size="sm" className="h-9 gap-1.5 border-slate-200 bg-card hover:bg-muted" onClick={() => openExecution(selected)} disabled={!isExecutable(selected)}><Play className="h-4 w-4 text-sky-500" /> Executar checklist</Button> : null}
-            {canCreate ? <Button onClick={openCreate} size="sm" className="h-9 bg-blue-600 hover:bg-blue-700 text-white font-semibold"><Plus className="mr-1.5 h-4 w-4" /> Novo modelo</Button> : null}
-          </div>
+          canCreate ? (
+            <Button onClick={openCreate} size="sm" className="h-9 bg-blue-600 hover:bg-blue-700 text-white font-semibold"><Plus className="mr-1.5 h-4 w-4" /> Novo modelo</Button>
+          ) : null
         }
       />
 
       <Tabs value={tab} onValueChange={setTab}>
+        {/* Abas de gestão só aparecem para quem gerencia: no celular do técnico
+            a tela fica em Modelos e Registros, sem construtor nem catálogos. */}
         <TabsList className="bg-slate-100 dark:bg-slate-800">
-          <TabsTrigger value="dashboard" className="text-xs font-semibold">Painel Geral</TabsTrigger>
+          {canDashboard ? <TabsTrigger value="dashboard" className="text-xs font-semibold">Painel Geral</TabsTrigger> : null}
           <TabsTrigger value="templates" className="text-xs font-semibold">Modelos</TabsTrigger>
-          <TabsTrigger value="builder" className="text-xs font-semibold">Construtor</TabsTrigger>
-          <TabsTrigger value="executions" className="text-xs font-semibold">Execuções</TabsTrigger>
+          {canBuilder ? <TabsTrigger value="builder" className="text-xs font-semibold">Construtor</TabsTrigger> : null}
+          {canExecute ? <TabsTrigger value="executions" className="text-xs font-semibold">Execuções</TabsTrigger> : null}
           <TabsTrigger value="records" className="text-xs font-semibold">Registros</TabsTrigger>
-          <TabsTrigger value="settings" className="text-xs font-semibold">Configurações</TabsTrigger>
+          {canManageTemplates ? <TabsTrigger value="settings" className="text-xs font-semibold">Configurações</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6">
@@ -906,18 +957,23 @@ export default function FormsPage() {
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-4">
-          <Filters filters={filters} setFilters={setFilters} options={options} />
-          <div className="grid gap-4">
+          <Filters filters={filters} setFilters={setFilters} options={options} showStatus={canManageTemplates} />
+          <div className="grid gap-2">
             {listQuery.isLoading ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando formulários...</CardContent></Card> : null}
-            {!listQuery.isLoading && templates.length === 0 ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhum formulário encontrado.</CardContent></Card> : null}
-            {templates.map((item) => (
+            {!listQuery.isLoading && visibleTemplates.length === 0 ? (
+              <Card><CardContent className="p-6 text-sm text-muted-foreground">
+                {canManageTemplates ? 'Nenhum formulário encontrado.' : 'Nenhum formulário publicado para preenchimento.'}
+              </CardContent></Card>
+            ) : null}
+            {visibleTemplates.map((item) => (
               <TemplateCard
                 key={item.id}
                 item={item}
                 selected={selectedId === item.id}
+                showDetails={canManageTemplates}
                 onSelect={() => setSelectedId(selectedId === item.id ? null : item.id)}
-                onSubmit={canExecute ? openSubmission : undefined}
-                onExecution={canExecute ? openExecution : undefined}
+                onFill={canFill ? openSubmission : undefined}
+                onSchedule={canExecute ? openExecution : undefined}
                 onEdit={canUpdate ? openEdit : undefined}
                 onPublish={canPublish ? (id) => publishTemplate.mutate(id) : undefined}
                 onDuplicate={canCreate ? (id) => duplicateTemplate.mutate(id) : undefined}
@@ -992,21 +1048,31 @@ export default function FormsPage() {
         </TabsContent>
 
         <TabsContent value="records" className="space-y-4">
-          <Card><CardContent className="space-y-3 p-4">
-            <SectionTitle icon={<FileCheck className="h-4 w-4" />} title={selected ? `Registros de ${selected.title}` : 'Registros operacionais'} />
-            {!selected ? <EmptyText>Selecione um modelo para ver preenchimentos, registros, evidências e pendências.</EmptyText> : null}
-            {selectedSubmissions.map((submission) => (
-              <SubmissionRecord
-                key={submission.id}
-                submission={submission}
-                onEvidence={canEvidence ? (item) => { setSelectedSubmission(item); setEvidenceOpen(true); } : undefined}
-                onSign={canExecute ? (item) => signSubmission.mutate(item) : undefined}
-                onApprove={canApprove ? (item) => { setSelectedSubmission(item); setApprovalOpen(true); } : undefined}
-                onIssue={canIssues ? (item) => { setSelectedSubmission(item); setIssueOpen(true); } : undefined}
-              />
-            ))}
-            {selected && !submissionsQuery.isLoading && !selectedSubmissions.length ? <EmptyText>Nenhum preenchimento registrado.</EmptyText> : null}
+          <Card><CardContent className="flex flex-col gap-3 p-4 md:flex-row md:flex-wrap md:items-end">
+            <Field label="Buscar"><Input value={recordFilters.search} onChange={(e) => setRecordFilters((f) => ({ ...f, search: e.target.value }))} placeholder="Código, formulário, setor ou quem preencheu" /></Field>
+            <Field label="Formulário">
+              <NativeSelect value={recordFilters.templateId} onChange={(e) => setRecordFilters((f) => ({ ...f, templateId: e.target.value }))}>
+                <option value="">Todos</option>
+                {visibleTemplates.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+              </NativeSelect>
+            </Field>
+            <Field label="De"><Input type="date" value={recordFilters.from} onChange={(e) => setRecordFilters((f) => ({ ...f, from: e.target.value }))} /></Field>
+            <Field label="Até"><Input type="date" value={recordFilters.to} onChange={(e) => setRecordFilters((f) => ({ ...f, to: e.target.value }))} /></Field>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setRecordFilters({ search: '', templateId: '', from: '', to: '' })}><X className="mr-2 h-4 w-4" /> Limpar</Button>
+              <Button variant="outline" onClick={() => downloadRecordList(records)} disabled={!records.length}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel da lista</Button>
+            </div>
           </CardContent></Card>
+
+          <div className="grid gap-2">
+            {recordsQuery.isLoading ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando registros...</CardContent></Card> : null}
+            {!recordsQuery.isLoading && !records.length ? (
+              <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhum formulário preenchido no filtro atual.</CardContent></Card>
+            ) : null}
+            {records.map((submission) => (
+              <RecordRow key={submission.id} submission={submission} onOpen={() => setRecordDetail(submission)} />
+            ))}
+          </div>
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
@@ -1041,6 +1107,15 @@ export default function FormsPage() {
       />
 
       <SubmissionDialog open={submissionOpen} setOpen={setSubmissionOpen} selected={selected} options={optionsQuery.data} execution={execution} setExecution={setExecution} participants={participants} setParticipants={setParticipants} photos={photos} setPhotos={setPhotos} notes={submissionNotes} setNotes={setSubmissionNotes} answers={answers} setAnswers={setAnswers} submit={() => submitForm.mutate()} saving={submitForm.isPending} />
+
+      <RecordDetailDialog
+        submission={recordDetail}
+        onClose={() => setRecordDetail(null)}
+        onEvidence={canEvidence ? (item) => { setSelectedSubmission(item); setEvidenceOpen(true); } : undefined}
+        onSign={canFill || canApprove ? (item) => signSubmission.mutate(item) : undefined}
+        onApprove={canApprove ? (item) => { setSelectedSubmission(item); setApprovalOpen(true); } : undefined}
+        onIssue={canIssues ? (item) => { setSelectedSubmission(item); setIssueOpen(true); } : undefined}
+      />
       <QrPrintDialog open={qrOpen} onOpenChange={setQrOpen} type="form" token={qrInfo?.token ?? null} title={qrInfo?.title ?? 'Formulário'} subtitle="Escaneie para abrir e preencher a inspeção" />
 
       <ExecutionDialog open={executionOpen} setOpen={setExecutionOpen} selected={selected} options={options} form={executionForm} setForm={setExecutionForm} save={() => createExecution.mutate()} saving={createExecution.isPending} />
@@ -1099,17 +1174,21 @@ export default function FormsPage() {
   );
 }
 
-function Filters({ filters, setFilters, options }: { filters: Record<string, string>; setFilters: (fn: any) => void; options?: FormsOptions }) {
+function Filters({ filters, setFilters, options, showStatus }: { filters: Record<string, string>; setFilters: (fn: any) => void; options?: FormsOptions; showStatus: boolean }) {
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-end">
-        <Field label="Buscar"><Input value={filters.search} onChange={(e) => setFilters((f: any) => ({ ...f, search: e.target.value }))} placeholder="Título, código, descrição, campo ou tag" /></Field>
-        <Field label="Status">
-          <NativeSelect value={filters.status} onChange={(e) => setFilters((f: any) => ({ ...f, status: e.target.value }))}>
-            <option value="">Todos</option>
-            {(options?.statuses ?? Object.keys(STATUS_LABEL)).map((status) => <option key={status} value={status}>{label(STATUS_LABEL, status)}</option>)}
-          </NativeSelect>
-        </Field>
+        <Field label="Buscar"><Input value={filters.search} onChange={(e) => setFilters((f: any) => ({ ...f, search: e.target.value }))} placeholder="Nome do formulário ou item" /></Field>
+        {/* Status só interessa a quem gerencia o modelo: o técnico só enxerga
+            formulário publicado, então o filtro seria sempre o mesmo. */}
+        {showStatus ? (
+          <Field label="Status">
+            <NativeSelect value={filters.status} onChange={(e) => setFilters((f: any) => ({ ...f, status: e.target.value }))}>
+              <option value="">Todos</option>
+              {(options?.statuses ?? Object.keys(STATUS_LABEL)).map((status) => <option key={status} value={status}>{label(STATUS_LABEL, status)}</option>)}
+            </NativeSelect>
+          </Field>
+        ) : null}
         <Field label="Tipo">
           <NativeSelect value={filters.type} onChange={(e) => setFilters((f: any) => ({ ...f, type: e.target.value }))}>
             <option value="">Todos</option>
@@ -1122,50 +1201,65 @@ function Filters({ filters, setFilters, options }: { filters: Record<string, str
   );
 }
 
-function TemplateCard({ item, selected, onSelect, onSubmit, onExecution, onEdit, onPublish, onDuplicate, onDelete }: {
+/**
+ * Linha da lista de modelos.
+ *
+ * Só o nome do formulário: quem vai preencher precisa reconhecer o checklist,
+ * não decorar código, versão, contadores e dono. Número, descrição, campos e
+ * metadados ficam no detalhe, que abre ao tocar no nome — e só para quem
+ * gerencia modelos. A ação principal (Preencher) é a única em destaque; editar,
+ * publicar, copiar, programar e excluir viram ícones, porque são do analista.
+ */
+function TemplateCard({ item, selected, showDetails, onSelect, onFill, onSchedule, onEdit, onPublish, onDuplicate, onDelete }: {
   item: FormTemplate;
   selected: boolean;
+  showDetails: boolean;
   onSelect: () => void;
-  onSubmit?: (item: FormTemplate) => void;
-  onExecution?: (item: FormTemplate) => void;
+  onFill?: (item: FormTemplate) => void;
+  onSchedule?: (item: FormTemplate) => void;
   onEdit?: (item: FormTemplate) => void;
   onPublish?: (id: string) => void;
   onDuplicate?: (id: string) => void;
   onDelete?: (id: string) => void;
 }) {
+  const executavel = isExecutable(item);
   return (
-    <Card className={cn('transition-colors', selected && 'border-primary/70 bg-primary/5')}>
-      <CardContent className="space-y-4 p-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <button type="button" className="min-w-0 text-left" onClick={onSelect}>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold">#{item.number} {item.code ? `${item.code} - ` : ''}{item.title}</span>
-              <Badge variant="outline" className={STATUS_CLASS[item.status] ?? 'border-border'}>{label(STATUS_LABEL, item.status)}</Badge>
-              <Badge variant="secondary">{label(TYPE_LABEL, item.type)}</Badge>
-              {item.version ? <Badge variant="outline">v{item.version}</Badge> : null}
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">{item.description || item.purpose || 'Sem descrição.'}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {item.orgNode?.name ?? item.process?.name ?? 'Formulário geral'}{item.indicator ? ` | Indicador: ${item.indicator.code ? `${item.indicator.code} - ` : ''}${item.indicator.name}` : ''}{item.owner ? ` | Dono: ${item.owner.name}` : ''}
-            </p>
+    <Card className={cn('transition-colors', selected && showDetails && 'border-primary/70 bg-primary/5')}>
+      <CardContent className="space-y-3 p-3 sm:p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
+            onClick={onSelect}
+            disabled={!showDetails}
+          >
+            <span className="truncate text-base font-semibold">{item.title}</span>
+            {/* Publicado é o normal e não precisa de selo; o que interessa
+                sinalizar é o que ainda não está pronto para preencher. */}
+            {!executavel ? (
+              <Badge variant="outline" className={cn('shrink-0', STATUS_CLASS[item.status] ?? 'border-border')}>{label(STATUS_LABEL, item.status)}</Badge>
+            ) : null}
           </button>
-          <div className="flex flex-wrap gap-2">
-            {onSubmit ? <Button size="sm" variant="outline" onClick={() => onSubmit(item)} disabled={!isExecutable(item) || item.fields.length === 0}><Send className="mr-2 h-4 w-4" /> Preencher</Button> : null}
-            {onExecution ? <Button size="sm" variant="outline" onClick={() => onExecution(item)} disabled={!isExecutable(item)}><Play className="mr-2 h-4 w-4" /> Execução</Button> : null}
-            {onPublish ? <Button size="sm" variant="outline" onClick={() => onPublish(item.id)} disabled={item.fields.length === 0 || item.status === 'PUBLISHED'}><CheckCircle2 className="mr-2 h-4 w-4" /> Publicar</Button> : null}
-            {onDuplicate ? <Button size="sm" variant="outline" onClick={() => onDuplicate(item.id)}><Copy className="mr-2 h-4 w-4" /> Copiar</Button> : null}
-            {onEdit ? <Button size="sm" variant="outline" onClick={() => onEdit(item)}><Edit className="mr-2 h-4 w-4" /> Editar</Button> : null}
-            {onDelete ? <Button size="sm" variant="outline" className="text-status-red" onClick={() => onDelete(item.id)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</Button> : null}
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            {onFill ? (
+              <Button
+                size="sm"
+                className="h-10 flex-1 bg-blue-600 font-semibold text-white hover:bg-blue-700 sm:h-9 sm:flex-none"
+                onClick={() => onFill(item)}
+                disabled={!executavel || item.fields.length === 0}
+                title={executavel ? 'Preencher este formulário' : 'Publique o formulário para poder preencher'}
+              >
+                <PenLine className="mr-2 h-4 w-4" /> Preencher
+              </Button>
+            ) : null}
+            {onSchedule ? <IconAction icon={Play} title="Programar execução (responsável e prazo)" onClick={() => onSchedule(item)} disabled={!executavel} /> : null}
+            {onPublish ? <IconAction icon={CheckCircle2} title="Publicar" onClick={() => onPublish(item.id)} disabled={item.fields.length === 0 || item.status === 'PUBLISHED'} /> : null}
+            {onEdit ? <IconAction icon={Edit} title="Editar" onClick={() => onEdit(item)} /> : null}
+            {onDuplicate ? <IconAction icon={Copy} title="Copiar" onClick={() => onDuplicate(item.id)} /> : null}
+            {onDelete ? <IconAction icon={Trash2} title="Excluir" danger onClick={() => onDelete(item.id)} /> : null}
           </div>
         </div>
-        <div className="grid gap-2 md:grid-cols-5">
-          <MiniStat label="Campos" value={item.fieldsCount} />
-          <MiniStat label="Obrigatorios" value={item.requiredFieldsCount ?? item.fields.filter((field) => field.required).length} />
-          <MiniStat label="Versões" value={item.versionsCount ?? item.versions?.length ?? 0} />
-          <MiniStat label="Execuções" value={item.executionsCount ?? 0} />
-          <MiniStat label="Registros" value={item.submissionsCount} />
-        </div>
-        {selected ? (
+        {selected && showDetails ? (
           <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
             <div className="space-y-2 rounded-md border bg-background/60 p-3">
               <SectionTitle icon={<ClipboardCheck className="h-4 w-4" />} title="Campos" />
@@ -1174,17 +1268,39 @@ function TemplateCard({ item, selected, onSelect, onSubmit, onExecution, onEdit,
             </div>
             <div className="space-y-2 rounded-md border bg-background/60 p-3">
               <SectionTitle icon={<History className="h-4 w-4" />} title="Versões e metadados" />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <MiniStat label="Campos" value={item.fieldsCount} />
+                <MiniStat label="Registros" value={item.submissionsCount} />
+              </div>
+              <MetaLine label="Descrição" value={item.description || item.purpose || '-'} />
+              <MetaLine label="Área" value={item.orgNode?.name ?? item.process?.name ?? 'Geral'} />
+              <MetaLine label="Indicador" value={item.indicator ? `${item.indicator.code ? `${item.indicator.code} - ` : ''}${item.indicator.name}` : '-'} />
               <MetaLine label="Tipo" value={item.typeConfig?.name ?? label(TYPE_LABEL, item.type)} />
-              <MetaLine label="Categoria" value={item.category?.name ?? '-'} />
-              <MetaLine label="Pasta" value={item.folder?.name ?? '-'} />
-              <MetaLine label="Confidencialidade" value={item.confidentiality ?? 'INTERNAL'} />
-              <MetaLine label="Tempo estimado" value={item.estimatedMinutes ? `${item.estimatedMinutes} min` : '-'} />
+              <MetaLine label="Versão" value={item.version ? `rev ${item.version}` : '-'} />
+              <MetaLine label="Dono" value={item.owner?.name ?? '-'} />
               <MiniList title="Tags" items={item.tags ?? []} empty="Sem tags." />
             </div>
           </div>
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+/** Ação secundária: ícone com tooltip, para não competir com "Preencher". */
+function IconAction({ icon: Icon, title, onClick, disabled, danger }: { icon: typeof Edit; title: string; onClick: () => void; disabled?: boolean; danger?: boolean }) {
+  return (
+    <Button
+      size="icon"
+      variant="outline"
+      className={cn('h-9 w-9', danger && 'text-status-red')}
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <Icon className="h-4 w-4" />
+    </Button>
   );
 }
 
@@ -1218,42 +1334,168 @@ function ExecutionRow({ execution, onResponses, onComplete }: { execution: FormE
   );
 }
 
-function SubmissionRecord({ submission, onEvidence, onSign, onApprove, onIssue }: {
-  submission: FormSubmission;
+/**
+ * Linha da aba Registros: o formulário preenchido como o usuário o procura —
+ * pelo nome do checklist, pelo setor e pela data. Abrir mostra a ficha inteira;
+ * PDF e Excel saem direto daqui, para conferência posterior.
+ */
+function RecordRow({ submission, onOpen }: { submission: FormSubmission; onOpen: () => void }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+        <button type="button" className="min-w-0 flex-1 text-left" onClick={onOpen}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate font-semibold">{submission.template?.title ?? submission.title ?? 'Preenchimento'}</span>
+            <Badge variant="outline" className="shrink-0">{label(SUBMISSION_LABEL, submission.status)}</Badge>
+            {typeof submission.score === 'number' ? (
+              <Badge variant="outline" className={cn('shrink-0', submission.score >= 90 ? 'border-emerald-300 text-emerald-700' : submission.score >= 70 ? 'border-amber-300 text-amber-700' : 'border-red-300 text-red-700')}>
+                {formatPercent(submission.score)}
+                {submission.usesWeights ? ` · ${formatNumber(submission.points)}/${formatNumber(submission.pointsTotal)} pts` : ''}
+              </Badge>
+            ) : null}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {[submission.code, submission.orgNode?.name, submission.submittedBy?.name, formatDate(recordDate(submission))].filter(Boolean).join(' · ')}
+          </p>
+        </button>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          <Button size="sm" variant="outline" className="h-9" onClick={onOpen}><FileCheck className="mr-2 h-4 w-4" /> Ver</Button>
+          <IconAction icon={FileDown} title="Baixar em PDF" onClick={() => downloadRecordPdf(submission)} />
+          <IconAction icon={FileSpreadsheet} title="Baixar em Excel" onClick={() => downloadRecordXlsx(submission)} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Ficha do preenchimento: o que foi respondido, por quem, com foto e anexos. */
+function RecordDetailDialog({ submission, onClose, onEvidence, onSign, onApprove, onIssue }: {
+  submission: FormSubmission | null;
+  onClose: () => void;
   onEvidence?: (submission: FormSubmission) => void;
   onSign?: (submission: FormSubmission) => void;
   onApprove?: (submission: FormSubmission) => void;
   onIssue?: (submission: FormSubmission) => void;
 }) {
+  const participants = recordParticipants(submission);
   return (
-    <div className="space-y-3 rounded-md border p-3">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{submission.code ? `${submission.code} - ` : ''}{submission.title || 'Preenchimento'}</span>
-            <Badge variant="outline">{label(SUBMISSION_LABEL, submission.status)}</Badge>
-            {submission.templateVersion ? <Badge variant="secondary">v{submission.templateVersion.versionLabel}</Badge> : null}
-            {submission.operationalRecord ? <Badge variant="outline">{submission.operationalRecord.code}</Badge> : null}
+    <Dialog open={Boolean(submission)} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
+        <DialogHeader><DialogTitle>{submission?.template?.title ?? 'Formulário preenchido'}</DialogTitle></DialogHeader>
+        {submission ? (
+          <div className="space-y-4 py-2">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <MetaLine label="Registro" value={submission.code ?? '-'} />
+              <MetaLine label="Área / Setor" value={submission.orgNode?.name ?? '-'} />
+              <MetaLine label="Preenchido por" value={submission.submittedBy?.name ?? '-'} />
+              <MetaLine label="Data" value={formatDate(recordDate(submission))} />
+              <MetaLine label="Situação" value={label(SUBMISSION_LABEL, submission.status)} />
+              <MetaLine
+                label={submission.usesWeights ? 'Pontuação' : 'Conformidade'}
+                value={submission.scoreSummary ?? (typeof submission.score === 'number' ? formatPercent(submission.score) : '-')}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <SectionTitle icon={<ClipboardCheck className="h-4 w-4" />} title="Respostas" />
+              {submission.answers.map((answer, index) => (
+                <div key={answer.id} className="rounded-md border px-3 py-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">{index + 1}. {answer.fieldLabel}</p>
+                    {/* Quanto o item valia e quanto ele rendeu — é o que
+                        permite conferir o percentual item a item. Pergunta sem
+                        nota é marcada como tal, e não como "0 pontos". */}
+                    {submission.usesWeights ? (
+                      typeof answer.score === 'number' ? (
+                        <Badge variant="outline" className="shrink-0 text-[10px] font-semibold">
+                          {formatNumber(answer.score)} / {formatNumber(fieldNote(answer))}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="shrink-0 border-dashed text-[10px] text-muted-foreground">
+                          {fieldNote(answer) === null ? 'Sem nota' : 'Fora da conta'}
+                        </Badge>
+                      )
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5 break-words text-sm font-medium">{answer.value || '—'}</p>
+                </div>
+              ))}
+              {!submission.answers.length ? <EmptyText>Sem respostas registradas.</EmptyText> : null}
+            </div>
+
+            {participants.length ? (
+              <div className="space-y-2">
+                <SectionTitle icon={<ListChecks className="h-4 w-4" />} title="Participantes" />
+                {participants.map((person, index) => (
+                  <div key={`${person.registrationId ?? index}`} className="rounded-md border px-3 py-2 text-sm">
+                    <span className="font-medium">{person.name ?? 'Participante'}</span>
+                    <span className="text-muted-foreground">{[person.registrationId, person.jobTitle, person.managerName].filter(Boolean).length ? ` — ${[person.registrationId, person.jobTitle, person.managerName].filter(Boolean).join(' · ')}` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {submission.notes ? <MetaLine label="Observações" value={submission.notes} /> : null}
+
+            <div className="space-y-2">
+              <SectionTitle icon={<Paperclip className="h-4 w-4" />} title="Evidências e fotos" />
+              {(submission.evidence ?? []).length ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(submission.evidence as RecordEvidence[]).map((item) => (
+                    <EvidenceThumb key={item.id} evidence={item} />
+                  ))}
+                </div>
+              ) : <EmptyText>Sem fotos ou anexos neste registro.</EmptyText>}
+            </div>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">{submission.submittedBy?.name ?? 'Usuário'} | {formatDate(submission.submittedAt ?? submission.completedAt ?? submission.reviewedAt)}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {onEvidence ? <Button size="sm" variant="outline" onClick={() => onEvidence(submission)}><Paperclip className="mr-2 h-4 w-4" /> Evidência</Button> : null}
-          {onSign ? <Button size="sm" variant="outline" onClick={() => onSign(submission)}><PenLine className="mr-2 h-4 w-4" /> Assinar</Button> : null}
-          {onApprove ? <Button size="sm" variant="outline" onClick={() => onApprove(submission)}><ShieldCheck className="mr-2 h-4 w-4" /> Aprovar</Button> : null}
-          {onIssue ? <Button size="sm" variant="outline" onClick={() => onIssue(submission)}><ListChecks className="mr-2 h-4 w-4" /> Pendência</Button> : null}
-        </div>
-      </div>
-      <div className="grid gap-2 md:grid-cols-5">
-        <MiniStat label="Respostas" value={submission.answersCount} />
-        <MiniStat label="Evidências" value={submission.evidenceCount ?? submission.evidence?.length ?? 0} />
-        <MiniStat label="Assinaturas" value={submission.signaturesCount ?? submission.signatures?.length ?? 0} />
-        <MiniStat label="Aprovações" value={submission.approvalsCount ?? submission.approvals?.length ?? 0} />
-        <MiniStat label="Pendências" value={submission.openIssues ?? submission.issues?.length ?? 0} />
-      </div>
-      <div className="grid gap-2 md:grid-cols-2">
-        {submission.answers.slice(0, 6).map((answer) => <MetaLine key={answer.id} label={answer.fieldLabel} value={answer.value ?? '-'} />)}
-      </div>
+        ) : null}
+        <DialogFooter className="flex-wrap gap-2">
+          {submission && onEvidence ? <Button size="sm" variant="outline" onClick={() => onEvidence(submission)}><Paperclip className="mr-2 h-4 w-4" /> Evidência</Button> : null}
+          {submission && onSign ? <Button size="sm" variant="outline" onClick={() => onSign(submission)}><PenLine className="mr-2 h-4 w-4" /> Assinar</Button> : null}
+          {submission && onApprove ? <Button size="sm" variant="outline" onClick={() => onApprove(submission)}><ShieldCheck className="mr-2 h-4 w-4" /> Aprovar</Button> : null}
+          {submission && onIssue ? <Button size="sm" variant="outline" onClick={() => onIssue(submission)}><ListChecks className="mr-2 h-4 w-4" /> Pendência</Button> : null}
+          {submission ? <Button size="sm" variant="outline" onClick={() => downloadRecordPdf(submission)}><FileDown className="mr-2 h-4 w-4" /> PDF</Button> : null}
+          {submission ? <Button size="sm" variant="outline" onClick={() => downloadRecordXlsx(submission)}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel</Button> : null}
+          <Button size="sm" onClick={onClose}>Fechar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Miniatura da evidência: a imagem exige Bearer, então vem por fetch autenticado. */
+function EvidenceThumb({ evidence }: { evidence: RecordEvidence }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const isImage = (evidence.mimeType ?? '').startsWith('image/');
+
+  useEffect(() => {
+    if (!isImage) return;
+    let url: string | null = null;
+    let cancelled = false;
+    (async () => {
+      const token = getAccessToken();
+      try {
+        const res = await fetch(`${API_URL}/forms/evidence/${evidence.id}/content`, { headers: token ? { authorization: `Bearer ${token}` } : undefined });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        if (cancelled) return;
+        url = URL.createObjectURL(blob);
+        setSrc(url);
+      } catch {
+        /* miniatura é acessório: falhou, mostra só o nome do arquivo */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [evidence.id, isImage]);
+
+  return (
+    <div className="overflow-hidden rounded-md border">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {src ? <img src={src} alt={evidence.fileName ?? 'Evidência'} className="h-40 w-full object-cover" /> : null}
+      <p className="truncate px-3 py-2 text-xs text-muted-foreground">{evidence.description || evidence.fileName || 'Anexo'}</p>
     </div>
   );
 }
@@ -1275,6 +1517,21 @@ function TemplateDialog({ open, setOpen, editing, form, setForm, options, update
 }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const optionTypes = new Set(['SELECT', 'MULTISELECT', 'RADIO', 'CHECKBOX']);
+  // Total de pontos do modelo; `null` quando ninguém pontuou nada (aí a tela
+  // não fala de nota, para não sugerir uma configuração que não existe).
+  const scoreTotal = useMemo(() => {
+    const notas = form.fields
+      .filter((field) => SCORABLE_TYPES.has(field.type))
+      .map((field) => parseWeight(field.weight));
+    if (!notas.some((nota) => nota !== null)) return null;
+    return notas.reduce((total: number, nota) => total + (nota ?? 0), 0);
+  }, [form.fields]);
+
+  // Perguntas de avaliação que ficaram de fora por não ter nota.
+  const semNota = useMemo(
+    () => form.fields.filter((field) => SCORABLE_TYPES.has(field.type) && parseWeight(field.weight) === null).length,
+    [form.fields],
+  );
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto bg-slate-50 p-0 dark:bg-slate-950">
@@ -1354,6 +1611,31 @@ Não se aplica" />
                       <label className="flex items-center gap-1.5"><input type="checkbox" checked={field.required} onChange={(e) => updateField(index, { required: e.target.checked })} /> Obrigatório</label>
                       <label className="flex items-center gap-1.5"><input type="checkbox" checked={field.evidenceRequired} onChange={(e) => updateField(index, { evidenceRequired: e.target.checked })} /> Exige evidência</label>
                       <label className="flex items-center gap-1.5"><input type="checkbox" checked={field.commentRequired} onChange={(e) => updateField(index, { commentRequired: e.target.checked })} /> Exige comentário</label>
+                      {/* Nota da pergunta: só faz sentido em item de avaliação —
+                          texto, foto e data são registro, não entram na conta. */}
+                      {SCORABLE_TYPES.has(field.type) ? (
+                        <label
+                          className="flex items-center gap-1.5"
+                          title="Quanto esta pergunta vale no resultado. Deixe em branco para a pergunta não pontuar."
+                        >
+                          Nota
+                          <Input
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={field.weight}
+                            onChange={(e) => updateField(index, { weight: e.target.value })}
+                            placeholder="—"
+                            className="h-8 w-20 text-xs"
+                          />
+                          {/* Enquanto ninguém pontuou nada, "sem nota" não quer
+                              dizer nada: todas valem igual. A partir da primeira
+                              nota, o aviso passa a ser informação real. */}
+                          {scoreTotal !== null && !field.weight.trim() ? (
+                            <span className="text-xs text-muted-foreground">não pontua</span>
+                          ) : null}
+                        </label>
+                      ) : null}
                       <label className="flex items-center gap-1.5">
                         Criticidade
                         <NativeSelect value={field.criticality} onChange={(e) => updateField(index, { criticality: e.target.value })} className="h-8 w-28 text-xs">
@@ -1423,7 +1705,18 @@ Não se aplica" />
           </div>
         </div>
         <DialogFooter className="sticky bottom-0 border-t bg-white px-6 py-3 dark:bg-slate-900">
-          <span className="mr-auto self-center text-xs text-muted-foreground">{form.fields.length} pergunta(s)</span>
+          <span className="mr-auto self-center text-xs text-muted-foreground">
+            {form.fields.length} pergunta(s)
+            {/* Soma das notas: o autor precisa ver se o checklist fecha em 100.
+                Não é obrigatório fechar — o resultado é sempre percentual —,
+                mas fechar em 100 deixa "nota = ponto" e evita confusão. */}
+            {scoreTotal !== null ? (
+              <> · <strong>{formatNumber(scoreTotal)}</strong> pontos no total
+                {semNota > 0 ? ` · ${semNota} pergunta(s) sem nota (não pontuam)` : ''}
+                {scoreTotal !== 100 ? ' — o resultado é percentual, não precisa fechar em 100' : ''}
+              </>
+            ) : null}
+          </span>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
           <Button onClick={save} disabled={!form.title.trim() || saving}><Save className="mr-2 h-4 w-4" /> {saving ? 'Salvando...' : 'Salvar formulário'}</Button>
         </DialogFooter>
@@ -1453,21 +1746,27 @@ function SubmissionDialog({ open, setOpen, selected, options, execution, setExec
   const isHeader = headerFieldFilter(selected?.sections);
   const headerFields = (selected?.fields ?? []).filter(isHeader);
   const questionFields = (selected?.fields ?? []).filter((field) => !isHeader(field));
+  // Modelo pontuado = alguma pergunta tem nota. Só então a tela fala de pontos;
+  // em checklist comum isso seria ruído na mão de quem está em campo.
+  const notas = questionFields.filter(isScorable).map(fieldNote);
+  const pontosDoModelo = notas.some((nota) => nota !== null)
+    ? notas.reduce((total: number, nota) => total + (nota ?? 0), 0)
+    : 0;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
-        <DialogHeader><DialogTitle>Preencher {selected?.title}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Preencher {selected?.title}</DialogTitle>
+          {pontosDoModelo > 0 ? (
+            <p className="text-xs text-muted-foreground">Checklist pontuado: {formatNumber(pontosDoModelo)} pontos no total. O resultado é o percentual dos pontos obtidos.</p>
+          ) : null}
+        </DialogHeader>
         <div className="grid gap-4 py-2">
           {/* Onde a inspeção está sendo feita: define a qual indicador o
-              resultado vai somar. */}
+              resultado vai somar. O formulário já foi escolhido em "Preencher". */}
           <div className="rounded-lg border p-3">
-            <ExecutePicker
-              nodes={options?.orgNodes ?? []}
-              forms={selected ? [{ id: selected.id, title: selected.title, version: selected.version, code: selected.code }] : []}
-              value={execution}
-              onChange={setExecution}
-            />
+            <ExecutePicker nodes={options?.orgNodes ?? []} value={execution} onChange={setExecution} />
           </div>
 
           {/* Cabecalho: contexto do registro, sem numeracao — nao sao perguntas. */}
@@ -1483,9 +1782,14 @@ function SubmissionDialog({ open, setOpen, selected, options, execution, setExec
               </div>
             </div>
           )}
-          {/* Perguntas: numeradas de 1 em diante, pela posicao na lista. */}
+          {/* Perguntas: numeradas de 1 em diante, pela posicao na lista.
+              Quando o modelo é pontuado, cada uma mostra quanto vale. */}
           {questionFields.map((field, index) => (
-            <Field key={field.id} label={`${questionNumber(field, index)}. ${field.label}${field.required ? ' *' : ''}`}>
+            <Field
+              key={field.id}
+              label={`${questionNumber(field, index)}. ${field.label}${field.required ? ' *' : ''}`}
+              hint={pontosDoModelo > 0 && isScorable(field) ? notaHint(field) : undefined}
+            >
               <AnswerInput field={field} value={answers[field.id] ?? ''} onChange={(value) => setAnswers((current: Record<string, string>) => ({ ...current, [field.id]: value }))} />
             </Field>
           ))}
@@ -1520,9 +1824,11 @@ function ExecutionDialog({ open, setOpen, selected, options, form, setForm, save
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-xl">
-        <DialogHeader><DialogTitle>Criar execução</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Programar execução</DialogTitle></DialogHeader>
         <div className="grid gap-3 py-2">
-          <p className="text-sm text-muted-foreground">{selected?.title}</p>
+          <p className="text-sm text-muted-foreground">
+            {selected?.title} — atribui o checklist a um responsável com prazo. Para responder agora, use <strong>Preencher</strong>.
+          </p>
           <Field label="Título"><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
           <Field label="Responsável"><NativeSelect value={form.assignedToId} onChange={(e) => setForm({ ...form, assignedToId: e.target.value })}><option value="">Sem responsável</option>{options?.users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</NativeSelect></Field>
           <Field label="Prazo"><Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></Field>
@@ -1562,8 +1868,42 @@ function ExecutionResponseDialog({ open, setOpen, execution, template, answers, 
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="grid min-w-0 flex-1 gap-2"><Label>{label}</Label>{children}</div>;
+function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+  return (
+    <div className="grid min-w-0 flex-1 gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <Label>{label}</Label>
+        {hint ? <Badge variant="outline" className="shrink-0 text-[10px] font-semibold">{hint}</Badge> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** A pergunta é do tipo que pode pontuar? (espelha SCORABLE_TYPES) */
+function isScorable(field: { type: FieldType }): boolean {
+  return SCORABLE_TYPES.has(field.type);
+}
+
+/**
+ * Nota da pergunta, ou `null` quando ela não tem nota.
+ * Espelha `noteOf` de form-scoring.logic.ts no backend.
+ */
+function fieldNote(field: { weight?: number | null }): number | null {
+  const parsed = Number(field.weight);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+/**
+ * Selo da pergunta em checklist pontuado.
+ *
+ * "Sem nota" precisa ser dito: o técnico tem de saber que aquela pergunta ele
+ * responde, mas ela não muda o resultado — senão vai achar que reprovar ali
+ * derrubou a inspeção.
+ */
+function notaHint(field: { weight?: number | null }): string {
+  const nota = fieldNote(field);
+  return nota === null ? 'Sem nota' : `Nota ${formatNumber(nota)}`;
 }
 
 function SectionTitle({ icon, title }: { icon: ReactNode; title: string }) {
@@ -1588,6 +1928,7 @@ function FieldPreview({ field }: { field: FormField }) {
         {field.code ? <Badge variant="outline">{field.code}</Badge> : null}
         {field.required ? <Badge variant="outline" className="border-red-300 text-red-700">Obrigatorio</Badge> : null}
         {field.evidenceRequired ? <Badge variant="outline" className="border-amber-300 text-amber-700">Evidência</Badge> : null}
+        {isScorable(field) && fieldNote(field) !== null ? <Badge variant="outline" className="border-blue-300 text-blue-700">Nota {formatNumber(fieldNote(field))}</Badge> : null}
       </div>
       {field.helpText ? <p className="mt-1 text-sm text-muted-foreground">{field.helpText}</p> : null}
       {field.options ? <p className="mt-1 text-xs text-muted-foreground">Opções: {splitOptions(field.options).join(', ')}</p> : null}
@@ -1679,11 +2020,26 @@ function templatePayload(form: TemplateForm) {
         evidenceRequired: field.evidenceRequired,
         commentRequired: field.commentRequired,
         criticality: field.criticality || null,
+        // Nota da pergunta; `null` = sem nota (fica fora da pontuação).
+        weight: parseWeight(field.weight),
         options: field.options || null,
         helpText: field.helpText || null,
       })),
     ],
   };
+}
+
+/**
+ * Nota digitada pelo autor, ou `null` quando ele deixou em branco.
+ *
+ * "Em branco" é uma resposta legítima: nem toda pergunta tem nota. Converter
+ * para 1 daria um ponto escondido à pergunta que o autor decidiu não pontuar.
+ */
+function parseWeight(value: string): number | null {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  const parsed = Number(text.replace(',', '.'));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 /**
@@ -1703,6 +2059,72 @@ function questionNumber(field: { metadata?: unknown }, index: number): string {
 /** Percentual de conformidade em pt-BR (ex.: 97,1%). */
 function formatPercent(value: number): string {
   return `${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
+}
+
+/** Data que o usuário reconhece como "quando isso foi preenchido". */
+function recordDate(submission: FormSubmission): string | null {
+  return submission.completedAt ?? submission.submittedAt ?? submission.createdAt ?? submission.reviewedAt ?? null;
+}
+
+/** Participantes chegam como Json do banco: só confia se vier como lista. */
+function recordParticipants(submission: FormSubmission | null): RecordParticipant[] {
+  if (!submission || !Array.isArray(submission.participants)) return [];
+  return (submission.participants as RecordParticipant[]).filter((item) => item && typeof item === 'object');
+}
+
+/** Registro no formato que os exportadores (PDF/Excel) entendem. */
+function toExportable(submission: FormSubmission): ExportableRecord {
+  return {
+    id: submission.id,
+    code: submission.code ?? null,
+    title: submission.title,
+    status: submission.status,
+    statusLabel: label(SUBMISSION_LABEL, submission.status),
+    templateTitle: submission.template?.title ?? submission.title ?? 'Formulário',
+    templateVersion: submission.templateVersion?.versionLabel ?? submission.template?.version ?? null,
+    orgNodeName: submission.orgNode?.name ?? null,
+    submittedByName: submission.submittedBy?.name ?? null,
+    filledAt: recordDate(submission),
+    score: submission.score ?? null,
+    points: submission.points ?? null,
+    pointsTotal: submission.pointsTotal ?? null,
+    usesWeights: Boolean(submission.usesWeights),
+    notes: submission.notes,
+    answers: submission.answers.map((answer) => ({
+      id: answer.id,
+      fieldLabel: answer.fieldLabel,
+      fieldType: answer.fieldType ?? null,
+      value: answer.value,
+      weight: answer.weight ?? null,
+      points: answer.score ?? null,
+    })),
+    participants: recordParticipants(submission),
+    evidence: (submission.evidence ?? []) as RecordEvidence[],
+  };
+}
+
+async function downloadRecordPdf(submission: FormSubmission) {
+  try {
+    await exportRecordPdf(toExportable(submission));
+  } catch {
+    toast.error('Não foi possível gerar o PDF do registro.');
+  }
+}
+
+async function downloadRecordXlsx(submission: FormSubmission) {
+  try {
+    await exportRecordXlsx(toExportable(submission));
+  } catch {
+    toast.error('Não foi possível gerar o Excel do registro.');
+  }
+}
+
+async function downloadRecordList(submissions: FormSubmission[]) {
+  try {
+    await exportRecordListXlsx(submissions.map(toExportable));
+  } catch {
+    toast.error('Não foi possível gerar a planilha da lista.');
+  }
 }
 
 /** O campo pertence ao cabeçalho? (evita duplicá-lo na lista de perguntas) */

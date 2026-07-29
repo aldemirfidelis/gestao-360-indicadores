@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyAnswer, conformityScore, conformitySummary } from './form-scoring.logic';
+import { classifyAnswer, conformityScore, conformitySummary, effectiveWeight, scoreSheet } from './form-scoring.logic';
 
 const conforme = (n: number) => Array.from({ length: n }, () => ({ fieldType: 'CONFORMITY', value: 'Conforme' }));
 
@@ -107,6 +107,131 @@ describe('conformityScore', () => {
   });
 });
 
+describe('nota por pergunta', () => {
+  it('a nota do modelo define quanto o item vale na conta', () => {
+    // Nota 30 + nota 30 + nota 40; só a de 40 reprovada => 60 de 100 = 60%.
+    const resultado = conformityScore([
+      { fieldType: 'CONFORMITY', value: 'Conforme', weight: 30 },
+      { fieldType: 'CONFORMITY', value: 'Conforme', weight: 30 },
+      { fieldType: 'CONFORMITY', value: 'Não conforme', weight: 40 },
+    ]);
+    expect(resultado.percent).toBe(60);
+    expect(resultado.pesoConforme).toBe(60);
+    expect(resultado.pesoAvaliado).toBe(100);
+    expect(resultado.usaNotas).toBe(true);
+  });
+
+  it('item não aplicável devolve os pontos dele ao total, mantendo o 100%', () => {
+    // Se a pergunta de nota 40 não se aplica, disputam-se só 60 pontos.
+    const resultado = conformityScore([
+      { fieldType: 'CONFORMITY', value: 'Conforme', weight: 30 },
+      { fieldType: 'CONFORMITY', value: 'Conforme', weight: 30 },
+      { fieldType: 'CONFORMITY', value: 'N/A', weight: 40 },
+    ]);
+    expect(resultado.percent).toBe(100);
+    expect(resultado.pesoAvaliado).toBe(60);
+  });
+
+  it('a nota escrita manda; criticidade só vale quando não há nota', () => {
+    // Sem nota, crítico continua pesando 3 (comportamento antigo preservado).
+    expect(effectiveWeight(null, true)).toBe(3);
+    expect(effectiveWeight(null, false)).toBe(1);
+    // Com nota, o número do autor prevalece — 30 crítico vale 30, não 90.
+    expect(effectiveWeight(30, true)).toBe(30);
+    expect(effectiveWeight(1, true)).toBe(1);
+  });
+
+  it('modelo sem nota nenhuma não é marcado como pontuado', () => {
+    expect(conformityScore(conforme(3)).usaNotas).toBe(false);
+    // Crítico sozinho não é "nota": quem definiu peso foi o sistema, não o autor.
+    expect(conformityScore([{ fieldType: 'CONFORMITY', value: 'Conforme', critical: true }]).usaNotas).toBe(false);
+  });
+
+  it('scoreSheet: conforme ganha a nota inteira, reprovado zera, o resto é null', () => {
+    const { items } = scoreSheet([
+      { fieldType: 'CONFORMITY', value: 'Conforme', weight: 30 },
+      { fieldType: 'CONFORMITY', value: 'Não conforme', weight: 30 },
+      // N/A, sem resposta e campo de registro não valem ponto nenhum.
+      { fieldType: 'CONFORMITY', value: 'N/A', weight: 30 },
+      { fieldType: 'CONFORMITY', value: '', weight: 30 },
+      { fieldType: 'TEXT', value: 'observação', weight: 30 },
+    ]);
+    expect(items.map((item) => item.points)).toEqual([30, 0, null, null, null]);
+  });
+});
+
+describe('pergunta sem nota', () => {
+  // Regra do usuário: nem toda pergunta tem nota. Num checklist pontuado, a
+  // pergunta sem nota é respondida mas fica fora do resultado.
+  const misto = [
+    { fieldType: 'CONFORMITY', value: 'Conforme', weight: 70 },
+    { fieldType: 'CONFORMITY', value: 'Não conforme', weight: 30 },
+    { fieldType: 'CONFORMITY', value: 'Não conforme', weight: null },
+    { fieldType: 'CONFORMITY', value: 'Conforme' },
+  ];
+
+  it('num checklist pontuado, só as perguntas com nota entram no resultado', () => {
+    const resultado = conformityScore(misto);
+    // 70 de 100: as duas sem nota não somaram nem subtraíram nada.
+    expect(resultado.percent).toBe(70);
+    expect(resultado.pesoAvaliado).toBe(100);
+    expect(resultado.semNota).toBe(2);
+    expect(resultado.usaNotas).toBe(true);
+  });
+
+  it('a pergunta sem nota não recebe pontos, nem zero', () => {
+    const { items } = scoreSheet(misto);
+    expect(items.map((item) => item.points)).toEqual([70, 0, null, null]);
+    expect(items.map((item) => item.outOfScore)).toEqual([false, false, true, true]);
+    // Uma reprovação sem nota não vira "0 de 0" no relatório: ela está fora.
+    expect(items[2].note).toBeNull();
+  });
+
+  it('sem nota nenhuma no modelo, todas as perguntas valem igual (checklist comum)', () => {
+    const resultado = conformityScore([
+      { fieldType: 'CONFORMITY', value: 'Conforme' },
+      { fieldType: 'CONFORMITY', value: 'Conforme' },
+      { fieldType: 'CONFORMITY', value: 'Não conforme' },
+    ]);
+    expect(resultado.percent).toBe(66.7);
+    expect(resultado.semNota).toBe(0);
+    expect(resultado.usaNotas).toBe(false);
+  });
+
+  it('formulário antigo (tudo com nota 1) continua sendo checklist comum', () => {
+    // O default antigo da coluna era 1: sem isso, todo modelo já existente
+    // passaria a exibir "pontos" de uma hora para outra.
+    const resultado = conformityScore([
+      { fieldType: 'CONFORMITY', value: 'Conforme', weight: 1 },
+      { fieldType: 'CONFORMITY', value: 'Não conforme', weight: 1 },
+    ]);
+    expect(resultado.percent).toBe(50);
+    expect(resultado.usaNotas).toBe(false);
+  });
+
+  it('só as perguntas escolhidas pontuam, mesmo com nota 1', () => {
+    // Autor quis "só estas duas contam" sem inventar pesos.
+    const resultado = conformityScore([
+      { fieldType: 'CONFORMITY', value: 'Conforme', weight: 1 },
+      { fieldType: 'CONFORMITY', value: 'Não conforme', weight: 1 },
+      { fieldType: 'CONFORMITY', value: 'Não conforme', weight: null },
+    ]);
+    expect(resultado.percent).toBe(50);
+    expect(resultado.usaNotas).toBe(true);
+    expect(resultado.semNota).toBe(1);
+  });
+
+  it('item crítico sem nota não é promovido a nota num checklist pontuado', () => {
+    const resultado = conformityScore([
+      { fieldType: 'CONFORMITY', value: 'Conforme', weight: 50 },
+      { fieldType: 'CONFORMITY', value: 'Não conforme', critical: true },
+    ]);
+    // O crítico ficou fora: quem pontua é a nota, e ele não tem nota.
+    expect(resultado.percent).toBe(100);
+    expect(resultado.semNota).toBe(1);
+  });
+});
+
 describe('conformitySummary', () => {
   it('resume em uma linha legível', () => {
     expect(conformitySummary(conformityScore([...conforme(33), { fieldType: 'CONFORMITY', value: 'NC' }]))).toBe(
@@ -121,5 +246,15 @@ describe('conformitySummary', () => {
 
   it('sem item avaliável, diz isso em vez de 0%', () => {
     expect(conformitySummary(conformityScore([]))).toBe('Sem itens avaliáveis');
+  });
+
+  it('com notas, resume em pontos — que é o que o usuário conferiu', () => {
+    const resumo = conformitySummary(
+      conformityScore([
+        { fieldType: 'CONFORMITY', value: 'Conforme', weight: 70 },
+        { fieldType: 'CONFORMITY', value: 'NC', weight: 30 },
+      ]),
+    );
+    expect(resumo).toBe('70% — 70 de 100 pontos');
   });
 });

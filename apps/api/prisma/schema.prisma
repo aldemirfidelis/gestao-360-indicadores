@@ -4243,7 +4243,9 @@ model FormField {
   maxValue          Float?
   minLength         Int?
   maxLength         Int?
-  weight            Float                @default(1)
+  /// Nota da pergunta no resultado. `null` = pergunta SEM nota: e respondida,
+  /// mas nao soma nem subtrai ponto quando o checklist e pontuado.
+  weight            Float?
   score             Float?
   criticality       String?
   validation        Json?
@@ -4355,6 +4357,12 @@ model FormAnswer {
   valueJson        Json?
   valueNumber      Float?
   valueDate        DateTime?
+  /// Nota da pergunta no modelo NO MOMENTO do preenchimento. Congelada aqui
+  /// para o registro continuar conferindo se o modelo for repontuado depois.
+  /// `null` = a pergunta nao tinha nota.
+  weight           Float?
+  /// Pontos obtidos no item: a nota quando conforme, 0 quando reprovado e null
+  /// quando o item nao disputa pontos (N/A, sem resposta ou campo de registro).
   score            Float?
   critical         Boolean              @default(false)
   requiresEvidence Boolean              @default(false)

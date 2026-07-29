@@ -157,7 +157,10 @@ export const PERMISSION_CATALOG = [
   ['forms:builder', 'Usar construtor de formularios', 'Formularios', 'update'],
   ['forms:versions', 'Criar e revisar versoes de templates', 'Formularios', 'update'],
   ['forms:publish', 'Publicar templates de formulario', 'Formularios', 'publish'],
-  ['forms:execute', 'Criar execucoes e preencher formularios', 'Formularios', 'update'],
+  // Preencher e programar sao coisas diferentes: o tecnico de campo so preenche
+  // (quase sempre pelo celular), quem programa/agenda a execucao e o analista.
+  ['forms:fill', 'Preencher formularios e checklists em campo', 'Formularios', 'update'],
+  ['forms:execute', 'Programar execucoes de formularios', 'Formularios', 'update'],
   ['forms:records', 'Visualizar registros operacionais', 'Formularios', 'view'],
   ['forms:evidence', 'Anexar evidencias de preenchimento', 'Formularios', 'update'],
   ['forms:approve', 'Aprovar registros de formularios', 'Formularios', 'approve'],
@@ -556,6 +559,7 @@ export const DEFAULT_PROFILES = [
       'forms:builder',
       'forms:versions',
       'forms:publish',
+      'forms:fill',
       'forms:execute',
       'forms:records',
       'forms:evidence',
@@ -712,6 +716,7 @@ export const DEFAULT_PROFILES = [
       'forms:create',
       'forms:update',
       'forms:dashboard',
+      'forms:fill',
       'forms:execute',
       'forms:records',
       'forms:evidence',
@@ -823,6 +828,16 @@ export const DEFAULT_PROFILES = [
       'directory:view',
       'help:view',
     ],
+  },
+  {
+    // Perfil de campo: o tecnico so PREENCHE checklist, quase sempre num celular
+    // ou tablet compartilhado. Nao cria, nao edita, nao publica e nao copia
+    // modelo — isso e do analista. Ve os proprios registros para conferencia.
+    code: 'TECNICO_CHECKLIST',
+    name: 'Técnico (Preenchimento de Checklist)',
+    role: 'COLLABORATOR',
+    description: 'Acesso de campo: abre a lista de formulários publicados e preenche a inspeção pelo celular, com foto e participantes.',
+    permissions: ['forms:view', 'forms:fill', 'forms:records', 'forms:evidence', 'directory:view', 'help:view'],
   },
   {
     code: 'OPERADOR_DADOS',
