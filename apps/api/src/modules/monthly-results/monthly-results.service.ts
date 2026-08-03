@@ -58,6 +58,8 @@ type SnapshotMode = 'period' | 'latest';
 // Cabeçalho da apresentação: chave única por empresa em AppSetting.
 const PRESENTATION_HEADER_KEY = 'monthly.presentation.header';
 const MAX_HEADER_IMAGE_BYTES = 2 * 1024 * 1024;
+/** Mesmo corpo que o gráfico usa fora da apresentação. */
+const DEFAULT_CHART_LABEL_SIZE = 10;
 
 export interface PresentationBranding {
   /** Data URL da faixa (png/jpeg/webp). Null = sem cabeçalho configurado. */
@@ -67,6 +69,12 @@ export interface PresentationBranding {
   showTitle: boolean;
   titleAlign: 'left' | 'center' | 'right';
   titleColor: 'light' | 'dark';
+  /**
+   * Corpo dos rótulos de dados dos gráficos na apresentação (px). Quem projeta
+   * numa sala grande precisa de número maior que o da tela de trabalho, e o
+   * tamanho certo depende do projetor — por isso é escolha do usuário.
+   */
+  chartLabelSize: number;
 }
 
 export type PresentationBrandingInput = Partial<PresentationBranding>;
@@ -1152,6 +1160,7 @@ export class MonthlyResultsService {
       showTitle: body.showTitle === undefined ? current.showTitle : Boolean(body.showTitle),
       titleAlign: this.parseTitleAlign(body.titleAlign ?? current.titleAlign),
       titleColor: (body.titleColor ?? current.titleColor) === 'dark' ? 'dark' : 'light',
+      chartLabelSize: this.parseChartLabelSize(body.chartLabelSize ?? current.chartLabelSize),
     };
 
     const value = JSON.stringify(branding);
@@ -1179,6 +1188,7 @@ export class MonthlyResultsService {
       showTitle: false,
       titleAlign: 'left',
       titleColor: 'light',
+      chartLabelSize: DEFAULT_CHART_LABEL_SIZE,
     };
     if (!raw) return fallback;
     try {
@@ -1191,6 +1201,7 @@ export class MonthlyResultsService {
         showTitle: Boolean(parsed.showTitle),
         titleAlign: this.parseTitleAlign(parsed.titleAlign),
         titleColor: parsed.titleColor === 'dark' ? 'dark' : 'light',
+        chartLabelSize: this.parseChartLabelSize(parsed.chartLabelSize),
       };
     } catch {
       return fallback;
@@ -1199,6 +1210,13 @@ export class MonthlyResultsService {
 
   private parseTitleAlign(value?: string | null): PresentationBranding['titleAlign'] {
     return value === 'center' || value === 'right' ? value : 'left';
+  }
+
+  /** Fora da faixa 8-32px o rótulo some ou cobre o gráfico; volta ao padrão. */
+  private parseChartLabelSize(value?: number | null): number {
+    const parsed = Math.round(Number(value));
+    if (!Number.isFinite(parsed)) return DEFAULT_CHART_LABEL_SIZE;
+    return Math.min(32, Math.max(8, parsed));
   }
 
   /** Aceita só data URL de imagem (png/jpeg/webp) dentro do limite; string vazia remove. */

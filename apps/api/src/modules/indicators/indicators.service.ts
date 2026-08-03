@@ -344,6 +344,20 @@ export class IndicatorsService {
             dueDate: true,
             expectedResult: true,
             responsibleUser: { select: { id: true, name: true } },
+            // As tarefas vêm junto: na apresentação da Reunião Mensal a aba
+            // Ações mostra o que foi combinado tarefa a tarefa (responsável,
+            // prazo e se concluiu), e não só o título do plano.
+            tasks: {
+              select: {
+                id: true,
+                title: true,
+                done: true,
+                dueDate: true,
+                rootCause: true,
+                assignedTo: { select: { id: true, name: true } },
+              },
+              orderBy: [{ done: 'asc' }, { position: 'asc' }],
+            },
           },
         },
         meetings: { select: { id: true, title: true, status: true, startsAt: true } },

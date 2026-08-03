@@ -67,7 +67,7 @@ import {
   type SnapshotIndicator,
 } from '../shared';
 import { exportAtaPdf, exportAcoesXlsx, exportFarolXlsx, exportResumoPdf } from '../exports';
-import { PresentationHeaderBanner, PresentationHeaderSettings, usePresentationBranding } from '../presentation-header';
+import { PresentationChartSettings, PresentationHeaderBanner, PresentationHeaderSettings, usePresentationBranding } from '../presentation-header';
 
 export default function MeetingWorkspace() {
   const params = useParams<{ id: string }>();
@@ -150,7 +150,7 @@ export default function MeetingWorkspace() {
           <PrepareTab meeting={meeting} options={options} can={can} run={run} pending={write.isPending} />
         </TabsContent>
         <TabsContent value="conduzir" className="space-y-4">
-          <ConductTab meeting={meeting} options={options} can={can} run={run} />
+          <ConductTab meeting={meeting} can={can} run={run} />
         </TabsContent>
         <TabsContent value="registrar" className="space-y-4">
           <RegisterTab meeting={meeting} options={options} can={can} run={run} />
@@ -514,12 +514,11 @@ type PresentationScreen =
   | { type: 'action'; id: string }
   | { type: 'deviation'; id: string };
 
-function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; options?: MonthlyOptions; can: Can; run: Run }) {
+function ConductTab({ meeting, can, run }: { meeting: MeetingDetail; can: Can; run: Run }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   // Faixa da empresa (configurada na aba Configurar) — só nesta apresentação.
   const branding = usePresentationBranding();
   const [areaIdx, setAreaIdx] = useState(0);
-  const [decisionOpen, setDecisionOpen] = useState(false);
   // Pilha de telas da apresentação: indicador -> plano de ação / desvio, sempre
   // com "voltar" para a tela anterior sem sair do modo apresentação.
   const [screenStack, setScreenStack] = useState<PresentationScreen[]>([]);
@@ -565,6 +564,11 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
       : previousScreen.type === 'action'
         ? 'Voltar ao plano de ação'
         : 'Voltar ao desvio';
+  const backButton = (
+    <Button variant="outline" size="sm" className="shrink-0" onClick={goBackScreen}>
+      <ArrowLeft className="mr-1.5 h-4 w-4" /> {backLabel}
+    </Button>
+  );
   // Título escrito sobre a faixa. Nas telas de detalhe o padrão é sempre
   // "Resultado x meta (ÁREA)" — o nome do indicador já está na própria tela.
   const bannerTitle = area ? (topScreen ? `Resultado x meta (${area.name})` : `Painel executivo (${area.name})`) : '';
@@ -602,11 +606,6 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {agendaForArea && can.present && <Timer item={agendaForArea} run={run} />}
-          {can.decide && (
-            <Button variant="outline" size="sm" onClick={() => setDecisionOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Registrar decisão
-            </Button>
-          )}
           <Button variant="outline" size="sm" onClick={toggleFullscreen}>
             {fullscreen ? <Minimize2 className="mr-2 h-4 w-4" /> : <Maximize2 className="mr-2 h-4 w-4" />}
             {fullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
@@ -624,21 +623,31 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
         <>
           {topScreen ? (
             <Card>
-              {/* Sem título: a faixa já anuncia a tela. Fica só o caminho de volta. */}
-              <CardHeader className="flex-row items-center justify-end gap-3 space-y-0 pb-2">
-                <Button variant="outline" size="sm" className="shrink-0" onClick={goBackScreen}>
-                  <ArrowLeft className="mr-1.5 h-4 w-4" /> {backLabel}
-                </Button>
-              </CardHeader>
-              <CardContent>
+              {/* Sem título e sem faixa própria para o botão: a faixa já anuncia
+                  a tela, e o "voltar" entra na primeira linha do conteúdo. */}
+              <CardContent className="p-4">
                 {topScreen.type === 'indicator' && (
-                  <IndicatorDetailView id={topScreen.id} embedded initialPeriodRef={meeting.periodRef} onOpenAction={openAction} onOpenDeviation={openDeviationScreen} />
+                  <IndicatorDetailView
+                    id={topScreen.id}
+                    embedded
+                    initialPeriodRef={meeting.periodRef}
+                    onOpenAction={openAction}
+                    onOpenDeviation={openDeviationScreen}
+                    headerActions={backButton}
+                    chartLabelSize={branding.data?.chartLabelSize}
+                  />
                 )}
                 {topScreen.type === 'action' && (
-                  <ActionDetailView id={topScreen.id} embedded onOpenDeviation={openDeviationScreen} />
+                  <>
+                    <div className="mb-3 flex justify-end">{backButton}</div>
+                    <ActionDetailView id={topScreen.id} embedded onOpenDeviation={openDeviationScreen} />
+                  </>
                 )}
                 {topScreen.type === 'deviation' && (
-                  <DeviationDetailView id={topScreen.id} embedded onOpenAction={openAction} />
+                  <>
+                    <div className="mb-3 flex justify-end">{backButton}</div>
+                    <DeviationDetailView id={topScreen.id} embedded onOpenAction={openAction} />
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -677,7 +686,6 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
         </>
       )}
 
-      {decisionOpen && <DecisionDialog meeting={meeting} options={options} area={area} onClose={() => setDecisionOpen(false)} run={run} />}
     </div>
   );
 }
@@ -1357,6 +1365,7 @@ function ConfigTab({ meeting, options, can, run }: { meeting: MeetingDetail; opt
     </Card>
 
     <PresentationHeaderSettings canUpdate={can.update} />
+    <PresentationChartSettings canUpdate={can.update} />
     </div>
   );
 }

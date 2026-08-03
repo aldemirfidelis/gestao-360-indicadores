@@ -170,6 +170,7 @@ interface LinkedTask {
   id: string;
   title: string;
   done: boolean;
+  dueDate?: string | null;
   rootCause?: string | null;
   assignedTo?: { id: string; name: string } | null;
 }
@@ -193,13 +194,15 @@ interface CurrentTreatment {
 
 const STATUS_LABEL = ACTION_STATUS_LABEL;
 
-const renderCustomBarLabel = (props: any, fill: string) => {
+const renderCustomBarLabel = (props: any, fill: string, fontSize = 9) => {
   const { x, y, width, value } = props;
   if (value === null || value === undefined || value === '') return null;
 
   const formatted = formatNumber(value);
   const cx = x + width / 2;
-  const cy = y - 6;
+  // Afasta o rótulo da barra proporcionalmente ao corpo: com fonte grande,
+  // 6px fixos deixavam o número encostado no topo da barra.
+  const cy = y - Math.max(6, Math.round(fontSize * 0.7));
 
   return (
     <text
@@ -207,7 +210,7 @@ const renderCustomBarLabel = (props: any, fill: string) => {
       y={cy}
       fill={fill}
       textAnchor="middle"
-      fontSize={9}
+      fontSize={fontSize}
       fontWeight={600}
     >
       {formatted}
@@ -223,6 +226,8 @@ export function IndicatorDetailView({
   autoAnalyze = false,
   onOpenAction,
   onOpenDeviation,
+  headerActions,
+  chartLabelSize,
 }: {
   id: string;
   embedded?: boolean;
@@ -234,6 +239,17 @@ export function IndicatorDetailView({
   /** Quando embutido na apresentação (Reunião Mensal), mantém a navegação na mesma tela em vez de sair para /actions e /deviations. */
   onOpenAction?: (actionId: string) => void;
   onOpenDeviation?: (deviationId: string) => void;
+  /**
+   * Ações do dono da tela (ex.: "Voltar ao painel executivo" da apresentação)
+   * renderizadas na MESMA linha do seletor de mês. Uma faixa só para o botão
+   * desperdiçaria altura útil no telão.
+   */
+  headerActions?: ReactNode;
+  /**
+   * Corpo (px) dos rótulos de dados do gráfico. Vem da configuração da Reunião
+   * Mensal para projeção; ausente = corpo padrão da tela de trabalho.
+   */
+  chartLabelSize?: number;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -445,6 +461,12 @@ export function IndicatorDetailView({
     : monthlyHistory.some((p) => p.meta !== null || p.realizado !== null);
   const safeSelectedIdx = Math.min(selectedIdx, Math.max(0, chartData.length - 1));
   const chartLineColor = realizadoSeriesColor(chartData, ind.direction);
+  // Sem tamanho configurado (fora da apresentação) valem os corpos de sempre.
+  const barLabelSize = chartLabelSize ?? 9;
+  const lineLabelSize = chartLabelSize ?? 10;
+  const secondaryLabelSize = Math.max(8, lineLabelSize - 1);
+  // Espaco no topo para o rotulo da barra/ponto mais alto nao ser cortado.
+  const chartTopMargin = Math.max(40, Math.round(Math.max(barLabelSize, lineLabelSize) * 2));
   const onChartClick = (state: any) => {
     const idx = state?.activeTooltipIndex;
     if (typeof idx === 'number' && idx >= 0 && idx < chartData.length) setSelectedIdx(idx);
@@ -625,13 +647,16 @@ export function IndicatorDetailView({
             {periodFilter && (
               <button type="button" className="text-xs text-primary hover:underline" onClick={() => setPeriodFilter(null)}>voltar ao mês atual</button>
             )}
+            {headerActions && <div className="ml-auto shrink-0">{headerActions}</div>}
           </div>
         );
       })()}
 
       {/* Gráfico à esquerda e a coluna de decisão (desvio, providências, causa raiz e
-          plano) à direita — mesmo layout do slide da Reunião Mensal. */}
-      <div ref={decisionExportRef} className="mb-6 grid grid-cols-1 gap-5 bg-background p-1 xl:grid-cols-[minmax(0,1fr)_360px]">
+          plano) à direita — mesmo layout do slide da Reunião Mensal. A coluna de
+          decisão ocupa ~36% porque é texto corrido (impacto, causa, tarefas) que
+          numa faixa estreita vira parágrafo de uma palavra por linha. */}
+      <div ref={decisionExportRef} className="mb-6 grid grid-cols-1 gap-5 bg-background p-1 xl:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)]">
         <Card className="overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -699,7 +724,7 @@ export function IndicatorDetailView({
                 <div className="h-[17rem] border border-border/60 bg-card/60 p-2 sm:h-[23rem]">
                   <ResponsiveContainer width="100%" height="100%">
                     {chartType === 'bar' ? (
-                      <BarChart data={chartData} barGap={2} margin={{ top: 40, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
+                      <BarChart data={chartData} barGap={2} margin={{ top: chartTopMargin, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
                         <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
                         <XAxis
                           dataKey="month"
@@ -715,11 +740,11 @@ export function IndicatorDetailView({
                         <YAxis tick={{ fontSize: 11 }} width={48} />
                         <Tooltip content={<DetailChartTooltip viewMode={viewMode} />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
                         <Bar dataKey="displayMeta" name="Meta" fill={CHART_COLORS.meta} radius={[3, 3, 0, 0]}>
-                          <LabelList dataKey="displayMeta" content={(props) => renderCustomBarLabel(props, CHART_COLORS.meta)} />
+                          <LabelList dataKey="displayMeta" content={(props) => renderCustomBarLabel(props, CHART_COLORS.meta, barLabelSize)} />
                         </Bar>
                         {hasSecondaryBar && (
                           <Bar dataKey="displaySecondary" name="Meta Secundária" fill={CHART_COLORS.secondary} radius={[3, 3, 0, 0]}>
-                            <LabelList dataKey="displaySecondary" content={(props) => renderCustomBarLabel(props, CHART_COLORS.secondary)} />
+                            <LabelList dataKey="displaySecondary" content={(props) => renderCustomBarLabel(props, CHART_COLORS.secondary, barLabelSize)} />
                           </Bar>
                         )}
                         <Bar dataKey="displayRealizado" name="Realizado" radius={[3, 3, 0, 0]}>
@@ -729,14 +754,14 @@ export function IndicatorDetailView({
                               fill={realizadoBarColor(entry.displayRealizado, entry.displayMeta, entry.gainLower, entry.gainUpper, ind.direction)}
                             />
                           ))}
-                          <LabelList dataKey="displayRealizado" content={(props) => renderCustomBarLabel(props, 'hsl(var(--foreground))')} />
+                          <LabelList dataKey="displayRealizado" content={(props) => renderCustomBarLabel(props, 'hsl(var(--foreground))', barLabelSize)} />
                         </Bar>
                         {hasNoValueBar && (
                           <Bar dataKey="noValueStub" name="Realizado sem valor" fill={CHART_COLORS.noValue} radius={[3, 3, 0, 0]} />
                         )}
                       </BarChart>
                     ) : (
-                      <LineChart data={chartData} margin={{ top: 24, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
+                      <LineChart data={chartData} margin={{ top: chartTopMargin, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
                         <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
                         <XAxis
                           dataKey="month"
@@ -752,15 +777,15 @@ export function IndicatorDetailView({
                         <YAxis tick={{ fontSize: 11 }} width={48} />
                         <Tooltip content={<DetailChartTooltip viewMode={viewMode} />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }} />
                         <Line type="monotone" dataKey="displayMeta" name="Meta" stroke={CHART_COLORS.meta} strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: CHART_COLORS.meta }} activeDot={{ r: 5 }}>
-                          <LabelList dataKey="displayMeta" position="top" fontSize={10} fill={CHART_COLORS.meta} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                          <LabelList dataKey="displayMeta" position="top" fontSize={lineLabelSize} fill={CHART_COLORS.meta} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                         </Line>
                         {hasSecondaryBar && (
                           <Line type="monotone" dataKey="displaySecondary" name="Meta Secundária" stroke={CHART_COLORS.secondary} strokeWidth={2} strokeDasharray="2 3" dot={{ r: 2.5, fill: CHART_COLORS.secondary }} activeDot={{ r: 4 }} connectNulls>
-                            <LabelList dataKey="displaySecondary" position="bottom" fontSize={9} fill={CHART_COLORS.secondary} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                            <LabelList dataKey="displaySecondary" position="bottom" fontSize={secondaryLabelSize} fill={CHART_COLORS.secondary} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                           </Line>
                         )}
                         <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke={chartLineColor} strokeWidth={2.5} dot={{ r: 3, fill: chartLineColor }} activeDot={{ r: 5 }}>
-                          <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill={chartLineColor} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                          <LabelList dataKey="displayRealizado" position="top" fontSize={lineLabelSize} fill={chartLineColor} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
                         </Line>
                       </LineChart>
                     )}
@@ -945,6 +970,9 @@ export function IndicatorDetailView({
         )}
       </div>
 
+      {/* Tabela de lançamentos e auditoria: material de conferência, não de
+          telão — na apresentação a tela fica só com o que se discute. */}
+      {!embedded && (
       <Card>
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
@@ -1006,6 +1034,7 @@ export function IndicatorDetailView({
           </div>
         </CardContent>
       </Card>
+      )}
 
       <IndicatorExportReport
         id={exportReportId}
@@ -1227,16 +1256,29 @@ function IndicatorDecisionCards({
                     const rcIdx = rootCauseIndexOf(task.rootCause);
                     return (
                       <li key={task.id} className="flex items-start gap-1.5">
+                        {/* Número da causa raiz na PRIMEIRA coluna, na mesma
+                            posição dos números do card Causa Raiz — é assim que
+                            se lê de um card para o outro qual tarefa ataca qual
+                            causa. O espaço vazio (tracejado) mantém os títulos
+                            alinhados quando a tarefa ainda não foi vinculada. */}
+                        {rootCauseLines.length > 0 && (
+                          rcIdx >= 0 ? (
+                            <span
+                              className={cn('mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white', rootCauseColor(rcIdx))}
+                              title={`Causa raiz ${rcIdx + 1}: ${rootCauseLines[rcIdx]}`}
+                            >
+                              {rcIdx + 1}
+                            </span>
+                          ) : (
+                            <span
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded-full border border-dashed border-muted-foreground/40"
+                              title="Tarefa ainda não vinculada a uma causa raiz"
+                            />
+                          )
+                        )}
                         <span className={cn('mt-1 h-3 w-3 shrink-0 rounded-full border', task.done ? 'border-status-green bg-status-green/25' : 'border-muted-foreground/40')} />
                         <span className={cn('flex-1 leading-snug', task.done ? 'text-muted-foreground line-through' : 'text-foreground')}>{task.title}</span>
-                        {rcIdx >= 0 ? (
-                          <span
-                            className={cn('mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white', rootCauseColor(rcIdx))}
-                            title={`Causa raiz ${rcIdx + 1}: ${rootCauseLines[rcIdx]}`}
-                          >
-                            {rcIdx + 1}
-                          </span>
-                        ) : rootCauseLines.length > 0 ? (
+                        {rcIdx < 0 && rootCauseLines.length > 0 ? (
                           <select
                             className="mt-0.5 h-5 shrink-0 rounded border bg-background px-1 text-[10px] text-muted-foreground"
                             value=""
@@ -1868,16 +1910,53 @@ function MiniHistory({ results, targets }: { results: IndicatorDetail['results']
   );
 }
 
+/**
+ * Aba Ações: os planos vinculados ao indicador com as TAREFAS de cada um.
+ *
+ * Na reunião a pergunta não é "existe plano?", é "o que foi combinado, com quem
+ * e para quando" — por isso a tarefa aparece inteira (responsável, prazo e se
+ * concluiu), concluídas incluídas: quem já entregou também precisa aparecer.
+ */
 function LinkedActionsTab({ actions, onOpenAction }: { actions: NonNullable<IndicatorDetail['actions']>; onOpenAction?: (actionId: string) => void }) {
   if (actions.length === 0) return <p className="text-xs text-muted-foreground">Nenhum plano de ação vinculado a este indicador.</p>;
   return (
-    <div className="space-y-1.5">
-      {actions.map((a) => (
-        <div key={a.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs">
-          <ActionRefLink id={a.id} onOpen={onOpenAction} className="min-w-0 flex-1 truncate font-medium hover:underline">{a.title}</ActionRefLink>
-          <StatusBadge value={a.status} label={ACTION_STATUS_LABEL[a.status] ?? a.status} />
-        </div>
-      ))}
+    <div className="space-y-2">
+      {actions.map((a) => {
+        const tasks = a.tasks ?? [];
+        const concluidas = tasks.filter((task) => task.done).length;
+        return (
+          <div key={a.id} className="rounded-lg border text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/25 px-3 py-2">
+              <ActionRefLink id={a.id} onOpen={onOpenAction} className="min-w-0 flex-1 truncate font-medium hover:underline">{a.title}</ActionRefLink>
+              <div className="flex shrink-0 items-center gap-2">
+                {tasks.length > 0 && (
+                  <span className="text-[11px] text-muted-foreground">{concluidas}/{tasks.length} tarefas</span>
+                )}
+                <StatusBadge value={a.status} label={ACTION_STATUS_LABEL[a.status] ?? a.status} />
+              </div>
+            </div>
+            {tasks.length === 0 ? (
+              <p className="px-3 py-2 text-[11px] text-muted-foreground">Nenhuma tarefa cadastrada neste plano.</p>
+            ) : (
+              <ul className="divide-y">
+                {tasks.map((task) => (
+                  <li key={task.id} className="flex items-start gap-2 px-3 py-2">
+                    <span className={cn('mt-1 h-2.5 w-2.5 shrink-0 rounded-full border', task.done ? 'border-status-green bg-status-green' : 'border-muted-foreground/50')} />
+                    <span className="min-w-0 flex-1">
+                      <span className={cn('block break-words', task.done && 'text-muted-foreground line-through')}>{task.title}</span>
+                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                        {task.assignedTo?.name ?? 'Sem responsável'}
+                        {task.dueDate ? ` · prazo ${new Date(task.dueDate).toLocaleDateString('pt-BR')}` : ' · sem prazo'}
+                        {` · ${task.done ? 'Concluída' : 'Em aberto'}`}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

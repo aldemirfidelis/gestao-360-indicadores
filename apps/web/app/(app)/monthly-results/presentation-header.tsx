@@ -26,12 +26,17 @@ export interface PresentationBranding {
   showTitle: boolean;
   titleAlign: 'left' | 'center' | 'right';
   titleColor: 'light' | 'dark';
+  /** Corpo dos rótulos de dados dos gráficos na apresentação (px). */
+  chartLabelSize: number;
   updatedAt?: string | null;
 }
 
 const BRANDING_KEY = ['monthly-presentation-branding'];
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+export const CHART_LABEL_SIZE_MIN = 8;
+export const CHART_LABEL_SIZE_MAX = 32;
+export const CHART_LABEL_SIZE_DEFAULT = 10;
 
 export function usePresentationBranding() {
   return useQuery<PresentationBranding>({
@@ -39,6 +44,36 @@ export function usePresentationBranding() {
     queryFn: () => api<PresentationBranding>('/monthly-results/presentation-branding'),
     staleTime: 5 * 60 * 1000,
   });
+}
+
+/** Salva a configuração da apresentação (faixa e gráficos compartilham o registro). */
+function usePresentationBrandingSave(okMessage: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<PresentationBranding>) =>
+      api<PresentationBranding>('/monthly-results/presentation-branding', { method: 'PUT', json: payload }),
+    onSuccess: (data) => {
+      qc.setQueryData(BRANDING_KEY, data);
+      toast.success(okMessage);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+/**
+ * Corpo do título sobre a faixa.
+ *
+ * O nome inteiro da área tem que aparecer — cortar com reticências esconde
+ * justamente o que a faixa anuncia. A solução é quebrar linha, mantendo o
+ * tamanho de projeção: em duas linhas o texto ainda cabe folgado na altura da
+ * faixa. Só um título realmente longo (que passaria de duas linhas e vazaria
+ * para fora da imagem) desce um degrau de fonte — e mesmo aí segue grande.
+ */
+function titleSizeClass(title: string): string {
+  const length = title.trim().length;
+  if (length <= 42) return 'text-[clamp(1.5rem,3.6vw,3.25rem)]';
+  if (length <= 70) return 'text-[clamp(1.25rem,2.9vw,2.6rem)]';
+  return 'text-[clamp(1rem,2.2vw,2rem)]';
 }
 
 /** Faixa exibida no topo das telas de apresentação (painel executivo e indicador). */
@@ -56,10 +91,11 @@ export function PresentationHeaderBanner({ branding, title }: { branding?: Prese
             branding.titleAlign === 'center' ? 'justify-center' : branding.titleAlign === 'right' ? 'justify-end' : 'justify-start',
           )}
         >
-          {/* Tamanho de projeção: precisa ser legível no fundo da sala. */}
           <span
             className={cn(
-              'max-w-[78%] truncate text-[clamp(1.5rem,3.8vw,3.5rem)] font-bold uppercase leading-tight tracking-wide drop-shadow-sm',
+              'max-w-[78%] break-words font-bold uppercase leading-tight tracking-wide drop-shadow-sm',
+              branding.titleAlign === 'center' ? 'text-center' : branding.titleAlign === 'right' ? 'text-right' : 'text-left',
+              titleSizeClass(title ?? ''),
               branding.titleColor === 'dark' ? 'text-slate-900' : 'text-white',
             )}
           >
@@ -73,7 +109,6 @@ export function PresentationHeaderBanner({ branding, title }: { branding?: Prese
 
 /** Editor do cabeçalho (aba Configurar da reunião). */
 export function PresentationHeaderSettings({ canUpdate }: { canUpdate: boolean }) {
-  const qc = useQueryClient();
   const branding = usePresentationBranding();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState<PresentationBranding | null>(null);
@@ -82,17 +117,7 @@ export function PresentationHeaderSettings({ canUpdate }: { canUpdate: boolean }
     if (branding.data) setDraft(branding.data);
   }, [branding.data]);
 
-  const save = useMutation({
-    mutationFn: (payload: Partial<PresentationBranding>) =>
-      api<PresentationBranding>('/monthly-results/presentation-branding', { method: 'PUT', json: payload }),
-    onSuccess: (data) => {
-      qc.setQueryData(BRANDING_KEY, data);
-      setDraft(data);
-      toast.success('Cabeçalho da apresentação salvo');
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
-
+  const save = usePresentationBrandingSave('Cabeçalho da apresentação salvo');
   const current = draft ?? branding.data ?? null;
 
   function pickFile(file: File | null) {
@@ -223,6 +248,77 @@ export function PresentationHeaderSettings({ canUpdate }: { canUpdate: boolean }
             </div>
           </>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Tamanho dos rótulos de dados dos gráficos da apresentação.
+ *
+ * O corpo bom depende do projetor e do tamanho da sala — não dá para acertar um
+ * número fixo que sirva a todas. Vale só para a apresentação da Reunião Mensal;
+ * o detalhe do indicador aberto fora dela mantém o corpo de tela de trabalho.
+ */
+export function PresentationChartSettings({ canUpdate }: { canUpdate: boolean }) {
+  const branding = usePresentationBranding();
+  const save = usePresentationBrandingSave('Tamanho dos rótulos salvo');
+  const salvo = branding.data?.chartLabelSize ?? CHART_LABEL_SIZE_DEFAULT;
+  const [size, setSize] = useState(salvo);
+
+  useEffect(() => setSize(salvo), [salvo]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Rótulos dos gráficos na apresentação</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Corpo dos números escritos sobre as barras e pontos do gráfico do indicador durante a apresentação. Aumente
+          para projetar em sala grande; diminua quando os valores começarem a se encostar.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <input
+            type="range"
+            min={CHART_LABEL_SIZE_MIN}
+            max={CHART_LABEL_SIZE_MAX}
+            step={1}
+            value={size}
+            disabled={!canUpdate || save.isPending}
+            onChange={(e) => setSize(Number(e.target.value))}
+            onMouseUp={() => size !== salvo && save.mutate({ chartLabelSize: size })}
+            onTouchEnd={() => size !== salvo && save.mutate({ chartLabelSize: size })}
+            onKeyUp={() => size !== salvo && save.mutate({ chartLabelSize: size })}
+            className="h-2 min-w-[220px] flex-1 cursor-pointer accent-primary"
+            aria-label="Tamanho do rótulo de dados"
+          />
+          <span className="w-14 shrink-0 text-sm font-medium tabular-nums">{size} px</span>
+          {canUpdate && size !== salvo && (
+            <Button size="sm" disabled={save.isPending} onClick={() => save.mutate({ chartLabelSize: size })}>
+              Salvar
+            </Button>
+          )}
+          {canUpdate && salvo !== CHART_LABEL_SIZE_DEFAULT && (
+            <Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => save.mutate({ chartLabelSize: CHART_LABEL_SIZE_DEFAULT })}>
+              Voltar ao padrão
+            </Button>
+          )}
+        </div>
+        {/* Prévia: o mesmo desenho do rótulo sobre a barra, no corpo escolhido. */}
+        <div className="flex items-end gap-4 rounded-md border bg-muted/20 p-4">
+          <div className="flex flex-col items-center gap-1">
+            <span style={{ fontSize: `${size}px` }} className="font-semibold leading-none text-foreground">100</span>
+            <span className="h-12 w-8 rounded-t bg-status-blue/80" />
+            <span className="text-[10px] text-muted-foreground">Meta</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <span style={{ fontSize: `${size}px` }} className="font-semibold leading-none text-foreground">85,5</span>
+            <span className="h-9 w-8 rounded-t bg-status-red/80" />
+            <span className="text-[10px] text-muted-foreground">Realizado</span>
+          </div>
+          <p className="text-xs text-muted-foreground">Prévia do rótulo no tamanho escolhido.</p>
+        </div>
       </CardContent>
     </Card>
   );
