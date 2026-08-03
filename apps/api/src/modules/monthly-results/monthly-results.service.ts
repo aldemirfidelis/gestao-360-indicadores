@@ -55,6 +55,22 @@ const ACTION_NOT_EXECUTING = new Set(['DRAFT', 'NOT_STARTED', 'UNDER_ANALYSIS', 
 const OPEN_ITEM_STATUSES: MonthlyItemStatus[] = [MonthlyItemStatus.OPEN, MonthlyItemStatus.IN_PROGRESS];
 type SnapshotMode = 'period' | 'latest';
 
+// Cabeçalho da apresentação: chave única por empresa em AppSetting.
+const PRESENTATION_HEADER_KEY = 'monthly.presentation.header';
+const MAX_HEADER_IMAGE_BYTES = 2 * 1024 * 1024;
+
+export interface PresentationBranding {
+  /** Data URL da faixa (png/jpeg/webp). Null = sem cabeçalho configurado. */
+  imageDataUrl: string | null;
+  fileName: string | null;
+  enabled: boolean;
+  showTitle: boolean;
+  titleAlign: 'left' | 'center' | 'right';
+  titleColor: 'light' | 'dark';
+}
+
+export type PresentationBrandingInput = Partial<PresentationBranding>;
+
 const DEFAULT_AGENDA = [
   { topic: 'Abertura', plannedMinutes: 10 },
   { topic: 'SSMA', areaName: 'SSMA', plannedMinutes: 45 },
@@ -1098,6 +1114,104 @@ export class MonthlyResultsService {
     if (!item) throw new NotFoundException('Item não encontrado.');
     await this.prisma.monthlyMeetingChecklistItem.update({ where: { id: itemId }, data: { done: body.done ?? !item.done } });
     return this.meetingDetail(me, item.meeting.id);
+  }
+
+  // =========================================================================
+  // Cabeçalho (faixa PNG) da apresentação da Reunião Mensal
+  //
+  // Guardado por empresa em AppSetting (sem tabela nova) e usado SOMENTE nas
+  // telas de apresentação deste módulo — o Painel Executivo e o detalhe do
+  // indicador fora da Reunião Mensal seguem sem cabeçalho.
+  // =========================================================================
+
+  async presentationBranding(me: AuthPayload) {
+    const record = await this.prisma.appSetting.findUnique({
+      where: { companyId_key: { companyId: me.companyId, key: PRESENTATION_HEADER_KEY } },
+      select: { value: true, updatedAt: true },
+    });
+    return { ...this.parsePresentationBranding(record?.value), updatedAt: record?.updatedAt ?? null };
+  }
+
+  async savePresentationBranding(me: AuthPayload, body: PresentationBrandingInput) {
+    const current = this.parsePresentationBranding(
+      (
+        await this.prisma.appSetting.findUnique({
+          where: { companyId_key: { companyId: me.companyId, key: PRESENTATION_HEADER_KEY } },
+          select: { value: true },
+        })
+      )?.value,
+    );
+
+    const imageDataUrl =
+      body.imageDataUrl === undefined ? current.imageDataUrl : this.sanitizeHeaderImage(body.imageDataUrl);
+    const branding: PresentationBranding = {
+      imageDataUrl,
+      fileName: body.fileName === undefined ? current.fileName : this.clean(body.fileName)?.slice(0, 160) ?? null,
+      // Sem imagem não há o que exibir: o flag volta a falso sozinho.
+      enabled: imageDataUrl ? (body.enabled === undefined ? current.enabled : Boolean(body.enabled)) : false,
+      showTitle: body.showTitle === undefined ? current.showTitle : Boolean(body.showTitle),
+      titleAlign: this.parseTitleAlign(body.titleAlign ?? current.titleAlign),
+      titleColor: (body.titleColor ?? current.titleColor) === 'dark' ? 'dark' : 'light',
+    };
+
+    const value = JSON.stringify(branding);
+    const saved = await this.prisma.appSetting.upsert({
+      where: { companyId_key: { companyId: me.companyId, key: PRESENTATION_HEADER_KEY } },
+      create: {
+        companyId: me.companyId,
+        key: PRESENTATION_HEADER_KEY,
+        value,
+        valueType: 'json',
+        group: 'Reuniao Mensal',
+        description: 'Cabecalho (faixa PNG) da apresentacao da Reuniao Mensal',
+      },
+      update: { value, valueType: 'json', group: 'Reuniao Mensal' },
+      select: { updatedAt: true },
+    });
+    return { ...branding, updatedAt: saved.updatedAt };
+  }
+
+  private parsePresentationBranding(raw?: string | null): PresentationBranding {
+    const fallback: PresentationBranding = {
+      imageDataUrl: null,
+      fileName: null,
+      enabled: false,
+      showTitle: false,
+      titleAlign: 'left',
+      titleColor: 'light',
+    };
+    if (!raw) return fallback;
+    try {
+      const parsed = JSON.parse(raw) as Partial<PresentationBranding>;
+      const imageDataUrl = typeof parsed.imageDataUrl === 'string' && parsed.imageDataUrl ? parsed.imageDataUrl : null;
+      return {
+        imageDataUrl,
+        fileName: typeof parsed.fileName === 'string' ? parsed.fileName : null,
+        enabled: Boolean(imageDataUrl) && Boolean(parsed.enabled),
+        showTitle: Boolean(parsed.showTitle),
+        titleAlign: this.parseTitleAlign(parsed.titleAlign),
+        titleColor: parsed.titleColor === 'dark' ? 'dark' : 'light',
+      };
+    } catch {
+      return fallback;
+    }
+  }
+
+  private parseTitleAlign(value?: string | null): PresentationBranding['titleAlign'] {
+    return value === 'center' || value === 'right' ? value : 'left';
+  }
+
+  /** Aceita só data URL de imagem (png/jpeg/webp) dentro do limite; string vazia remove. */
+  private sanitizeHeaderImage(value: string | null): string | null {
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
+    const match = /^data:image\/(png|jpeg|jpg|webp);base64,([A-Za-z0-9+/=\s]+)$/i.exec(raw);
+    if (!match) throw new BadRequestException('Envie uma imagem PNG, JPG ou WEBP.');
+    const base64 = match[2].replace(/\s+/g, '');
+    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+    const bytes = Math.floor((base64.length * 3) / 4) - padding;
+    if (bytes > MAX_HEADER_IMAGE_BYTES) throw new BadRequestException('A imagem do cabeçalho deve ter até 2 MB.');
+    return `data:image/${match[1].toLowerCase() === 'jpg' ? 'jpeg' : match[1].toLowerCase()};base64,${base64}`;
   }
 
   // =========================================================================

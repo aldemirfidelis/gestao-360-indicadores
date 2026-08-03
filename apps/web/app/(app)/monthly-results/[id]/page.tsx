@@ -32,6 +32,7 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { IndicatorDetailView } from '@/components/platform/indicator-detail-view';
 import { ActionDetailView } from '@/components/platform/action-detail-view';
 import { DeviationDetailView } from '@/components/platform/deviation-detail-view';
+import { KeyMessageCard, useAreaKeyMessage } from '@/components/platform/key-message-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,6 +66,7 @@ import {
   type SnapshotIndicator,
 } from '../shared';
 import { exportAtaPdf, exportAcoesXlsx, exportFarolXlsx, exportResumoPdf } from '../exports';
+import { PresentationHeaderBanner, PresentationHeaderSettings, usePresentationBranding } from '../presentation-header';
 
 export default function MeetingWorkspace() {
   const params = useParams<{ id: string }>();
@@ -513,6 +515,8 @@ type PresentationScreen =
 
 function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; options?: MonthlyOptions; can: Can; run: Run }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // Faixa da empresa (configurada na aba Configurar) — só nesta apresentação.
+  const branding = usePresentationBranding();
   const [areaIdx, setAreaIdx] = useState(0);
   const [decisionOpen, setDecisionOpen] = useState(false);
   // Pilha de telas da apresentação: indicador -> plano de ação / desvio, sempre
@@ -566,6 +570,12 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
         ? 'Desvio'
         : '';
   const backLabel = screenStack.length > 1 ? 'Voltar ao indicador' : 'Voltar aos indicadores';
+  // Título opcional escrito sobre a faixa: painel executivo da área ou tela aberta.
+  const bannerTitle = area ? (topScreen ? `${screenTitle} (${area.name})` : `Painel executivo (${area.name})`) : '';
+  // Mensagem-chave do mês: a MESMA registrada pelo gestor no Painel Executivo
+  // daquela área — a apresentação lê, não pede para redigitar.
+  const areaKeyMessage = useAreaKeyMessage(area?.orgNodeId);
+  const panelKeyMessage = (areaKeyMessage.data?.conclusion ?? '').trim();
   const areaPlans = Array.from(
     new Map(areaIndicators.map((i) => i.linkedAction).filter(Boolean).map((a: any) => [a.id, a])).values(),
   ) as any[];
@@ -606,6 +616,8 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
           </Button>
         </div>
       </div>
+
+      <PresentationHeaderBanner branding={branding.data} title={bannerTitle} />
 
       {!area ? (
         <Card>
@@ -687,6 +699,8 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
                 {areaIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador nesta área.</p>}
                 {areaIndicators.length > 0 && visibleIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador neste farol.</p>}
               </div>
+
+              {panelKeyMessage && <KeyMessageCard message={panelKeyMessage} />}
 
               <AreaPlansKanban inProgress={plansInProgress} closed={plansClosed} />
             </>
@@ -1245,6 +1259,7 @@ function ConfigTab({ meeting, options, can, run }: { meeting: MeetingDetail; opt
     nextWeeklyAt: meeting.nextWeeklyAt ? meeting.nextWeeklyAt.slice(0, 16) : '',
   });
   return (
+    <div className="space-y-4">
     <Card>
       <CardHeader>
         <CardTitle>Configuração da reunião</CardTitle>
@@ -1311,6 +1326,9 @@ function ConfigTab({ meeting, options, can, run }: { meeting: MeetingDetail; opt
         )}
       </CardContent>
     </Card>
+
+    <PresentationHeaderSettings canUpdate={can.update} />
+    </div>
   );
 }
 

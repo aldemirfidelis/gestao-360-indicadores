@@ -3,9 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { BarChart3, Download, Edit3, MessageSquareText } from 'lucide-react';
+import { Download } from 'lucide-react';
 import Link from 'next/link';
-import { PageHeader } from '@/components/shell/page-header';
 import { exportNodeToPng } from '@/lib/export-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { KeyMessageCard, areaKeyMessageQueryKey, useAreaKeyMessage } from '@/components/platform/key-message-card';
 import { api } from '@/lib/api';
 import { cn, formatNumber } from '@/lib/utils';
 
@@ -57,7 +57,6 @@ function recentMonthOptions(): { value: string; label: string }[] {
   }
   return options;
 }
-const CONCLUSION_PLACEHOLDER = 'Nenhuma mensagem-chave registrada para esta área.';
 
 const LIGHT_DOT: Record<string, string> = {
   GREEN: 'bg-emerald-700',
@@ -113,11 +112,7 @@ export default function VisualizationPage() {
       ),
     enabled: Boolean(selectedNodeId),
   });
-  const conclusionQuery = useQuery<{ ownerNodeId: string; conclusion: string; updatedAt: string | null }>({
-    queryKey: ['visualization', 'conclusion', selectedNodeId],
-    queryFn: () => api<{ ownerNodeId: string; conclusion: string; updatedAt: string | null }>(`/dashboard/area-conclusion?ownerNodeId=${encodeURIComponent(selectedNodeId)}`),
-    enabled: Boolean(selectedNodeId),
-  });
+  const conclusionQuery = useAreaKeyMessage(selectedNodeId);
   const saveConclusionMutation = useMutation({
     mutationFn: (conclusion: string) =>
       api(`/dashboard/area-conclusion?ownerNodeId=${encodeURIComponent(selectedNodeId)}`, {
@@ -125,7 +120,7 @@ export default function VisualizationPage() {
         json: { conclusion },
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['visualization', 'conclusion', selectedNodeId] });
+      queryClient.invalidateQueries({ queryKey: areaKeyMessageQueryKey(selectedNodeId) });
       setConclusionOpen(false);
     },
   });
@@ -162,30 +157,16 @@ export default function VisualizationPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        eyebrow="Painel executivo"
-        title="Visão executiva por área"
-        tone="view"
-        actions={
-          <Button type="button" variant="outline" className="gap-2" onClick={exportPanel} disabled={exporting || indicators.isLoading || !selectedNodeId}>
-            <Download className="h-4 w-4" />
-            {exporting ? 'Exportando...' : 'Exportar imagem'}
-          </Button>
-        }
-      />
+      {/* Painel enxuto: sem título/descrição de escopo — só filtros, cards e mensagem-chave. */}
+      <div className="flex justify-end">
+        <Button type="button" variant="outline" className="gap-2" onClick={exportPanel} disabled={exporting || indicators.isLoading || !selectedNodeId}>
+          <Download className="h-4 w-4" />
+          {exporting ? 'Exportando...' : 'Exportar imagem'}
+        </Button>
+      </div>
 
       <Card className="overflow-hidden">
         <CardContent className="space-y-4 p-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <BarChart3 className="h-4 w-4 shrink-0 text-status-green" />
-              <span>Escopo do painel</span>
-            </div>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              Indicadores principais, faróis e mensagem-chave do mês em uma visão compacta para decisão.
-            </p>
-          </div>
-
           <div className="flex flex-wrap items-end gap-4">
           <div className="min-w-[220px] flex-1 basis-64">
             <Label htmlFor="area-select" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -285,25 +266,8 @@ export default function VisualizationPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-status-orange">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.08em] text-foreground">
-                    <MessageSquareText className="h-4 w-4 shrink-0 text-status-orange" />
-                    <span>Mensagem-chave do mês</span>
-                  </div>
-                  <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
-                    {conclusion || CONCLUSION_PLACEHOLDER}
-                  </p>
-                </div>
-              </div>
-              <Button className="mt-4 gap-2" type="button" variant="outline" onClick={openConclusionEditor} disabled={!selectedNodeId}>
-                <Edit3 className="h-4 w-4" />
-                {conclusion ? 'Editar mensagem' : 'Registrar mensagem'}
-              </Button>
-            </CardContent>
-          </Card>
+          {/* Mesma mensagem que a apresentação da Reunião Mensal exibe. */}
+          <KeyMessageCard message={conclusion} onEdit={openConclusionEditor} editDisabled={!selectedNodeId} />
         </div>
       </section>
 

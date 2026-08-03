@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
-import { MonthlyResultsService } from './monthly-results.service';
+import { MonthlyResultsService, PresentationBrandingInput } from './monthly-results.service';
 
 @Controller('monthly-results')
 export class MonthlyResultsController {
@@ -25,6 +25,19 @@ export class MonthlyResultsController {
   @RequirePermissions('monthly:view')
   meetingDetail(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
     return this.service.meetingDetail(me, id);
+  }
+
+  // ---- Cabeçalho da apresentação (faixa PNG por empresa) ----
+  @Get('presentation-branding')
+  @RequirePermissions('monthly:view')
+  presentationBranding(@CurrentUser() me: AuthPayload) {
+    return this.service.presentationBranding(me);
+  }
+
+  @Put('presentation-branding')
+  @RequirePermissions('monthly:update')
+  savePresentationBranding(@CurrentUser() me: AuthPayload, @Body() body: PresentationBrandingInput) {
+    return this.service.savePresentationBranding(me, body ?? {});
   }
 
   // ---- Reunião ----

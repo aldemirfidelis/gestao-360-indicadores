@@ -619,25 +619,9 @@ export function IndicatorDetailView({
         );
       })()}
 
-      <div ref={decisionExportRef} className="mb-6 grid grid-cols-1 gap-5 bg-background p-1 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <IndicatorDecisionCards
-          indicator={ind}
-          principal={principalDeviation}
-          principalDeviation={linkedPrincipalDeviation}
-          deviations={deviationRows}
-          currentTreatment={currentTreatment.data ?? null}
-          onOpenDeviation={openOrCreateDeviation}
-          openingDeviation={openDeviation.isPending}
-          canCreateDeviation={Boolean(last?.periodRef) && canCreateDeviation}
-          canDeleteDeviation={canDeleteDeviation}
-          onDeleteDeviation={(deviationId) => {
-            if (window.confirm('Excluir este desvio? Esta ação remove o desvio e sua análise da lista.')) deleteDeviation.mutate(deviationId);
-          }}
-          deletingDeviation={deleteDeviation.isPending}
-          actionsHref={indicatorActionsHref}
-          onOpenAction={onOpenAction}
-        />
-
+      {/* Gráfico à esquerda e a coluna de decisão (desvio, providências, causa raiz e
+          plano) à direita — mesmo layout do slide da Reunião Mensal. */}
+      <div ref={decisionExportRef} className="mb-6 grid grid-cols-1 gap-5 bg-background p-1 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -805,6 +789,24 @@ export function IndicatorDetailView({
             )}
           </CardContent>
         </Card>
+
+        <IndicatorDecisionCards
+          indicator={ind}
+          principal={principalDeviation}
+          principalDeviation={linkedPrincipalDeviation}
+          deviations={deviationRows}
+          currentTreatment={currentTreatment.data ?? null}
+          onOpenDeviation={openOrCreateDeviation}
+          openingDeviation={openDeviation.isPending}
+          canCreateDeviation={Boolean(last?.periodRef) && canCreateDeviation}
+          canDeleteDeviation={canDeleteDeviation}
+          onDeleteDeviation={(deviationId) => {
+            if (window.confirm('Excluir este desvio? Esta ação remove o desvio e sua análise da lista.')) deleteDeviation.mutate(deviationId);
+          }}
+          deletingDeviation={deleteDeviation.isPending}
+          actionsHref={indicatorActionsHref}
+          onOpenAction={onOpenAction}
+        />
 
         <div className="hidden">
           <RailCard icon={Lightbulb} iconClass="text-status-blue" title="Insights automáticos">
