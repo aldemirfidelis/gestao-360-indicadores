@@ -163,6 +163,14 @@ export class FormsController {
     return this.service.listSubmissions(me, id);
   }
 
+  // Reapura os preenchimentos já registrados (percentual + média no indicador).
+  // Serve quando o modelo muda — ex.: perguntas que não contavam passam a contar.
+  @Post(':id/recalculate')
+  @RequirePermissions('forms:update')
+  recalculate(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.recalculateSubmissions(me, id);
+  }
+
   // `forms:fill` é a permissão do técnico de campo — quem só preenche não
   // precisa de `forms:update`, que libera editar a estrutura do modelo.
   @Post(':id/submissions')

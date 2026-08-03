@@ -23,8 +23,9 @@ import { NonConformitiesService } from '../nonconformities/nonconformities.servi
 import { logSwallowed } from '../../common/logging/swallow';
 import { FormCodeService } from './form-code.service';
 import { FormIndicatorService } from './form-indicator.service';
+import { competenceOf } from './form-indicator.logic';
 import { sortSections } from './form-header.logic';
-import { conformityScore, conformitySummary, noteOf, scoreSheet } from './form-scoring.logic';
+import { classifyAnswer, conformityScore, conformitySummary, noteOf, scoreSheet } from './form-scoring.logic';
 import { FormStorageService } from './form-storage.service';
 import { randomUUID } from 'node:crypto';
 
@@ -1291,17 +1292,16 @@ export class FormsService {
     answers: Array<{ fieldType?: string | null; fieldLabel: string; value?: string | null; critical?: boolean }>,
     onlyCritical: boolean,
   ) {
-    const negative = new Set([
-      'nao_conforme', 'não_conforme', 'nao conforme', 'não conforme', 'nc', 'nok',
-      'reprovado', 'nao', 'não', 'no', 'false', '0',
-    ]);
     return answers.filter((answer) => {
-      const value = String(answer.value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
-      if (!value || !(negative.has(value) || negative.has(value.replace(/ /g, '_')))) return false;
-      const type = String(answer.fieldType ?? '');
-      const conformityField = type === String(FormFieldType.CONFORMITY);
-      const criticalYesNo = (type === String(FormFieldType.YES_NO) || type === String(FormFieldType.BOOLEAN)) && Boolean(answer.critical);
-      if (!conformityField && !criticalYesNo) return false;
+      // Mesmo classificador do percentual: o que reprova a inspeção é
+      // exatamente o que derruba a nota (inclusive lista "Conforme/Não
+      // Conforme", ver form-scoring.logic).
+      if (classifyAnswer({ fieldType: answer.fieldType, value: answer.value }) !== 'NAO_CONFORME') return false;
+      const type = String(answer.fieldType ?? '').toUpperCase();
+      // Sim/Não é pergunta comum, cuja resposta legítima pode ser "não": só
+      // vira NC quando o item foi marcado como crítico.
+      const genericYesNo = type === String(FormFieldType.YES_NO) || type === String(FormFieldType.BOOLEAN);
+      if (genericYesNo && !answer.critical) return false;
       if (onlyCritical && !answer.critical) return false;
       return true;
     });
@@ -1580,6 +1580,26 @@ export class FormsService {
       await this.maybeCreateNonconformity(me, updated.template, updated, updated.answers ?? []);
     }
 
+    // Aprovar, corrigir respostas ou trocar o setor muda a média do mês: o
+    // indicador precisa ser recalculado aqui também, e não só na criação.
+    // Best-effort — o preenchimento já está salvo e não pode cair por isso.
+    if (COMPLETED_SUBMISSION_STATUSES.has(updated.status)) {
+      const setores = new Set([updated.orgNodeId, before.orgNodeId].filter(Boolean) as string[]);
+      for (const orgNodeId of setores) {
+        try {
+          await this.formIndicator.syncFromSubmission(me, {
+            id: updated.id,
+            templateId: updated.templateId,
+            orgNodeId,
+            completedAt: updated.completedAt,
+            score: updated.score,
+          });
+        } catch (error) {
+          logSwallowed('forms.indicatorSync', error);
+        }
+      }
+    }
+
     await this.traceability.record({
       companyId: me.companyId,
       indicatorId: updated.indicatorId,
@@ -1596,6 +1616,63 @@ export class FormsService {
     });
 
     return this.enrichSubmission(updated);
+  }
+
+  /**
+   * Reapura os preenchimentos já registrados de um modelo.
+   *
+   * O percentual é gravado no momento do preenchimento. Quando a regra de
+   * apuração ou a estrutura do modelo muda (ex.: perguntas em lista de opções
+   * passam a contar como conformidade), o que já foi registrado continuaria com
+   * o número antigo — e o indicador, sem a média. Isto recalcula a partir das
+   * respostas guardadas e relança a média do mês nos indicadores vinculados.
+   */
+  async recalculateSubmissions(me: AuthPayload, templateId: string) {
+    const template = await this.loadTemplate(templateId, me.companyId);
+    await this.assertWriteArea(me, this.areaOfTemplate(template), 'edit');
+
+    const submissions = await this.prisma.formSubmission.findMany({
+      where: { companyId: me.companyId, templateId, deletedAt: null },
+      select: {
+        id: true, status: true, score: true, orgNodeId: true, completedAt: true, templateId: true,
+        answers: { select: { fieldType: true, value: true, weight: true, critical: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let atualizados = 0;
+    const paraSincronizar = new Map<string, { id: string; templateId: string; orgNodeId: string; completedAt: Date | null; score: number | null }>();
+
+    for (const submission of submissions) {
+      const apuracao = conformityScore(submission.answers);
+      if (apuracao.percent !== submission.score) {
+        await this.prisma.formSubmission.update({ where: { id: submission.id }, data: { score: apuracao.percent } });
+        atualizados += 1;
+      }
+      if (!COMPLETED_SUBMISSION_STATUSES.has(submission.status) || !submission.orgNodeId) continue;
+      // Um sync por (setor, mês) resolve o grupo inteiro: a média é recalculada
+      // do zero lá dentro, então repetir por inspeção seria trabalho jogado fora.
+      const chave = `${submission.orgNodeId}|${competenceOf(submission.completedAt) ?? ''}`;
+      paraSincronizar.set(chave, {
+        id: submission.id,
+        templateId: submission.templateId,
+        orgNodeId: submission.orgNodeId,
+        completedAt: submission.completedAt,
+        score: apuracao.percent,
+      });
+    }
+
+    const indicadores: Array<{ indicatorName: string; competence: string; value: number; count: number }> = [];
+    for (const alvo of paraSincronizar.values()) {
+      try {
+        const lancado = await this.formIndicator.syncFromSubmission(me, alvo);
+        if (lancado) indicadores.push({ indicatorName: lancado.indicatorName, competence: lancado.competence, value: lancado.value, count: lancado.count });
+      } catch (error) {
+        logSwallowed('forms.indicatorSync', error);
+      }
+    }
+
+    return { submissions: submissions.length, atualizados, indicadores };
   }
 
   async listExecutions(me: AuthPayload, filters: ExecutionFilters = {}) {

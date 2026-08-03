@@ -12,6 +12,19 @@
  *   avaliado, e o preenchimento incompleto é tratado pela obrigatoriedade.
  * - Só campos de avaliação contam. Texto, foto e data são registro, não nota.
  *
+ * ## Lista de opções também é avaliação
+ *
+ * Muito checklist real (ISSMA, por exemplo) é montado com campo de SELEÇÃO cujas
+ * opções são "Conforme / Não Conforme / Não se Aplica" — o autor não usou o tipo
+ * "Conformidade", mas a pergunta é de conformidade do mesmo jeito. Exigir o tipo
+ * certo faria a inspeção inteira sair como "sem itens avaliáveis" e o indicador
+ * nunca receber a média.
+ *
+ * Então SELECT/RADIO/STATUS também contam, porém só com o vocabulário ESTRITO de
+ * conformidade (conforme / não conforme / não aplicável e abreviações). Uma lista
+ * de "IG, ST, GE, RE" ou de "Sim, Não" continua fora: sem a palavra explícita, não
+ * dá para afirmar que aquilo é um julgamento de conformidade.
+ *
  * ## Nota por pergunta
  *
  * O autor pode dar uma nota a cada pergunta ("esta vale 30"). Nem toda pergunta
@@ -29,14 +42,19 @@
  * 1 ponto escondido — diluindo as notas que o autor escreveu.
  */
 
+/** Palavras que são conformidade em qualquer contexto. */
+const CONFORME_ESTRITO = ['conforme', 'c', 'aprovado'];
+
+/** Palavras que são desvio em qualquer contexto. */
+const NAO_CONFORME_ESTRITO = [
+  'nao conforme', 'não conforme', 'nao_conforme', 'não_conforme', 'nc', 'nok', 'reprovado',
+];
+
 /** Respostas que valem como conformidade. */
-const CONFORME = new Set(['conforme', 'sim', 'ok', 'c', 'aprovado', 'true', 'yes', '1']);
+const CONFORME = new Set([...CONFORME_ESTRITO, 'sim', 'ok', 'true', 'yes', '1']);
 
 /** Respostas que valem como desvio. */
-const NAO_CONFORME = new Set([
-  'nao conforme', 'não conforme', 'nao_conforme', 'não_conforme', 'nc', 'nok',
-  'nao', 'não', 'no', 'reprovado', 'false', '0',
-]);
+const NAO_CONFORME = new Set([...NAO_CONFORME_ESTRITO, 'nao', 'não', 'no', 'false', '0']);
 
 /** Respostas que tiram o item da conta. */
 const NAO_APLICAVEL = new Set([
@@ -46,6 +64,16 @@ const NAO_APLICAVEL = new Set([
 
 /** Tipos de campo que representam avaliação (o resto é registro). */
 const TIPOS_AVALIAVEIS = new Set(['CONFORMITY', 'YES_NO', 'BOOLEAN']);
+
+/**
+ * Listas de opção: entram na conta só quando a resposta é uma palavra de
+ * conformidade. "Sim"/"Não" numa lista genérica fica de fora de propósito — em
+ * campo CONFORMITY/YES_NO o autor declarou que é avaliação; numa lista qualquer,
+ * não.
+ */
+const TIPOS_LISTA = new Set(['SELECT', 'RADIO', 'STATUS']);
+const CONFORME_LISTA = new Set(CONFORME_ESTRITO);
+const NAO_CONFORME_LISTA = new Set(NAO_CONFORME_ESTRITO);
 
 export type ConformityVerdict = 'CONFORME' | 'NAO_CONFORME' | 'NAO_APLICAVEL' | 'IGNORADO';
 
@@ -128,15 +156,23 @@ function normalize(value?: string | null): string {
 /** Classifica uma resposta. Campo que não é de avaliação é sempre IGNORADO. */
 export function classifyAnswer(answer: ScorableAnswer): ConformityVerdict {
   const type = String(answer.fieldType ?? '').toUpperCase();
-  if (!TIPOS_AVALIAVEIS.has(type)) return 'IGNORADO';
+  const avaliavel = TIPOS_AVALIAVEIS.has(type);
+  const lista = TIPOS_LISTA.has(type);
+  if (!avaliavel && !lista) return 'IGNORADO';
 
   const value = normalize(answer.value);
   if (!value) return 'IGNORADO';
   if (NAO_APLICAVEL.has(value)) return 'NAO_APLICAVEL';
-  if (NAO_CONFORME.has(value)) return 'NAO_CONFORME';
-  if (CONFORME.has(value)) return 'CONFORME';
+  if ((avaliavel ? NAO_CONFORME : NAO_CONFORME_LISTA).has(value)) return 'NAO_CONFORME';
+  if ((avaliavel ? CONFORME : CONFORME_LISTA).has(value)) return 'CONFORME';
   // Valor fora do vocabulário: não inventa veredito.
   return 'IGNORADO';
+}
+
+/** O tipo do campo pode receber nota? (espelhado no construtor de formulários) */
+export function isScorableFieldType(type?: string | null): boolean {
+  const upper = String(type ?? '').toUpperCase();
+  return TIPOS_AVALIAVEIS.has(upper) || TIPOS_LISTA.has(upper);
 }
 
 /**

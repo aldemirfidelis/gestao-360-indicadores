@@ -68,12 +68,20 @@ export class FormIndicatorService {
     const value = averageConformity(submissions.map((item) => item.score));
     if (value === null) return null;
 
-    await this.results.upsert(me, {
-      indicatorId: indicator.id,
-      periodRef: competence,
-      value,
-      note: `Média de ${submissions.length} inspeção(ões) do período, calculada automaticamente pelo formulário.`,
-    });
+    // Lançamento de AUTOMAÇÃO, não do usuário: quem preenche a inspeção em campo
+    // costuma não ter permissão de escrita na área do indicador, e exigir isso
+    // faria a média simplesmente não sair. A empresa continua isolada (o
+    // indicador foi carregado dentro dela) e o ator fica registrado.
+    await this.results.upsertSystem(
+      me.companyId,
+      {
+        indicatorId: indicator.id,
+        periodRef: competence,
+        value,
+        note: `Média de ${submissions.length} inspeção(ões) do período, calculada automaticamente pelo formulário.`,
+      },
+      me.sub,
+    );
 
     this.logger.log(`Indicador ${indicator.name} (${competence}) = ${value}% a partir de ${submissions.length} inspeção(ões).`);
     return { indicatorId: indicator.id, indicatorName: indicator.name, competence, value, count: submissions.length };

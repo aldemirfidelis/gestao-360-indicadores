@@ -9,7 +9,7 @@ function make(opts: { indicator?: any; submissions?: Array<{ id: string; score: 
     indicator: { findFirst: vi.fn().mockResolvedValue(opts.indicator ?? null) },
     formSubmission: { findMany: vi.fn().mockResolvedValue(opts.submissions ?? []) },
   };
-  const results = { upsert: vi.fn().mockResolvedValue({ result: { id: 'r1' } }) } as any;
+  const results = { upsertSystem: vi.fn().mockResolvedValue({ result: { id: 'r1' } }) } as any;
   return { service: new FormIndicatorService(prisma, results), prisma, results };
 }
 
@@ -30,9 +30,11 @@ describe('FormIndicatorService.syncFromSubmission', () => {
 
     const out = await service.syncFromSubmission(me, inspecao);
 
-    expect(results.upsert).toHaveBeenCalledWith(
-      me,
+    // Lançamento de automação: escreve pela empresa, registrando o ator.
+    expect(results.upsertSystem).toHaveBeenCalledWith(
+      'empresa-1',
       expect.objectContaining({ indicatorId: 'ind-1', periodRef: '2026-07', value: 91 }),
+      'user-1',
     );
     expect(out).toMatchObject({ value: 91, count: 10, competence: '2026-07' });
   });
@@ -51,7 +53,7 @@ describe('FormIndicatorService.syncFromSubmission', () => {
   it('sem indicador vinculado, não lança nada (e não quebra)', async () => {
     const { service, results } = make({ indicator: null });
     await expect(service.syncFromSubmission(me, inspecao)).resolves.toBeNull();
-    expect(results.upsert).not.toHaveBeenCalled();
+    expect(results.upsertSystem).not.toHaveBeenCalled();
   });
 
   it('recalcula o mês inteiro, não soma incremental', async () => {
@@ -75,7 +77,7 @@ describe('FormIndicatorService.syncFromSubmission', () => {
   it('mês sem inspeção pontuável não grava valor', async () => {
     const { service, results } = make({ indicator: { id: 'ind-1', name: 'x' }, submissions: [] });
     await expect(service.syncFromSubmission(me, inspecao)).resolves.toBeNull();
-    expect(results.upsert).not.toHaveBeenCalled();
+    expect(results.upsertSystem).not.toHaveBeenCalled();
   });
 
   it('a nota explica de onde veio o número', async () => {
@@ -84,6 +86,6 @@ describe('FormIndicatorService.syncFromSubmission', () => {
       submissions: [{ id: 's1', score: 100 }, { id: 's2', score: 80 }],
     });
     await service.syncFromSubmission(me, inspecao);
-    expect(results.upsert.mock.calls[0][1].note).toContain('2 inspeção(ões)');
+    expect(results.upsertSystem.mock.calls[0][1].note).toContain('2 inspeção(ões)');
   });
 });

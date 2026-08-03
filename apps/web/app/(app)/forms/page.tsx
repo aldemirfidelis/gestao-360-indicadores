@@ -27,6 +27,7 @@ import {
   Play,
   Plus,
   QrCode,
+  RefreshCw,
   Save,
   Send,
   ShieldCheck,
@@ -409,11 +410,13 @@ const STATUS_CLASS: Record<string, string> = {
 const FIELD_TYPES = ['TEXT', 'TEXTAREA', 'NUMBER', 'DATE', 'BOOLEAN', 'CONFORMITY', 'SELECT', 'MULTISELECT', 'PHOTO', 'ATTACHMENT', 'SIGNATURE', 'LOCATION'];
 
 /**
- * Tipos que valem nota. Espelha TIPOS_AVALIAVEIS de form-scoring.logic.ts no
- * backend: texto, foto e data são registro, não entram no percentual — então
- * oferecer "Nota" neles seria prometer um ponto que nunca é contado.
+ * Tipos que valem nota. Espelha form-scoring.logic.ts no backend: texto, foto e
+ * data são registro, não entram no percentual — então oferecer "Nota" neles
+ * seria prometer um ponto que nunca é contado. Lista de opção entra porque
+ * checklist de conformidade costuma ser montado com SELECT ("Conforme / Não
+ * Conforme / Não se Aplica").
  */
-const SCORABLE_TYPES = new Set(['CONFORMITY', 'YES_NO', 'BOOLEAN']);
+const SCORABLE_TYPES = new Set(['CONFORMITY', 'YES_NO', 'BOOLEAN', 'SELECT', 'RADIO', 'STATUS']);
 
 const EMPTY_FIELD: FieldForm = {
   order: '1',
@@ -589,6 +592,26 @@ export default function FormsPage() {
     onSuccess: (created) => {
       toast.success('Copia criada');
       setSelectedId(created.id);
+      invalidate();
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  // Reapura os registros já preenchidos e relança a média no indicador. Serve
+  // quando a estrutura/regra do modelo muda depois de já haver inspeções.
+  const recalculateTemplate = useMutation({
+    mutationFn: (id: string) =>
+      api<{ submissions: number; atualizados: number; indicadores: Array<{ indicatorName: string; competence: string; value: number; count: number }> }>(
+        `/forms/${id}/recalculate`,
+        { method: 'POST', json: {} },
+      ),
+    onSuccess: (data) => {
+      const lancamentos = data.indicadores
+        .map((item) => `${item.indicatorName} (${item.competence}): ${formatNumber(item.value)}% de ${item.count} inspeção(ões)`)
+        .join(' · ');
+      toast.success(
+        `${data.atualizados} de ${data.submissions} registro(s) reapurado(s).${lancamentos ? ` Indicador atualizado — ${lancamentos}` : ' Nenhum indicador vinculado recebeu média.'}`,
+      );
       invalidate();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -977,6 +1000,7 @@ export default function FormsPage() {
                 onEdit={canUpdate ? openEdit : undefined}
                 onPublish={canPublish ? (id) => publishTemplate.mutate(id) : undefined}
                 onDuplicate={canCreate ? (id) => duplicateTemplate.mutate(id) : undefined}
+                onRecalculate={canUpdate ? (id) => recalculateTemplate.mutate(id) : undefined}
                 onDelete={canDelete ? (id) => deleteTemplate.mutate(id) : undefined}
               />
             ))}
@@ -1210,7 +1234,7 @@ function Filters({ filters, setFilters, options, showStatus }: { filters: Record
  * gerencia modelos. A ação principal (Preencher) é a única em destaque; editar,
  * publicar, copiar, programar e excluir viram ícones, porque são do analista.
  */
-function TemplateCard({ item, selected, showDetails, onSelect, onFill, onSchedule, onEdit, onPublish, onDuplicate, onDelete }: {
+function TemplateCard({ item, selected, showDetails, onSelect, onFill, onSchedule, onEdit, onPublish, onDuplicate, onRecalculate, onDelete }: {
   item: FormTemplate;
   selected: boolean;
   showDetails: boolean;
@@ -1220,6 +1244,7 @@ function TemplateCard({ item, selected, showDetails, onSelect, onFill, onSchedul
   onEdit?: (item: FormTemplate) => void;
   onPublish?: (id: string) => void;
   onDuplicate?: (id: string) => void;
+  onRecalculate?: (id: string) => void;
   onDelete?: (id: string) => void;
 }) {
   const executavel = isExecutable(item);
@@ -1256,6 +1281,14 @@ function TemplateCard({ item, selected, showDetails, onSelect, onFill, onSchedul
             {onPublish ? <IconAction icon={CheckCircle2} title="Publicar" onClick={() => onPublish(item.id)} disabled={item.fields.length === 0 || item.status === 'PUBLISHED'} /> : null}
             {onEdit ? <IconAction icon={Edit} title="Editar" onClick={() => onEdit(item)} /> : null}
             {onDuplicate ? <IconAction icon={Copy} title="Copiar" onClick={() => onDuplicate(item.id)} /> : null}
+            {onRecalculate ? (
+              <IconAction
+                icon={RefreshCw}
+                title="Recalcular resultados dos registros já preenchidos e a média no indicador"
+                onClick={() => onRecalculate(item.id)}
+                disabled={!item.submissionsCount}
+              />
+            ) : null}
             {onDelete ? <IconAction icon={Trash2} title="Excluir" danger onClick={() => onDelete(item.id)} /> : null}
           </div>
         </div>
@@ -1746,12 +1779,13 @@ function SubmissionDialog({ open, setOpen, selected, options, execution, setExec
   const isHeader = headerFieldFilter(selected?.sections);
   const headerFields = (selected?.fields ?? []).filter(isHeader);
   const questionFields = (selected?.fields ?? []).filter((field) => !isHeader(field));
-  // Modelo pontuado = alguma pergunta tem nota. Só então a tela fala de pontos;
-  // em checklist comum isso seria ruído na mão de quem está em campo.
+  // Modelo pontuado = o autor de fato configurou pontos: notas diferentes de 1,
+  // ou pergunta deliberadamente fora do resultado. Espelha `usaNotas` do
+  // backend — checklist em que tudo vale 1 é checklist comum, e falar de pontos
+  // ali seria ruído na mão de quem está em campo.
   const notas = questionFields.filter(isScorable).map(fieldNote);
-  const pontosDoModelo = notas.some((nota) => nota !== null)
-    ? notas.reduce((total: number, nota) => total + (nota ?? 0), 0)
-    : 0;
+  const modeloPontuado = notas.some((nota) => nota !== null) && notas.some((nota) => nota === null || nota !== 1);
+  const pontosDoModelo = modeloPontuado ? notas.reduce((total: number, nota) => total + (nota ?? 0), 0) : 0;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

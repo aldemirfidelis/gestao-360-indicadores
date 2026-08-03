@@ -33,6 +33,23 @@ describe('classifyAnswer', () => {
     expect(classifyAnswer({ fieldType: 'CONFORMITY', value: null })).toBe('IGNORADO');
     expect(classifyAnswer({ fieldType: 'CONFORMITY', value: 'talvez' })).toBe('IGNORADO');
   });
+
+  // Checklist real (ISSMA) montado com lista de opções em vez do tipo Conformidade.
+  it('lista de opção com vocabulário de conformidade conta como avaliação', () => {
+    expect(classifyAnswer({ fieldType: 'SELECT', value: 'Conforme' })).toBe('CONFORME');
+    expect(classifyAnswer({ fieldType: 'SELECT', value: 'Não Conforme' })).toBe('NAO_CONFORME');
+    expect(classifyAnswer({ fieldType: 'SELECT', value: 'Não se Aplica' })).toBe('NAO_APLICAVEL');
+    expect(classifyAnswer({ fieldType: 'RADIO', value: 'NC' })).toBe('NAO_CONFORME');
+  });
+
+  it('lista sem vocabulário de conformidade fica fora da conta', () => {
+    // "Tipo de inspeção: IG, ST, GE, RE" é registro, não julgamento.
+    expect(classifyAnswer({ fieldType: 'SELECT', value: 'IG' })).toBe('IGNORADO');
+    // Sim/Não numa lista genérica é ambíguo: só conta em campo Sim/Não declarado.
+    expect(classifyAnswer({ fieldType: 'SELECT', value: 'Sim' })).toBe('IGNORADO');
+    expect(classifyAnswer({ fieldType: 'SELECT', value: 'Não' })).toBe('IGNORADO');
+    expect(classifyAnswer({ fieldType: 'YES_NO', value: 'Sim' })).toBe('CONFORME');
+  });
 });
 
 describe('conformityScore', () => {
@@ -57,6 +74,28 @@ describe('conformityScore', () => {
     expect(resultado.percent).toBe(100);
     expect(resultado.avaliados).toBe(30);
     expect(resultado.naoAplicaveis).toBe(4);
+  });
+
+  // Regressão: o ISSMA de produção saía "Sem itens avaliáveis" e o indicador
+  // nunca recebia a média. Cabeçalho (texto/data/usuário), lista de contexto
+  // ("Tipo de inspeção") e observações finais convivem com as perguntas.
+  it('inspeção montada com lista de opções resulta em percentual, não em nulo', () => {
+    const resultado = conformityScore([
+      { fieldType: 'TEXT', value: 'Frente 3' },
+      { fieldType: 'DATETIME', value: '2026-08-03T09:46' },
+      { fieldType: 'SELECT', value: 'IG' },
+      { fieldType: 'USER', value: 'Aldemir' },
+      ...Array.from({ length: 8 }, () => ({ fieldType: 'SELECT', value: 'Conforme', weight: 1 })),
+      { fieldType: 'SELECT', value: 'Não Conforme', weight: 1 },
+      { fieldType: 'SELECT', value: 'Não se Aplica', weight: 1 },
+      { fieldType: 'TEXTAREA', value: 'Sem observações', weight: 1 },
+    ]);
+    expect(resultado.percent).toBe(88.9);
+    expect(resultado.conformes).toBe(8);
+    expect(resultado.naoConformes).toBe(1);
+    expect(resultado.naoAplicaveis).toBe(1);
+    // Tudo valendo 1 e nada fora do resultado: segue sendo checklist comum.
+    expect(resultado.usaNotas).toBe(false);
   });
 
   it('metade conforme = 50%', () => {
