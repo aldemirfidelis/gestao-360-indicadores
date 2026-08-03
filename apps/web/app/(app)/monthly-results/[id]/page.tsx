@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
   Clock3,
   FileDown,
@@ -522,7 +523,6 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
   // Pilha de telas da apresentação: indicador -> plano de ação / desvio, sempre
   // com "voltar" para a tela anterior sem sair do modo apresentação.
   const [screenStack, setScreenStack] = useState<PresentationScreen[]>([]);
-  const [lightFilter, setLightFilter] = useState<'GREEN' | 'YELLOW' | 'RED' | null>(null);
   const [presentMode, setPresentMode] = useState<'monthly' | 'cumulative'>('monthly');
   const [fullscreen, setFullscreen] = useState(false);
   // A apresentação segue a ordem do Roteiro da reunião (link com a aba Preparar).
@@ -537,7 +537,6 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
 
   useEffect(() => {
     setScreenStack([]);
-    setLightFilter(null);
   }, [areaIdx]);
 
   useEffect(() => {
@@ -553,29 +552,27 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
     else await node.requestFullscreen().catch(() => null);
   }
 
+  // Apresentação enxuta: todos os indicadores da área, sem filtro de farol na
+  // tela — o farol de cada card já comunica, e chip/legenda viravam ruído no telão.
   const areaIndicators = area?.indicators ?? [];
-  // Contagens do farol (Dentro da Meta inclui superação/azul) — base dos filtros clicáveis.
-  const greenCount = areaIndicators.filter((i) => i.light === 'GREEN' || i.light === 'BLUE').length;
-  const yellowCount = areaIndicators.filter((i) => i.light === 'YELLOW').length;
-  const redCount = areaIndicators.filter((i) => i.light === 'RED').length;
-  const visibleIndicators = !lightFilter
-    ? areaIndicators
-    : areaIndicators.filter((i) => (lightFilter === 'GREEN' ? i.light === 'GREEN' || i.light === 'BLUE' : i.light === lightFilter));
-  const selectedIndicator = topScreen?.type === 'indicator' ? areaIndicators.find((i) => i.indicatorId === topScreen.id) ?? null : null;
-  const screenTitle = topScreen?.type === 'indicator'
-    ? selectedIndicator?.name ?? 'Detalhe do indicador'
-    : topScreen?.type === 'action'
-      ? 'Plano de ação'
-      : topScreen?.type === 'deviation'
-        ? 'Desvio'
-        : '';
-  const backLabel = screenStack.length > 1 ? 'Voltar ao indicador' : 'Voltar aos indicadores';
-  // Título opcional escrito sobre a faixa: painel executivo da área ou tela aberta.
-  const bannerTitle = area ? (topScreen ? `${screenTitle} (${area.name})` : `Painel executivo (${area.name})`) : '';
+  // O rótulo tem que nomear o destino real da pilha (indicador → plano → desvio),
+  // senão o condutor não sabe para onde volta no meio da apresentação.
+  const previousScreen = screenStack[screenStack.length - 2] ?? null;
+  const backLabel = !previousScreen
+    ? 'Voltar ao painel executivo'
+    : previousScreen.type === 'indicator'
+      ? 'Voltar ao indicador'
+      : previousScreen.type === 'action'
+        ? 'Voltar ao plano de ação'
+        : 'Voltar ao desvio';
+  // Título escrito sobre a faixa. Nas telas de detalhe o padrão é sempre
+  // "Resultado x meta (ÁREA)" — o nome do indicador já está na própria tela.
+  const bannerTitle = area ? (topScreen ? `Resultado x meta (${area.name})` : `Painel executivo (${area.name})`) : '';
   // Mensagem-chave do mês: a MESMA registrada pelo gestor no Painel Executivo
-  // daquela área — a apresentação lê, não pede para redigitar.
-  const areaKeyMessage = useAreaKeyMessage(area?.orgNodeId);
-  const panelKeyMessage = (areaKeyMessage.data?.conclusion ?? '').trim();
+  // daquela área — a apresentação lê, não pede para redigitar. Se a área não tem
+  // mensagem no painel, vale a que foi escrita na própria reunião.
+  const panelKeyMessage = useAreaKeyMessage(area?.orgNodeId);
+  const keyMessage = (panelKeyMessage.data?.conclusion ?? '').trim() || (area?.areaKeyMessage ?? '').trim();
   const areaPlans = Array.from(
     new Map(areaIndicators.map((i) => i.linkedAction).filter(Boolean).map((a: any) => [a.id, a])).values(),
   ) as any[];
@@ -625,29 +622,10 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
         </Card>
       ) : (
         <>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold">{area.name}</h2>
-              {area.areaKeyMessage && <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{area.areaKeyMessage}</p>}
-            </div>
-            {!topScreen && (
-              <div className="flex flex-wrap gap-2">
-                <FarolFilter label="Dentro da Meta" light="GREEN" count={greenCount} active={lightFilter === 'GREEN'} onClick={() => setLightFilter((c) => (c === 'GREEN' ? null : 'GREEN'))} />
-                <FarolFilter label="Atenção" light="YELLOW" count={yellowCount} active={lightFilter === 'YELLOW'} onClick={() => setLightFilter((c) => (c === 'YELLOW' ? null : 'YELLOW'))} />
-                <FarolFilter label="Fora da Meta" light="RED" count={redCount} active={lightFilter === 'RED'} onClick={() => setLightFilter((c) => (c === 'RED' ? null : 'RED'))} />
-              </div>
-            )}
-          </div>
-
           {topScreen ? (
             <Card>
-              <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  {selectedIndicator && (
-                    <span className={cn('h-3 w-3 shrink-0 rounded-full', selectedIndicator.light === 'RED' && 'status-red-pulse')} style={{ background: LIGHT_COLORS[selectedIndicator.light] }} />
-                  )}
-                  <CardTitle className="truncate text-base">{screenTitle}</CardTitle>
-                </div>
+              {/* Sem título: a faixa já anuncia a tela. Fica só o caminho de volta. */}
+              <CardHeader className="flex-row items-center justify-end gap-3 space-y-0 pb-2">
                 <Button variant="outline" size="sm" className="shrink-0" onClick={goBackScreen}>
                   <ArrowLeft className="mr-1.5 h-4 w-4" /> {backLabel}
                 </Button>
@@ -666,14 +644,6 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
             </Card>
           ) : (
             <>
-              <p className="text-xs text-muted-foreground">
-                Clique no farol para filtrar; clique em um indicador para apresentá-lo (Visão 360°) — os demais recolhem e você volta com “Voltar aos indicadores”.
-                {lightFilter && (
-                  <button type="button" className="ml-2 font-medium text-primary hover:underline" onClick={() => setLightFilter(null)}>
-                    Limpar filtro
-                  </button>
-                )}
-              </p>
               <div className="mb-2 inline-flex rounded-md border p-0.5 text-xs">
                 {(['monthly', 'cumulative'] as const).map((m) => (
                   <button
@@ -687,7 +657,7 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
                 ))}
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {visibleIndicators.map((ind) => (
+                {areaIndicators.map((ind) => (
                   <PresentationCard
                     key={ind.id}
                     ind={ind}
@@ -697,12 +667,11 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
                   />
                 ))}
                 {areaIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador nesta área.</p>}
-                {areaIndicators.length > 0 && visibleIndicators.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador neste farol.</p>}
               </div>
 
-              {panelKeyMessage && <KeyMessageCard message={panelKeyMessage} />}
+              {keyMessage && <KeyMessageCard message={keyMessage} />}
 
-              <AreaPlansKanban inProgress={plansInProgress} closed={plansClosed} />
+              <AreaPlansKanban inProgress={plansInProgress} closed={plansClosed} onOpenAction={openAction} />
             </>
           )}
         </>
@@ -715,22 +684,22 @@ function ConductTab({ meeting, options, can, run }: { meeting: MeetingDetail; op
 
 const CLOSED_ACTION_STATUSES = ['DONE', 'DONE_LATE', 'EFFECTIVE', 'INEFFECTIVE', 'CANCELLED'];
 
-function AreaPlansKanban({ inProgress, closed }: { inProgress: any[]; closed: any[] }) {
+function AreaPlansKanban({ inProgress, closed, onOpenAction }: { inProgress: any[]; closed: any[]; onOpenAction?: (actionId: string) => void }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Planos de ação da área</CardTitle>
-        <p className="text-xs text-muted-foreground">Acompanhe os planos vinculados aos indicadores desta área (reuniões anteriores e atual).</p>
+        <p className="text-xs text-muted-foreground">Clique em um plano para abrir as tarefas sem sair da apresentação.</p>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <PlanColumn title="Em execução" tone="text-status-yellow" plans={inProgress} />
-        <PlanColumn title="Encerrados" tone="text-status-green" plans={closed} />
+        <PlanColumn title="Em execução" tone="text-status-yellow" plans={inProgress} onOpenAction={onOpenAction} />
+        <PlanColumn title="Encerrados" tone="text-status-green" plans={closed} onOpenAction={onOpenAction} />
       </CardContent>
     </Card>
   );
 }
 
-function PlanColumn({ title, tone, plans }: { title: string; tone: string; plans: any[] }) {
+function PlanColumn({ title, tone, plans, onOpenAction }: { title: string; tone: string; plans: any[]; onOpenAction?: (actionId: string) => void }) {
   return (
     <div className="rounded-lg border bg-muted/20 p-3">
       <div className={cn('mb-2 flex items-center justify-between text-sm font-semibold', tone)}>
@@ -740,19 +709,79 @@ function PlanColumn({ title, tone, plans }: { title: string; tone: string; plans
       <div className="space-y-2">
         {plans.length === 0 && <p className="text-xs text-muted-foreground">Nenhum plano.</p>}
         {plans.map((plan) => (
-          <Link key={plan.id} href={`/actions/${plan.id}`} className="block rounded-md border bg-background p-2.5 text-xs transition hover:border-primary/50">
-            <div className="flex items-start justify-between gap-2">
-              <span className="min-w-0 break-words font-medium">{plan.title}</span>
-              <Badge variant="outline" className="shrink-0">{ACTION_STATUS_LABEL[plan.status] ?? plan.status}</Badge>
-            </div>
-            <div className="mt-1 text-muted-foreground">
-              {plan.responsibleUser?.name ?? 'Sem responsável'}{typeof plan.progress === 'number' ? ` · ${plan.progress}%` : ''}
-            </div>
-          </Link>
+          <PlanRow key={plan.id} plan={plan} onOpenAction={onOpenAction} />
         ))}
       </div>
     </div>
   );
+}
+
+/**
+ * Plano em acordeon: abre as tarefas ali mesmo (responsável, prazo, situação).
+ * Sair da apresentação para conferir "quem ficou com o quê" quebrava o ritmo da
+ * reunião — as tarefas só são buscadas quando alguém expande.
+ */
+function PlanRow({ plan, onOpenAction }: { plan: any; onOpenAction?: (actionId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const detail = useQuery<{ tasks: PlanTask[] }>({
+    queryKey: ['action', plan.id, 'tasks'],
+    queryFn: () => api<{ tasks: PlanTask[] }>(`/actions/${plan.id}`),
+    enabled: open,
+  });
+  const tasks = detail.data?.tasks ?? [];
+  return (
+    <div className="rounded-md border bg-background text-xs">
+      <button type="button" className="flex w-full items-start gap-2 p-2.5 text-left transition hover:border-primary/50" onClick={() => setOpen((v) => !v)}>
+        <ChevronRight className={cn('mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-start justify-between gap-2">
+            <span className="min-w-0 break-words font-medium">{plan.title}</span>
+            <Badge variant="outline" className="shrink-0">{ACTION_STATUS_LABEL[plan.status] ?? plan.status}</Badge>
+          </span>
+          <span className="mt-1 block text-muted-foreground">
+            {plan.responsibleUser?.name ?? 'Sem responsável'}{typeof plan.progress === 'number' ? ` · ${plan.progress}%` : ''}
+          </span>
+        </span>
+      </button>
+      {open && (
+        <div className="border-t px-2.5 py-2">
+          {detail.isLoading && <p className="text-muted-foreground">Carregando tarefas…</p>}
+          {detail.isError && <p className="text-status-red">Não foi possível carregar as tarefas.</p>}
+          {detail.data && tasks.length === 0 && <p className="text-muted-foreground">Nenhuma tarefa cadastrada neste plano.</p>}
+          {tasks.length > 0 && (
+            <ul className="space-y-1.5">
+              {tasks.map((task) => (
+                <li key={task.id} className="flex items-start gap-2">
+                  <span className={cn('mt-1 h-2.5 w-2.5 shrink-0 rounded-full border', task.done ? 'border-status-green bg-status-green' : 'border-muted-foreground/50')} />
+                  <span className="min-w-0 flex-1">
+                    <span className={cn('block break-words', task.done && 'text-muted-foreground line-through')}>{task.title}</span>
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      {task.assignedTo?.name ?? 'Sem responsável'}
+                      {task.dueDate ? ` · prazo ${formatDate(task.dueDate)}` : ''}
+                      {` · ${task.done ? 'Concluída' : 'Em aberto'}`}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {onOpenAction && (
+            <Button variant="ghost" size="sm" className="mt-2 h-7 px-2 text-xs" onClick={() => onOpenAction(plan.id)}>
+              Abrir plano completo
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface PlanTask {
+  id: string;
+  title: string;
+  done: boolean;
+  dueDate: string | null;
+  assignedTo: { id: string; name: string } | null;
 }
 
 function Timer({ item, run }: { item: AgendaItem; run: Run }) {
@@ -1557,21 +1586,3 @@ function Counter({ light, value }: { light: Light; value: number }) {
   return <span className={cn('rounded-full border px-2 py-0.5 text-xs font-medium', LIGHT_STYLES[light])}>{LIGHT_LABEL[light]} {value}</span>;
 }
 
-function FarolFilter({ label, light, count, active, onClick }: { label: string; light: Light; count: number; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      title={active ? 'Clique para limpar o filtro' : `Filtrar: ${label}`}
-      className={cn(
-        'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition',
-        LIGHT_STYLES[light],
-        active ? 'ring-2 ring-offset-1 ring-current' : 'opacity-80 hover:opacity-100',
-      )}
-    >
-      <span className={cn('h-2 w-2 rounded-full', light === 'RED' && 'status-red-pulse')} style={{ background: LIGHT_COLORS[light] }} />
-      {label} {count}
-    </button>
-  );
-}

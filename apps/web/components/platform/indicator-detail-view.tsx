@@ -242,7 +242,10 @@ export function IndicatorDetailView({
   const [chartType, setChartType] = useState<IndicatorChartType>('bar');
   const [grainMonth, setGrainMonth] = useState(currentMonthRef());
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const [detailTab, setDetailTab] = useState<'ANALISE' | 'HISTORICO' | 'ACOES'>('ANALISE');
+  // Na apresentação da Reunião Mensal a única aba é Ações (os planos vinculados
+  // ao indicador): análise e histórico são trabalho de bastidor, não de fórum.
+  const detailTabs = embedded ? (['ACOES'] as const) : (['ANALISE', 'HISTORICO', 'ACOES'] as const);
+  const [detailTab, setDetailTab] = useState<'ANALISE' | 'HISTORICO' | 'ACOES'>(embedded ? 'ACOES' : 'ANALISE');
   const { open: openVision360 } = useVision360();
   const { hasPermission } = useAuth();
   const canCreateDeviation = hasPermission(['deviations:create', 'deviations:update']);
@@ -524,7 +527,9 @@ export function IndicatorDetailView({
       />
       )}
 
-      {/* Fluxo Lógico e Rastreabilidade Superior */}
+      {/* Fluxo Lógico e Rastreabilidade Superior — fora da apresentação: no telão
+          a hierarquia completa é informação demais para o tempo do fórum. */}
+      {!embedded && (
       <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border bg-card/45 p-3 text-xs shadow-sm backdrop-blur-sm">
         <span className="font-semibold text-muted-foreground">Hierarquia integrada:</span>
         <span className="font-medium text-foreground">{ind.company?.name ?? 'Empresa'}</span>
@@ -557,7 +562,11 @@ export function IndicatorDetailView({
           </>
         )}
       </div>
+      )}
 
+      {/* "Realizado atual" duplica o que os cards do painel já mostraram: só
+          fora da apresentação. */}
+      {!embedded && (
       <div className="mb-6 max-w-sm">
         <Card>
           <CardContent className="p-4">
@@ -593,6 +602,7 @@ export function IndicatorDetailView({
           </CardContent>
         </Card>
       </div>
+      )}
 
       {(() => {
         const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -763,7 +773,7 @@ export function IndicatorDetailView({
                 </div>
                 <div className="mt-4 border-t pt-4">
                   <div className="mb-3 flex flex-wrap gap-1">
-                    {(['ANALISE', 'HISTORICO', 'ACOES'] as const).map((tab) => (
+                    {detailTabs.map((tab) => (
                       <button
                         key={tab}
                         type="button"
@@ -806,6 +816,7 @@ export function IndicatorDetailView({
           deletingDeviation={deleteDeviation.isPending}
           actionsHref={indicatorActionsHref}
           onOpenAction={onOpenAction}
+          embedded={embedded}
         />
 
         <div className="hidden">
@@ -872,8 +883,9 @@ export function IndicatorDetailView({
         </div>
       </div>
 
-      {/* Blocos de Ações e Reuniões Relacionados */}
-      <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+      {/* Blocos de Ações e Reuniões Relacionados. Na apresentação fica só o de
+          planos: para reunião/desvio o caminho é o próprio plano de ação. */}
+      <div className={cn('mb-6 grid grid-cols-1 gap-6', !embedded && 'md:grid-cols-2')}>
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b">
             <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
@@ -902,6 +914,7 @@ export function IndicatorDetailView({
           </CardContent>
         </Card>
 
+        {!embedded && (
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b">
             <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
@@ -929,6 +942,7 @@ export function IndicatorDetailView({
             )}
           </CardContent>
         </Card>
+        )}
       </div>
 
       <Card>
@@ -1070,6 +1084,7 @@ function IndicatorDecisionCards({
   deletingDeviation,
   actionsHref,
   onOpenAction,
+  embedded = false,
 }: {
   indicator: IndicatorDetail;
   principal: PrincipalDeviation | null;
@@ -1084,11 +1099,11 @@ function IndicatorDecisionCards({
   deletingDeviation?: boolean;
   actionsHref: string;
   onOpenAction?: (actionId: string) => void;
+  /** Na apresentação da reunião o card é leitura: abrir/excluir desvio não é ação de fórum. */
+  embedded?: boolean;
 }) {
   // O pai já resolve o desvio do mês em foco (ou null quando há filtro sem desvio no mês).
   const mainDeviation = principalDeviation ?? null;
-  const deviationHref = mainDeviation ? `/deviations/${mainDeviation.id}` : '/deviations';
-  const treatmentHref = currentTreatment ? `/treatments/${currentTreatment.id}` : '/treatments';
   const latestAnalysis = mainDeviation?.analyses?.[0] ?? null;
   const linkedActions = uniqueActionRows(deviations.flatMap((deviation) => deviation.actions ?? []));
   const rootCause = mainDeviation?.rootCause?.trim();
@@ -1136,29 +1151,31 @@ function IndicatorDecisionCards({
               Impacto registrado: {truncateText(mainDeviation.impact, 150)}
             </p>
           )}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant={mainDeviation ? 'outline' : 'destructive'}
-              size="sm"
-              onClick={() => onOpenDeviation(mainDeviation)}
-              disabled={openingDeviation || (!mainDeviation && !canCreateDeviation)}
-            >
-              <AlertTriangle className="mr-1.5 h-4 w-4" />
-              {openingDeviation ? 'Abrindo...' : mainDeviation ? `Abrir desvio #${mainDeviation.number}` : 'Registrar Desvio'}
-            </Button>
-            {mainDeviation && canDeleteDeviation && onDeleteDeviation && (
+          {!embedded && (
+            <div className="flex flex-wrap items-center gap-2">
               <Button
-                variant="ghost"
+                variant={mainDeviation ? 'outline' : 'destructive'}
                 size="sm"
-                className="text-status-red hover:text-status-red"
-                disabled={deletingDeviation}
-                onClick={() => onDeleteDeviation(mainDeviation.id)}
-                title="Excluir desvio (administradores)"
+                onClick={() => onOpenDeviation(mainDeviation)}
+                disabled={openingDeviation || (!mainDeviation && !canCreateDeviation)}
               >
-                <Trash2 className="mr-1.5 h-4 w-4" />Excluir
+                <AlertTriangle className="mr-1.5 h-4 w-4" />
+                {openingDeviation ? 'Abrindo...' : mainDeviation ? `Abrir desvio #${mainDeviation.number}` : 'Registrar Desvio'}
               </Button>
-            )}
-          </div>
+              {mainDeviation && canDeleteDeviation && onDeleteDeviation && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-status-red hover:text-status-red"
+                  disabled={deletingDeviation}
+                  onClick={() => onDeleteDeviation(mainDeviation.id)}
+                  title="Excluir desvio (administradores)"
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" />Excluir
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </DecisionCard>
 

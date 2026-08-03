@@ -346,11 +346,14 @@ export function ActionDetailView({
                     <div className="font-semibold">{a.meeting.title}</div>
                     <div className="mt-1 text-xs text-muted-foreground">{formatDate(a.meeting.startsAt)}</div>
                   </div>
-                  <Button asChild className="w-full">
-                    <Link href={`/meetings/${a.meeting.id}`}>
-                      Abrir reunião
-                    </Link>
-                  </Button>
+                  {/* Sem atalho para fora na apresentação da Reunião Mensal. */}
+                  {!embedded && (
+                    <Button asChild className="w-full">
+                      <Link href={`/meetings/${a.meeting.id}`}>
+                        Abrir reunião
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3 rounded-md border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
@@ -380,7 +383,7 @@ export function ActionDetailView({
         </div>
       )}
 
-      {tab === 'Origem' && <OriginTrail a={a} />}
+      {tab === 'Origem' && <OriginTrail a={a} embedded={embedded} />}
       {tab === 'Análise de causa' && (
         <AnalysisWorkspace
           action={a}
@@ -472,7 +475,7 @@ function EditableText({ label, value, onSave }: { label: string; value: string; 
   );
 }
 
-function OriginTrail({ a }: { a: ActionDetail }) {
+function OriginTrail({ a, embedded }: { a: ActionDetail; embedded?: boolean }) {
   return (
     <SectionCard title="Trilha completa de origem" description="Caminho lógico que originou este plano de ação.">
       <div className="relative pl-6 border-l-2 border-primary/20 space-y-6">
@@ -487,7 +490,8 @@ function OriginTrail({ a }: { a: ActionDetail }) {
                 <GitBranch className="h-3.5 w-3.5 text-primary" />
                 {item.type === 'INDICATOR' ? 'Indicador' : item.type === 'DEVIATION' ? 'Desvio / FCA' : item.type === 'MEETING' ? 'Reunião' : item.type}
               </div>
-              {item.href ? (
+              {/* Na apresentação a trilha é leitura: seguir o link sairia do fórum. */}
+              {item.href && !embedded ? (
                 <Link className="text-sm font-semibold text-primary hover:underline block" href={item.href}>
                   {item.label}
                 </Link>

@@ -96,7 +96,8 @@ export function DeviationDetailView({
     onSuccess: (meeting) => {
       toast.success('Reunião criada — conduza a análise de causa nas ferramentas');
       qc.invalidateQueries({ queryKey: ['deviation', id] });
-      router.push(`/meetings/${meeting.id}`);
+      // Embutido na apresentação: sair para a reunião derrubaria o fórum da tela.
+      if (!embedded) router.push(`/meetings/${meeting.id}`);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar a reunião'),
   });
@@ -238,10 +239,14 @@ export function DeviationDetailView({
                       : 'A análise (Ishikawa → 5 Porquês → 5W2H → PDCA) é feita em uma reunião.'}
                   </div>
                 </div>
+                {/* Na apresentação da Reunião Mensal, abrir a reunião da análise
+                    tiraria o condutor da tela: some o atalho em vez de navegar. */}
                 {d.meetings && d.meetings.length > 0 ? (
-                  <Button variant="outline" asChild>
-                    <Link href={`/meetings/${d.meetings[0].id}`}>Abrir reunião</Link>
-                  </Button>
+                  embedded ? null : (
+                    <Button variant="outline" asChild>
+                      <Link href={`/meetings/${d.meetings[0].id}`}>Abrir reunião</Link>
+                    </Button>
+                  )
                 ) : (
                   <Button onClick={() => createMeeting.mutate()} disabled={createMeeting.isPending}>
                     <CalendarPlus className="mr-2 h-4 w-4" />

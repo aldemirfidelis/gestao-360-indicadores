@@ -56,9 +56,10 @@ export function PresentationHeaderBanner({ branding, title }: { branding?: Prese
             branding.titleAlign === 'center' ? 'justify-center' : branding.titleAlign === 'right' ? 'justify-end' : 'justify-start',
           )}
         >
+          {/* Tamanho de projeção: precisa ser legível no fundo da sala. */}
           <span
             className={cn(
-              'max-w-[72%] truncate text-[clamp(1rem,2.4vw,2rem)] font-bold drop-shadow-sm',
+              'max-w-[78%] truncate text-[clamp(1.5rem,3.8vw,3.5rem)] font-bold uppercase leading-tight tracking-wide drop-shadow-sm',
               branding.titleColor === 'dark' ? 'text-slate-900' : 'text-white',
             )}
           >
