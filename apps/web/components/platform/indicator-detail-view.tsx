@@ -908,9 +908,11 @@ export function IndicatorDetailView({
         </div>
       </div>
 
-      {/* Blocos de Ações e Reuniões Relacionados. Na apresentação fica só o de
-          planos: para reunião/desvio o caminho é o próprio plano de ação. */}
-      <div className={cn('mb-6 grid grid-cols-1 gap-6', !embedded && 'md:grid-cols-2')}>
+      {/* Blocos de Ações e Reuniões Relacionados: fora da apresentação. No telão
+          a aba Ações já mostra os mesmos planos com as tarefas dentro, e para
+          reunião/desvio o caminho é o próprio plano de ação. */}
+      {!embedded && (
+      <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b">
             <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
@@ -939,7 +941,6 @@ export function IndicatorDetailView({
           </CardContent>
         </Card>
 
-        {!embedded && (
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b">
             <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
@@ -967,8 +968,8 @@ export function IndicatorDetailView({
             )}
           </CardContent>
         </Card>
-        )}
       </div>
+      )}
 
       {/* Tabela de lançamentos e auditoria: material de conferência, não de
           telão — na apresentação a tela fica só com o que se discute. */}
