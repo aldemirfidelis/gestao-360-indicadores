@@ -35,6 +35,7 @@ import {
 import { PageHeader } from '@/components/shell/page-header';
 import { HeaderBuilder } from '@/components/forms/header-builder';
 import { PhotoCapture, type CapturedPhoto } from '@/components/forms/photo-capture';
+import { clearSubmissionDraft, draftHasContent, loadSubmissionDraft, saveSubmissionDraft } from '@/lib/forms/submission-draft';
 import { ExecutePicker } from '@/components/forms/execute-picker';
 import { ParticipantsField, ParticipantsFooter, type Participant } from '@/components/forms/participants-field';
 import type { ExecuteSelection } from '@/lib/forms/execute';
@@ -486,6 +487,8 @@ export default function FormsPage() {
   const [execution, setExecution] = useState<ExecuteSelection>({ areaId: '', sectorId: '' });
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  // Quando o preenchimento foi recuperado de um rascunho (null = começou agora).
+  const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
   const [executionForm, setExecutionForm] = useState({ title: '', assignedToId: '', dueDate: '', offlineEnabled: false });
   const [executionAnswers, setExecutionAnswers] = useState<Record<string, string>>({});
   const [evidenceForm, setEvidenceForm] = useState({ fileName: '', fileUrl: '', description: '', type: 'ATTACHMENT' });
@@ -632,11 +635,14 @@ export default function FormsPage() {
       // Em checklist pontuado o resumo já vem em pontos ("70% — 70 de 100
       // pontos"), que é o número que o técnico confere na hora.
       else toast.success(submission.scoreSummary ? `Preenchimento registrado — ${submission.scoreSummary}` : 'Preenchimento registrado');
+      // Registrado no servidor: o rascunho local perdeu a razão de existir.
+      if (selectedId) void clearSubmissionDraft(selectedId);
       setSubmissionOpen(false);
       setSubmissionNotes('');
       setAnswers({});
       setPhotos([]);
       setParticipants([]);
+      setDraftRestoredAt(null);
       invalidate();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -807,8 +813,50 @@ export default function FormsPage() {
     setExecution({ areaId: '', sectorId: '' });
     setParticipants([]);
     setAnswers(Object.fromEntries(item.fields.map((field) => [field.id, ''])));
+    setDraftRestoredAt(null);
     setSubmissionOpen(true);
+    // Recupera o que ficou de um preenchimento interrompido (tirar foto no
+    // celular costuma fazer o navegador recarregar a página e zerar o React).
+    void loadSubmissionDraft(item.id).then((draft) => {
+      if (!draft || !draftHasContent(draft)) return;
+      setAnswers({ ...Object.fromEntries(item.fields.map((field) => [field.id, ''])), ...draft.answers });
+      setSubmissionNotes(draft.notes ?? '');
+      setPhotos((draft.photos ?? []) as CapturedPhoto[]);
+      setParticipants((draft.participants ?? []) as Participant[]);
+      setExecution(draft.execution ?? { areaId: '', sectorId: '' });
+      setDraftRestoredAt(draft.updatedAt);
+    });
   }
+
+  /** Recomeça do zero, jogando fora o rascunho recuperado. */
+  function discardDraft() {
+    setSubmissionNotes('');
+    setPhotos([]);
+    setExecution({ areaId: '', sectorId: '' });
+    setParticipants([]);
+    setAnswers(Object.fromEntries((selected?.fields ?? []).map((field) => [field.id, ''])));
+    setDraftRestoredAt(null);
+    if (selectedId) void clearSubmissionDraft(selectedId);
+  }
+
+  // Grava o rascunho a cada mudança enquanto a tela de preencher está aberta.
+  // O celular pode descartar a aba a qualquer momento (câmera, ligação, troca de
+  // app) — o que estiver gravado é o que sobrevive.
+  useEffect(() => {
+    if (!submissionOpen || !selectedId) return;
+    const timer = setTimeout(() => {
+      void saveSubmissionDraft({
+        templateId: selectedId,
+        updatedAt: Date.now(),
+        answers,
+        notes: submissionNotes,
+        participants,
+        photos,
+        execution,
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [submissionOpen, selectedId, answers, submissionNotes, participants, photos, execution]);
 
   // Aberto via QR (/scan -> /forms?fill=<templateId>): abre direto o preenchimento da inspeção.
   const fillHandledRef = useRef(false);
@@ -981,7 +1029,7 @@ export default function FormsPage() {
         saving={saveTemplate.isPending}
       />
 
-      <SubmissionDialog open={submissionOpen} setOpen={setSubmissionOpen} selected={selected} options={optionsQuery.data} execution={execution} setExecution={setExecution} participants={participants} setParticipants={setParticipants} photos={photos} setPhotos={setPhotos} notes={submissionNotes} setNotes={setSubmissionNotes} answers={answers} setAnswers={setAnswers} submit={() => submitForm.mutate()} saving={submitForm.isPending} />
+      <SubmissionDialog open={submissionOpen} setOpen={setSubmissionOpen} selected={selected} options={optionsQuery.data} execution={execution} setExecution={setExecution} participants={participants} setParticipants={setParticipants} photos={photos} setPhotos={setPhotos} notes={submissionNotes} setNotes={setSubmissionNotes} answers={answers} setAnswers={setAnswers} submit={() => submitForm.mutate()} saving={submitForm.isPending} draftRestoredAt={draftRestoredAt} onDiscardDraft={discardDraft} />
 
       <RecordDetailDialog
         submission={recordDetail}
@@ -1642,7 +1690,7 @@ Não se aplica" />
   );
 }
 
-function SubmissionDialog({ open, setOpen, selected, options, execution, setExecution, participants, setParticipants, photos, setPhotos, notes, setNotes, answers, setAnswers, submit, saving }: {
+function SubmissionDialog({ open, setOpen, selected, options, execution, setExecution, participants, setParticipants, photos, setPhotos, notes, setNotes, answers, setAnswers, submit, saving, draftRestoredAt, onDiscardDraft }: {
   open: boolean;
   setOpen: (open: boolean) => void;
   selected: FormTemplate | null;
@@ -1659,6 +1707,9 @@ function SubmissionDialog({ open, setOpen, selected, options, execution, setExec
   setAnswers: (fn: any) => void;
   submit: () => void;
   saving: boolean;
+  /** Quando veio de rascunho recuperado (ms), para avisar quem preenche. */
+  draftRestoredAt?: number | null;
+  onDiscardDraft?: () => void;
 }) {
   const isHeader = headerFieldFilter(selected?.sections);
   const headerFields = (selected?.fields ?? []).filter(isHeader);
@@ -1681,6 +1732,22 @@ function SubmissionDialog({ open, setOpen, selected, options, execution, setExec
           ) : null}
         </DialogHeader>
         <div className="grid gap-4 py-2">
+          {/* Preenchimento interrompido (câmera, ligação, aba descartada): volta
+              de onde parou, e quem quiser recomeçar decide na hora. */}
+          {draftRestoredAt ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+              <span>
+                Recuperamos o preenchimento que ficou em aberto{' '}
+                {new Date(draftRestoredAt).toLocaleString('pt-BR')}. Confira antes de registrar.
+              </span>
+              {onDiscardDraft ? (
+                <Button size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs" onClick={onDiscardDraft} disabled={saving}>
+                  Começar do zero
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+
           {/* Onde a inspeção está sendo feita: define a qual indicador o
               resultado vai somar. O formulário já foi escolhido em "Preencher". */}
           <div className="rounded-lg border p-3">
