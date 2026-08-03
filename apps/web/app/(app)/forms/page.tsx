@@ -6,8 +6,6 @@ import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  Archive,
-  Bot,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -17,7 +15,6 @@ import {
   FileCheck,
   FileDown,
   FileSpreadsheet,
-  FolderTree,
   History,
   LayoutTemplate,
   Link2,
@@ -32,7 +29,6 @@ import {
   Send,
   ShieldCheck,
   Sparkles,
-  Tags,
   Trash2,
   X,
 } from 'lucide-react';
@@ -215,15 +211,6 @@ interface FormsSummary {
   executions?: number;
   issues?: number;
   withoutFields: number;
-}
-
-interface FormsDashboard extends FormsSummary {
-  pendingApprovals: number;
-  openIssues: number;
-  overdueExecutions: number;
-  records: number;
-  recentRecords: Array<{ id: string; code: string; title: string; status: string; recordDate: string }>;
-  recentExecutions: FormExecution[];
 }
 
 interface FormsOptions {
@@ -475,13 +462,9 @@ export default function FormsPage() {
   const canEvidence = hasPermission(['forms:evidence']);
   const canApprove = hasPermission(['forms:approve']);
   const canIssues = hasPermission(['forms:issues']);
-  const canAi = hasPermission(['forms:ai']);
-  const canDashboard = hasPermission(['forms:dashboard']);
   // Quem só preenche não gerencia modelo: a lista some de detalhes e de ações.
   const canManageTemplates = canCreate || canUpdate || canPublish || canDelete || canBuilder;
-  // O técnico cai direto na lista de formulários: sem o painel, "Painel Geral"
-  // seria uma tela vazia de KPIs que ele nem tem permissão de consultar.
-  const [tab, setTab] = useState(canDashboard ? 'dashboard' : 'templates');
+  const [tab, setTab] = useState('templates');
   const [filters, setFilters] = useState({ search: '', status: '', type: '' });
   const [executionFilters, setExecutionFilters] = useState({ search: '', status: '' });
   const [recordFilters, setRecordFilters] = useState({ search: '', templateId: '', from: '', to: '' });
@@ -510,7 +493,6 @@ export default function FormsPage() {
   const [issueForm, setIssueForm] = useState({ title: '', description: '', severity: 'MEDIUM', responsibleUserId: '', dueDate: '' });
 
   const listQuery = useQuery<FormTemplate[]>({ queryKey: ['forms', filters], queryFn: () => api<FormTemplate[]>(`/forms${toQueryString(filters)}`) });
-  const dashboardQuery = useQuery<FormsDashboard>({ queryKey: ['forms', 'dashboard'], queryFn: () => api<FormsDashboard>('/forms/dashboard'), enabled: canDashboard });
   const optionsQuery = useQuery<FormsOptions>({ queryKey: ['forms', 'options'], queryFn: () => api<FormsOptions>('/forms/options'), staleTime: 60_000 });
   const executionsQuery = useQuery<FormExecution[]>({ queryKey: ['forms', 'executions', executionFilters], queryFn: () => api<FormExecution[]>(`/forms/executions${toQueryString(executionFilters)}`), enabled: canExecute });
   // Registros de TODOS os formulários: quem preenche precisa achar o que
@@ -527,7 +509,6 @@ export default function FormsPage() {
     [templates, canManageTemplates],
   );
   const records = useMemo(() => recordsQuery.data ?? [], [recordsQuery.data]);
-  const dashboard = dashboardQuery.data;
   const options = optionsQuery.data;
   const selected = useMemo(() => templates.find((item) => item.id === selectedId) ?? null, [templates, selectedId]);
 
@@ -612,15 +593,6 @@ export default function FormsPage() {
       toast.success(
         `${data.atualizados} de ${data.submissions} registro(s) reapurado(s).${lancamentos ? ` Indicador atualizado — ${lancamentos}` : ' Nenhum indicador vinculado recebeu média.'}`,
       );
-      invalidate();
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
-  const createVersion = useMutation({
-    mutationFn: (id: string) => api(`/forms/${id}/versions`, { method: 'POST', json: { changeReason: 'Versão criada pelo construtor' } }),
-    onSuccess: () => {
-      toast.success('Versão criada');
       invalidate();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -774,18 +746,6 @@ export default function FormsPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const createAiSuggestions = useMutation({
-    mutationFn: () => {
-      if (!selected) throw new Error('Formulário não selecionado');
-      return api('/forms/ai/suggestions', { method: 'POST', json: { templateId: selected.id } });
-    },
-    onSuccess: () => {
-      toast.success('Sugestões geradas');
-      invalidate();
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
   function openCreate() {
     setEditing(null);
     setForm(cloneTemplateForm());
@@ -917,67 +877,14 @@ export default function FormsPage() {
       />
 
       <Tabs value={tab} onValueChange={setTab}>
-        {/* Abas de gestão só aparecem para quem gerencia: no celular do técnico
-            a tela fica em Modelos e Registros, sem construtor nem catálogos. */}
+        {/* Três telas só: o modelo, o que foi programado e o que foi preenchido.
+            Painel Geral, Construtor e Configurações saíram — do Construtor o que
+            era de fato usado (gerar QR) virou botão no próprio card do modelo. */}
         <TabsList className="bg-slate-100 dark:bg-slate-800">
-          {canDashboard ? <TabsTrigger value="dashboard" className="text-xs font-semibold">Painel Geral</TabsTrigger> : null}
           <TabsTrigger value="templates" className="text-xs font-semibold">Modelos</TabsTrigger>
-          {canBuilder ? <TabsTrigger value="builder" className="text-xs font-semibold">Construtor</TabsTrigger> : null}
           {canExecute ? <TabsTrigger value="executions" className="text-xs font-semibold">Execuções</TabsTrigger> : null}
           <TabsTrigger value="records" className="text-xs font-semibold">Registros</TabsTrigger>
-          {canManageTemplates ? <TabsTrigger value="settings" className="text-xs font-semibold">Configurações</TabsTrigger> : null}
         </TabsList>
-
-        <TabsContent value="dashboard" className="space-y-6">
-          
-          {/* KPIs de Checklists */}
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-            <KpiCard title="Modelos de Formulários" value={formatNumber(dashboard?.total)} change={`${formatNumber(dashboard?.active)} ativos no SGQ`} color="sky" icon={LayoutTemplate} />
-            <KpiCard title="Execuções Programadas" value={formatNumber(dashboard?.executions)} change={`${formatNumber(dashboard?.overdueExecutions)} em atraso`} color="rose" icon={ListChecks} />
-            <KpiCard title="Registros Realizados" value={formatNumber(dashboard?.records)} change={`${formatNumber(dashboard?.submissions)} checklists preenchidos`} color="emerald" icon={FileCheck} />
-            <KpiCard title="Não Conformidades (RNC)" value={formatNumber(dashboard?.openIssues)} change={`${formatNumber(dashboard?.pendingApprovals)} revisões pendentes`} color="purple" icon={ShieldCheck} />
-          </div>
-
-          {/* Gráfico de Aderência e Desvios */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[340px]">
-              <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
-                <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-855 dark:text-white">
-                  <Play className="h-4 w-4 text-sky-500" />
-                  Execuções Pendentes e Recentes
-                </h3>
-              </div>
-              <CardContent className="p-4 overflow-y-auto flex-1 space-y-3">
-                {(dashboard?.recentExecutions ?? []).slice(0, 4).map((execution) => (
-                  <ExecutionRow key={execution.id} execution={execution} onResponses={canExecute ? openExecutionResponse : undefined} onComplete={canExecute ? (id) => completeExecution.mutate(id) : undefined} />
-                ))}
-                {!dashboard?.recentExecutions?.length ? <EmptyText>Sem execuções recentes no momento.</EmptyText> : null}
-              </CardContent>
-            </Card>
-
-            <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[340px]">
-              <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
-                <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-855 dark:text-white">
-                  <Archive className="h-4 w-4 text-emerald-500" />
-                  Registros Operacionais Recebidos
-                </h3>
-              </div>
-              <CardContent className="p-4 overflow-y-auto flex-1 space-y-3">
-                {(dashboard?.recentRecords ?? []).slice(0, 3).map((record) => (
-                  <div key={record.id} className="rounded-xl border p-3 bg-slate-50/30 dark:bg-slate-900/30 flex flex-col gap-1 text-xs">
-                    <div className="flex items-center justify-between font-bold">
-                      <span className="text-slate-800 dark:text-slate-200">{record.code}</span>
-                      <Badge variant="outline" className="text-[9px] scale-90">{record.status}</Badge>
-                    </div>
-                    <p className="text-slate-600 dark:text-slate-350">{record.title}</p>
-                    <span className="text-[10px] text-slate-400 mt-1">{formatDate(record.recordDate)}</span>
-                  </div>
-                ))}
-                {!dashboard?.recentRecords?.length ? <EmptyText>Sem registros recebidos.</EmptyText> : null}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
 
         <TabsContent value="templates" className="space-y-4">
           <Filters filters={filters} setFilters={setFilters} options={options} showStatus={canManageTemplates} />
@@ -1001,56 +908,13 @@ export default function FormsPage() {
                 onPublish={canPublish ? (id) => publishTemplate.mutate(id) : undefined}
                 onDuplicate={canCreate ? (id) => duplicateTemplate.mutate(id) : undefined}
                 onRecalculate={canUpdate ? (id) => recalculateTemplate.mutate(id) : undefined}
+                onQrCode={canBuilder ? (id) => generateQr.mutate(id) : undefined}
+                onPrintQr={canBuilder ? (token) => { setQrInfo({ token, title: item.title }); setQrOpen(true); } : undefined}
+                qrCodes={selectedId === item.id ? selectedBuilder?.qrCodes : undefined}
+                externalLinks={selectedId === item.id ? selectedBuilder?.externalLinks : undefined}
                 onDelete={canDelete ? (id) => deleteTemplate.mutate(id) : undefined}
               />
             ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="builder" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-[260px_1fr_340px]">
-            <Card><CardContent className="space-y-3 p-4">
-              <SectionTitle icon={<LayoutTemplate className="h-4 w-4" />} title="Componentes" />
-              {FIELD_TYPES.map((type) => (
-                <div key={type} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                  <span>{label(FIELD_LABEL, type)}</span>
-                  <Badge variant="outline">{type}</Badge>
-                </div>
-              ))}
-            </CardContent></Card>
-            <Card><CardContent className="space-y-4 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <SectionTitle icon={<Edit className="h-4 w-4" />} title={selected ? selected.title : 'Selecione um modelo'} />
-                <div className="flex flex-wrap gap-2">
-                  {selected && canUpdate ? <Button size="sm" variant="outline" onClick={() => openEdit(selected)}><Edit className="mr-2 h-4 w-4" /> Editar estrutura</Button> : null}
-                  {selected && canBuilder ? <Button size="sm" variant="outline" onClick={() => createVersion.mutate(selected.id)}><History className="mr-2 h-4 w-4" /> Nova versão</Button> : null}
-                  {selected && canAi ? <Button size="sm" variant="outline" onClick={() => createAiSuggestions.mutate()}><Sparkles className="mr-2 h-4 w-4" /> Sugestões</Button> : null}
-                </div>
-              </div>
-              {!selected ? <EmptyText>Escolha um modelo na aba Modelos para visualizar o construtor.</EmptyText> : null}
-              {selected?.sections?.length ? selected.sections.map((section) => (
-                <div key={section.id} className="space-y-2 rounded-md border p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{section.title}</span>
-                    {section.repeatable ? <Badge variant="outline">Repetivel</Badge> : null}
-                  </div>
-                  {selected.fields.filter((field) => !field.sectionId || field.sectionId === section.id).map((field) => <FieldPreview key={field.id} field={field} />)}
-                </div>
-              )) : selected?.fields.map((field) => <FieldPreview key={field.id} field={field} />)}
-            </CardContent></Card>
-            <Card><CardContent className="space-y-4 p-4">
-              <SectionTitle icon={<ShieldCheck className="h-4 w-4" />} title="Governança" />
-              <MiniList title="Versões" items={(selectedBuilder?.template.versions ?? selected?.versions ?? []).map((v) => `${v.versionLabel} - ${label(STATUS_LABEL, v.status)}`)} empty="Sem versões." />
-              <MiniList title="Regras" items={(selectedBuilder?.rules ?? []).map((r) => `${r.name} - ${r.event}`)} empty="Sem regras configuradas." />
-              <MiniList title="Formulas" items={(selectedBuilder?.formulas ?? []).map((f) => `${f.code}: ${f.expression}`)} empty="Sem formulas configuradas." />
-              {selected && canBuilder ? (
-                <Button size="sm" variant="outline" className="w-full" onClick={() => generateQr.mutate(selected.id)} disabled={generateQr.isPending}>
-                  <QrCode className="mr-2 h-4 w-4" />{generateQr.isPending ? 'Gerando…' : 'Gerar QR do formulário'}
-                </Button>
-              ) : null}
-              <MiniList title="QR e externo" items={[...(selectedBuilder?.qrCodes ?? []).map((q) => `QR ${q.code}`), ...(selectedBuilder?.externalLinks ?? []).map((l) => `${l.name} - ${l.status}`)]} empty="Sem acesso externo." />
-              <MiniList title="IA" items={(selectedBuilder?.aiSuggestions ?? []).map((s) => s.title)} empty="Sem sugestões." />
-            </CardContent></Card>
           </div>
         </TabsContent>
 
@@ -1099,19 +963,6 @@ export default function FormsPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="settings" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-4">
-            <CatalogPanel icon={<FileSpreadsheet className="h-4 w-4" />} title="Tipos" items={(options?.typeConfigs ?? []).map((item) => `${item.name} (${label(TYPE_LABEL, item.category)})`)} />
-            <CatalogPanel icon={<FolderTree className="h-4 w-4" />} title="Categorias" items={(options?.categories ?? []).map((item) => item.name)} />
-            <CatalogPanel icon={<FolderTree className="h-4 w-4" />} title="Pastas" items={(options?.folders ?? []).map((item) => item.name)} />
-            <CatalogPanel icon={<Tags className="h-4 w-4" />} title="Tags" items={(options?.tags ?? []).map((item) => item.name)} />
-          </div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <CatalogPanel icon={<LayoutTemplate className="h-4 w-4" />} title="Blocos reutilizáveis" items={(options?.reusableBlocks ?? []).map((item) => `${item.name} - ${item.blockType}`)} />
-            <CatalogPanel icon={<QrCode className="h-4 w-4" />} title="QR/externo" items={(selectedBuilder?.qrCodes ?? []).map((item) => item.code)} />
-            <CatalogPanel icon={<Bot className="h-4 w-4" />} title="Assistente" items={(selectedBuilder?.aiSuggestions ?? []).map((item) => item.title)} />
-          </div>
-        </TabsContent>
       </Tabs>
 
       <TemplateDialog
@@ -1234,7 +1085,7 @@ function Filters({ filters, setFilters, options, showStatus }: { filters: Record
  * gerencia modelos. A ação principal (Preencher) é a única em destaque; editar,
  * publicar, copiar, programar e excluir viram ícones, porque são do analista.
  */
-function TemplateCard({ item, selected, showDetails, onSelect, onFill, onSchedule, onEdit, onPublish, onDuplicate, onRecalculate, onDelete }: {
+function TemplateCard({ item, selected, showDetails, onSelect, onFill, onSchedule, onEdit, onPublish, onDuplicate, onRecalculate, onQrCode, onPrintQr, qrCodes, externalLinks, onDelete }: {
   item: FormTemplate;
   selected: boolean;
   showDetails: boolean;
@@ -1245,6 +1096,12 @@ function TemplateCard({ item, selected, showDetails, onSelect, onFill, onSchedul
   onPublish?: (id: string) => void;
   onDuplicate?: (id: string) => void;
   onRecalculate?: (id: string) => void;
+  /** Gera (ou reusa) o QR do formulário e abre a impressão. */
+  onQrCode?: (id: string) => void;
+  /** Imprime um QR já existente, sem emitir outro. O token é o próprio `code`. */
+  onPrintQr?: (token: string) => void;
+  qrCodes?: { id: string; code: string; label: string | null; active: boolean }[];
+  externalLinks?: { id: string; name: string; status: string }[];
   onDelete?: (id: string) => void;
 }) {
   const executavel = isExecutable(item);
@@ -1281,6 +1138,7 @@ function TemplateCard({ item, selected, showDetails, onSelect, onFill, onSchedul
             {onPublish ? <IconAction icon={CheckCircle2} title="Publicar" onClick={() => onPublish(item.id)} disabled={item.fields.length === 0 || item.status === 'PUBLISHED'} /> : null}
             {onEdit ? <IconAction icon={Edit} title="Editar" onClick={() => onEdit(item)} /> : null}
             {onDuplicate ? <IconAction icon={Copy} title="Copiar" onClick={() => onDuplicate(item.id)} /> : null}
+            {onQrCode ? <IconAction icon={QrCode} title="Gerar e imprimir o QR Code deste formulário" onClick={() => onQrCode(item.id)} /> : null}
             {onRecalculate ? (
               <IconAction
                 icon={RefreshCw}
@@ -1313,6 +1171,32 @@ function TemplateCard({ item, selected, showDetails, onSelect, onFill, onSchedul
               <MetaLine label="Dono" value={item.owner?.name ?? '-'} />
               <MiniList title="Tags" items={item.tags ?? []} empty="Sem tags." />
             </div>
+          </div>
+        ) : null}
+
+        {/* QR e acesso externo do formulário: fica abaixo, para consulta, com a
+            impressão de cada QR já gerado (a inspeção em si). */}
+        {selected && showDetails && ((qrCodes?.length ?? 0) > 0 || (externalLinks?.length ?? 0) > 0) ? (
+          <div className="space-y-2 rounded-md border bg-background/60 p-3">
+            <SectionTitle icon={<QrCode className="h-4 w-4" />} title="QR e acesso externo" />
+            {qrCodes?.map((qr) => (
+              <div key={qr.id} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                <span className="min-w-0">
+                  <span className="block truncate">{qr.label || item.title}</span>
+                  <span className="block truncate font-mono text-[11px] text-muted-foreground">{qr.code}</span>
+                </span>
+                {onPrintQr ? (
+                  <Button size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs" onClick={() => onPrintQr(qr.code)}>
+                    <QrCode className="mr-1.5 h-3.5 w-3.5" /> Imprimir
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+            {externalLinks?.map((linkItem) => (
+              <div key={linkItem.id} className="rounded-md border px-3 py-2 text-sm">
+                {linkItem.name} — {linkItem.status}
+              </div>
+            ))}
           </div>
         ) : null}
       </CardContent>
@@ -1988,17 +1872,6 @@ function MiniList({ title, items, empty }: { title: string; items: string[]; emp
   );
 }
 
-function CatalogPanel({ icon, title, items }: { icon: ReactNode; title: string; items: string[] }) {
-  return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
-        <SectionTitle icon={icon} title={title} />
-        {items.length ? items.slice(0, 10).map((item) => <div key={item} className="rounded-md border px-3 py-2 text-sm">{item}</div>) : <EmptyText>Nenhum item.</EmptyText>}
-      </CardContent>
-    </Card>
-  );
-}
-
 function EmptyText({ children }: { children: ReactNode }) {
   return <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">{children}</p>;
 }
@@ -2195,25 +2068,3 @@ function toQueryString(filters: Record<string, string>) {
   return qs ? `?${qs}` : '';
 }
 
-function KpiCard({ title, value, change, color, icon: Icon }: { title: string; value: any; change: string; color: 'emerald' | 'sky' | 'purple' | 'rose' | 'amber'; icon: any }) {
-  const colors = {
-    emerald: 'border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/10 dark:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400',
-    sky: 'border-sky-100 dark:border-sky-900/30 bg-sky-50/10 dark:bg-sky-950/10 text-sky-600 dark:text-sky-400',
-    purple: 'border-purple-100 dark:border-purple-900/30 bg-purple-50/10 dark:bg-purple-950/10 text-purple-600 dark:text-purple-400',
-    rose: 'border-rose-100 dark:border-rose-900/30 bg-rose-50/10 dark:bg-rose-950/10 text-rose-600 dark:text-rose-400',
-    amber: 'border-amber-100 dark:border-amber-900/30 bg-amber-50/10 dark:bg-amber-950/10 text-amber-600 dark:text-amber-400'
-  };
-
-  return (
-    <Card className={cn("border bg-card shadow-sm p-4 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.01] flex items-center justify-between", colors[color])}>
-      <div className="space-y-1">
-        <span className="text-[10px] uppercase font-bold tracking-wider opacity-85 text-slate-550 dark:text-slate-400">{title}</span>
-        <div className="text-2xl font-extrabold text-slate-900 dark:text-white leading-none">{value ?? '0'}</div>
-        <span className="text-[10px] text-slate-400 font-medium">{change}</span>
-      </div>
-      <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 shadow-sm border border-slate-50 dark:border-slate-800">
-        <Icon className="h-5 w-5" />
-      </div>
-    </Card>
-  );
-}

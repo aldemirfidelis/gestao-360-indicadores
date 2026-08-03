@@ -416,13 +416,23 @@ export class FormsService {
     return execution;
   }
 
+  /**
+   * Valida os vínculos e devolve o que pode ir direto para o `data` do Prisma.
+   *
+   * `ids` traz SÓ as colunas que existem nas três entidades de formulário
+   * (modelo, preenchimento e execução). `ownerUserId` é exclusivo do modelo e
+   * sai separado de propósito: quando ele morava dentro de `ids`, um
+   * `...links.ids` numa execução ou num preenchimento derrubava a requisição
+   * inteira com `Unknown argument 'ownerUserId'` (era o 500 de "Programar
+   * execução" e o de aprovar/corrigir preenchimento).
+   */
   private async validateLinks(companyId: string, input: LinkInput) {
     const ids = {
       orgNodeId: input.orgNodeId ?? null,
       processId: input.processId ?? null,
       indicatorId: input.indicatorId ?? null,
-      ownerUserId: input.ownerUserId ?? null,
     };
+    const ownerUserId = input.ownerUserId ?? null;
     const areas: string[] = [];
 
     if (ids.orgNodeId) {
@@ -444,14 +454,14 @@ export class FormsService {
       if (!indicator) throw new NotFoundException('Indicador nao encontrado');
       if (indicator.ownerNodeId) areas.push(indicator.ownerNodeId);
     }
-    if (ids.ownerUserId) {
-      const user = await this.prisma.user.findFirst({ where: { id: ids.ownerUserId, companyId, deletedAt: null, active: true }, select: { id: true } });
+    if (ownerUserId) {
+      const user = await this.prisma.user.findFirst({ where: { id: ownerUserId, companyId, deletedAt: null, active: true }, select: { id: true } });
       if (!user) throw new NotFoundException('Responsavel nao encontrado');
     }
 
     const uniqueAreas = Array.from(new Set(areas.filter(Boolean)));
     if (uniqueAreas.length > 1) throw new ConflictException('Vinculos do formulario pertencem a areas diferentes.');
-    return { ids, area: uniqueAreas[0] ?? null };
+    return { ids, ownerUserId, area: uniqueAreas[0] ?? null };
   }
 
   private async validateCatalog(companyId: string, input: CatalogInput) {
@@ -876,6 +886,8 @@ export class FormsService {
           integrations: this.json(body?.integrations),
           tags: this.stringArray(body?.tags),
           ...links.ids,
+          // Só o modelo tem dono; execução e preenchimento não têm esta coluna.
+          ownerUserId: links.ownerUserId,
         },
         include: this.templateInclude(),
       });
@@ -917,8 +929,13 @@ export class FormsService {
       folderId: 'folderId' in (patch ?? {}) ? this.id(patch.folderId) : before.folderId,
     });
 
-    const data: Prisma.FormTemplateUpdateInput = {
+    // `Unchecked...` porque gravamos as FKs como escalares (orgNodeId,
+    // ownerUserId...) em vez de `connect`. O tipo "checked" aceitava isso por
+    // acaso — spread não passa por excess property check — e foi assim que um
+    // `ownerUserId` inválido chegou até o Prisma em runtime.
+    const data: Prisma.FormTemplateUncheckedUpdateInput = {
       ...links.ids,
+      ownerUserId: links.ownerUserId,
       ...catalog,
       updatedById: me.sub,
     };

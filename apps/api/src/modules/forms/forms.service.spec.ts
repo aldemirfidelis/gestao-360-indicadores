@@ -446,6 +446,30 @@ describe('FormsService - formularios e checklists', () => {
     expect(submission).toBeTruthy();
     expect(prisma.formSubmission.create).toHaveBeenCalled();
   });
+
+  // Regressao: `ownerUserId` so existe no MODELO. Enquanto ele vinha junto do
+  // resto dos vinculos, o spread derrubava "Programar execucao" e a atualizacao
+  // de preenchimento com PrismaClientValidationError (HTTP 500).
+  it('createExecution nao manda ownerUserId (coluna que a execucao nao tem)', async () => {
+    const template = baseTemplate({ status: 'PUBLISHED', ownerUserId: 'user-9' });
+    const { service, prisma } = makeService({ template });
+    prisma.formExecution.create = vi.fn().mockImplementation((args: any) => Promise.resolve({ id: 'exec-1', title: args.data.title, template, assignments: [] }));
+    prisma.formExecution.count = vi.fn().mockResolvedValue(0);
+
+    await service.createExecution(me, { templateId: 'f1', assignedToId: null, dueDate: '2026-08-05' });
+
+    const data = prisma.formExecution.create.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty('ownerUserId');
+    expect(data).toMatchObject({ companyId: 'companyA', templateId: 'f1' });
+  });
+
+  it('updateSubmission nao manda ownerUserId no preenchimento', async () => {
+    const { service, prisma } = makeService({ submission: baseSubmission() });
+    await service.updateSubmission(me, 'sub-1', { notes: 'ajuste' });
+    const data = prisma.formSubmission.update.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty('ownerUserId');
+    expect(data.notes).toBe('ajuste');
+  });
 });
 
 function baseTemplate(overrides: Record<string, unknown> = {}) {
