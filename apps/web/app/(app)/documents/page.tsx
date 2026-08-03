@@ -22,6 +22,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Search,
   Send,
   Settings,
   ShieldCheck,
@@ -405,6 +406,10 @@ export default function DocumentsPage() {
   const [section, setSection] = useState('acervo');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [filters, setFilters] = useState({ search: '', status: '', type: '', expiring: '' });
+  // A Matriz Geral tem filtro próprio: ela é a tela de consulta do acervo
+  // inteiro, e herdar o recorte do Acervo (onde se trabalha o documento) faria
+  // a "matriz geral" abrir já filtrada sem o usuário ter pedido.
+  const [matrixFilters, setMatrixFilters] = useState({ search: '', status: '', type: '', orgNodeId: '' });
   const [form, setForm] = useState<DocForm>(EMPTY_FORM);
   const [typeForm, setTypeForm] = useState({ name: 'Procedimento', sigla: 'PRO', prefix: 'PRO', category: 'PROCEDURE' as DocType, digits: '3', defaultValidityDays: '365', alertDays: '30' });
   const [templateDialog, setTemplateDialog] = useState<{ mode: 'create' | 'edit'; template: DocTemplate | null } | null>(null);
@@ -419,7 +424,9 @@ export default function DocumentsPage() {
   const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
   const [grantForm, setGrantForm] = useState({ requesterUserId: '', reason: '', expiresAt: '' });
   const [draftContent, setDraftContent] = useState('');
-  const [editorSession, setEditorSession] = useState<EditorSession | null>(null);
+  // `notice`: aviso que fica visivel no cabecalho enquanto o documento e lido
+  // (ex.: rascunho). Toast some em segundos; a ressalva precisa ficar.
+  const [editorSession, setEditorSession] = useState<(EditorSession & { notice?: string }) | null>(null);
   const [viewer, setViewer] = useState<{ url: string; fileId: string; fileName: string } | null>(null);
   const [viewerLoading, setViewerLoading] = useState(false);
   const autoOpenEditorRef = useRef<string | null>(null);
@@ -503,6 +510,11 @@ export default function DocumentsPage() {
     queryKey: ['documents', filters],
     queryFn: () => api<Doc[]>(`/documents${toQueryString(filters)}`),
   });
+  const matrixQuery = useQuery<Doc[]>({
+    queryKey: ['documents', 'matriz', matrixFilters],
+    queryFn: () => api<Doc[]>(`/documents${toQueryString(matrixFilters)}`),
+    enabled: section === 'matriz',
+  });
   const summaryQuery = useQuery<DocSummary>({
     queryKey: ['documents', 'summary'],
     queryFn: () => api<DocSummary>('/documents/summary'),
@@ -529,6 +541,7 @@ export default function DocumentsPage() {
   });
 
   const items = useMemo(() => listQuery.data ?? [], [listQuery.data]);
+  const matrixItems = useMemo(() => matrixQuery.data ?? [], [matrixQuery.data]);
   const summary = summaryQuery.data;
   const options = optionsQuery.data;
   const detail = detailQuery.data ?? null;
@@ -661,14 +674,18 @@ export default function DocumentsPage() {
   });
 
   const openViewer = useMutation({
-    mutationFn: (id: string) => api<EditorSession>(`/documents/${id}/viewer/open`, { method: 'POST', json: {} }),
-    onSuccess: (session) => {
+    mutationFn: ({ id }: { id: string; notice?: string }) =>
+      api<EditorSession>(`/documents/${id}/viewer/open`, { method: 'POST', json: {} }),
+    onSuccess: (session, variables) => {
       if (session.editorUrl && session.accessToken) {
-        setEditorSession({ ...session, readOnly: true });
+        setEditorSession({ ...session, readOnly: true, notice: variables.notice });
       } else {
+        // Sem editor online configurado, a ficha do documento ainda tem o PDF e
+        // o download — melhor levar para la do que deixar o clique sem efeito.
         toast.message('Visualizador pela web indisponível', {
-          description: session.message ?? 'Use o PDF ou baixe o DOCX.',
+          description: session.message ?? 'Abrindo a ficha do documento, com PDF e download.',
         });
+        setDetailId(variables.id);
       }
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível abrir a visualização'),
@@ -1217,7 +1234,58 @@ export default function DocumentsPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="matriz">
+        <TabsContent value="matriz" className="space-y-4">
+          {/* Busca e filtros próprios: aqui se procura o documento para ler, e
+              não se navega pastas como no Acervo. */}
+          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
+            <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:flex-wrap md:items-end">
+              <div className="min-w-[240px] flex-1">
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Buscar documento</div>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Código, título, descrição ou conteúdo"
+                    value={matrixFilters.search}
+                    onChange={(e) => setMatrixFilters((f) => ({ ...f, search: e.target.value }))}
+                    className="h-9 pl-8 text-xs"
+                  />
+                </div>
+              </div>
+              <div className="w-full sm:w-44">
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Tipo</div>
+                <NativeSelect className="h-9 text-xs" value={matrixFilters.type} onChange={(e) => setMatrixFilters((f) => ({ ...f, type: e.target.value }))}>
+                  <option value="">Todos</option>
+                  {Object.entries(TYPE_LABEL).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+                </NativeSelect>
+              </div>
+              <div className="w-full sm:w-48">
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</div>
+                <NativeSelect className="h-9 text-xs" value={matrixFilters.status} onChange={(e) => setMatrixFilters((f) => ({ ...f, status: e.target.value }))}>
+                  <option value="">Todos</option>
+                  {Object.entries(STATUS_LABEL).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+                </NativeSelect>
+              </div>
+              <div className="w-full sm:w-52">
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Área</div>
+                <NativeSelect className="h-9 text-xs" value={matrixFilters.orgNodeId} onChange={(e) => setMatrixFilters((f) => ({ ...f, orgNodeId: e.target.value }))}>
+                  <option value="">Todas</option>
+                  {(options?.orgNodes ?? []).map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}
+                </NativeSelect>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => setMatrixFilters({ search: '', status: '', type: '', orgNodeId: '' })}
+                >
+                  <X className="mr-1.5 h-3.5 w-3.5" />Limpar
+                </Button>
+                <Badge variant="outline" className="h-9 px-3 leading-8">{formatNumber(matrixItems.length)} documentos</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
             <CardContent className="overflow-x-auto p-0">
               <table className="w-full min-w-[980px] text-xs">
@@ -1235,7 +1303,7 @@ export default function DocumentsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-350">
-                  {items.map((doc) => (
+                  {matrixItems.map((doc) => (
                     <tr key={doc.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-900/40">
                       <td className="px-4 py-3 font-bold">{doc.code ?? `#${doc.number}`}</td>
                       <td className="px-4 py-3 font-medium">{doc.title}</td>
@@ -1246,10 +1314,42 @@ export default function DocumentsPage() {
                       <td className="px-4 py-3 font-bold">v{doc.version}</td>
                       <td className={cn('px-4 py-3', doc.isExpired && 'text-status-red')}>{formatDate(doc.validUntil)}</td>
                       <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="sm" className="h-7 text-sky-500 hover:bg-sky-50/50" onClick={() => setDetailId(doc.id)}><Eye className="mr-1.5 h-3.5 w-3.5" />Abrir</Button>
+                        {/* Abrir = ler o documento no editor online, em modo
+                            somente leitura. Documento ainda não publicado abre
+                            do mesmo jeito, mas avisado: quem consulta a matriz
+                            precisa saber que aquilo não é versão vigente. */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-sky-500 hover:bg-sky-50/50"
+                          disabled={openViewer.isPending}
+                          onClick={() =>
+                            openViewer.mutate({
+                              id: doc.id,
+                              notice:
+                                doc.status === 'PUBLISHED'
+                                  ? undefined
+                                  : `${STATUS_LABEL[doc.status]} — este documento ainda não é a versão vigente. Leitura apenas.`,
+                            })
+                          }
+                        >
+                          <Eye className="mr-1.5 h-3.5 w-3.5" />Abrir
+                        </Button>
                       </td>
                     </tr>
                   ))}
+                  {!matrixQuery.isLoading && matrixItems.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
+                        Nenhum documento encontrado para a busca atual.
+                      </td>
+                    </tr>
+                  )}
+                  {matrixQuery.isLoading && (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Carregando documentos…</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </CardContent>
@@ -1612,7 +1712,7 @@ export default function DocumentsPage() {
                       <div className="mt-1 text-[10px] text-muted-foreground">A abertura padrão é somente leitura. Toda edição fica registrada; quem não é responsável precisa de liberação.</div>
                       <div className="mt-3 space-y-2">
                         {detail.editor.configured && (
-                          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" disabled={openViewer.isPending} onClick={() => openViewer.mutate(detail.id)}>
+                          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" disabled={openViewer.isPending} onClick={() => openViewer.mutate({ id: detail.id })}>
                             <Eye className="mr-1.5 h-3.5 w-3.5" />{openViewer.isPending ? 'Abrindo visualização...' : 'Visualizar no Collabora'}
                           </Button>
                         )}
@@ -2084,7 +2184,7 @@ export default function DocumentsPage() {
   );
 }
 
-function OnlineEditorDialog({ session, onClose }: { session: EditorSession | null; onClose: () => void }) {
+function OnlineEditorDialog({ session, onClose }: { session: (EditorSession & { notice?: string }) | null; onClose: () => void }) {
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -2102,6 +2202,12 @@ function OnlineEditorDialog({ session, onClose }: { session: EditorSession | nul
       <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle className="text-sm">{session.readOnly ? 'Visualização do documento' : 'Edição do documento'} — {session.provider}</DialogTitle>
+          {session.notice && (
+            <p className="mt-1 flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              {session.notice}
+            </p>
+          )}
         </DialogHeader>
         <div className="relative min-h-0 flex-1">
           <form ref={formRef} action={session.editorUrl} method="post" target="g360-editor-frame" className="hidden">
