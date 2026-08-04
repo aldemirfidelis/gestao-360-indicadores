@@ -3,10 +3,38 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthPayload } from '../auth/auth.types';
 import { MonthlyResultsService, PresentationBrandingInput } from './monthly-results.service';
+import { MeetingMinutesService } from './meeting-minutes.service';
 
 @Controller('monthly-results')
 export class MonthlyResultsController {
-  constructor(private readonly service: MonthlyResultsService) {}
+  constructor(
+    private readonly service: MonthlyResultsService,
+    private readonly minutes: MeetingMinutesService,
+  ) {}
+
+  // ---- Ata integrada (ações que saíram da reunião) ----
+  @Get('minutes/meetings')
+  @RequirePermissions('monthly:view', 'actions:view')
+  minutesMeetings(@CurrentUser() me: AuthPayload) {
+    return this.minutes.meetings(me);
+  }
+
+  @Get('minutes')
+  @RequirePermissions('monthly:view', 'actions:view')
+  minutesList(
+    @CurrentUser() me: AuthPayload,
+    @Query('meetingId') meetingId?: string,
+    @Query('periodRef') periodRef?: string,
+    @Query('onlyOpen') onlyOpen?: string,
+  ) {
+    return this.minutes.minutes(me, { meetingId, periodRef, onlyOpen });
+  }
+
+  @Get('minutes/actions/:actionId/curve')
+  @RequirePermissions('monthly:view', 'actions:view')
+  minutesCurve(@CurrentUser() me: AuthPayload, @Param('actionId') actionId: string) {
+    return this.minutes.curve(me, actionId);
+  }
 
   // ---- Leitura / overview ----
   @Get('options')

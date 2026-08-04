@@ -516,7 +516,12 @@ model Company {
   name              String
   tradeName         String?
   cnpj              String?       @unique
+  /// Logo da empresa. Aparece na tela de login do tenant e no topo do portal,
+  /// ao lado da marca Gestão 360. Aceita URL ou data URL (imagem embutida).
   logoUrl           String?
+  /// Cor principal do portal desta empresa (hex, ex.: "#0a1128"). Pinta o
+  /// cabeçalho/menu e os realces. Vazio = azul padrão do Gestão 360.
+  brandColor        String?
   // Subdomínio do tenant (ex.: "goiasa" -> goiasa.gestao360.org). Usado para
   // branding da tela de login e validação do login por host.
   slug              String?       @unique
@@ -753,6 +758,7 @@ model OrgNode {
   activities              OrganizationalUnitActivity[] @relation("OrgNodeActivities")
   okrObjectives           OKRObjective[]               @relation("OKRObjectiveOwnerNode")
   monthlyMeetingAreas     MonthlyMeetingArea[]         @relation("MonthlyAreaOrgNode")
+  sharedIndicators        IndicatorSharedArea[]        @relation("SharedIndicatorArea")
 
   @@unique([companyId, externalSource, externalId])
   @@index([companyId])
@@ -1345,6 +1351,7 @@ model Indicator {
   formSubmissions          FormSubmission[]              @relation("FormSubmissionIndicator")
   keyResults               KeyResult[]                   @relation("KeyResultIndicator")
   monthlyMeetingIndicators MonthlyMeetingIndicator[]     @relation("MonthlySnapshotIndicator")
+  sharedAreas              IndicatorSharedArea[]         @relation("IndicatorSharedArea")
 
   @@unique([companyId, code])
   @@unique([companyId, externalSource, externalId])
@@ -1354,6 +1361,26 @@ model Indicator {
   @@index([type])
   @@index([status])
   @@index([externalSource, externalId])
+}
+
+/// Indicador compartilhado entre áreas.
+/// `Indicator.ownerNodeId` continua sendo a área DONA (quem lança o realizado,
+/// responde pela meta e apresenta na Reunião Mensal). Esta tabela lista as
+/// áreas PARTICIPANTES: o mesmo indicador (um único número, sem duplicação de
+/// cadastro) passa a aparecer no Painel Executivo e na preparação da Reunião
+/// Mensal dessas áreas também.
+model IndicatorSharedArea {
+  id          String    @id @default(uuid())
+  indicatorId String
+  indicator   Indicator @relation("IndicatorSharedArea", fields: [indicatorId], references: [id], onDelete: Cascade)
+  orgNodeId   String
+  orgNode     OrgNode   @relation("SharedIndicatorArea", fields: [orgNodeId], references: [id])
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([indicatorId, orgNodeId])
+  @@index([indicatorId])
+  @@index([orgNodeId])
 }
 
 model IndicatorTarget {
@@ -5512,6 +5539,10 @@ model MonthlyMeetingIndicator {
   executiveStatus    String?
   showInPresentation Boolean            @default(true)
   isCritical         Boolean            @default(false)
+  /// Card criado para uma área PARTICIPANTE (o indicador é de outra área).
+  /// Ela prepara e comenta, mas quem apresenta no telão é a área dona — por
+  /// isso o card entra com showInPresentation = false.
+  isShared           Boolean            @default(false)
   financialImpact    Float?
   position           Int                @default(0)
   deviationId        String?
@@ -7659,6 +7690,27 @@ model PlatformModuleCatalog {
 
   @@index([globalStatus])
   @@index([category])
+}
+
+/// Bloqueio de TELA por empresa. O catálogo de páginas (PortalPage) é global —
+/// muda para todos os clientes. Esta tabela é a exceção por empresa: permite
+/// tirar uma tela específica de um cliente sem afetar os demais.
+/// Sem registro = a tela segue o módulo/plano da empresa.
+model PlatformCompanyPage {
+  id             String   @id @default(uuid())
+  companyId      String
+  pageCode       String
+  /// HERDADO_DO_MODULO | ATIVO | SOMENTE_LEITURA | BLOQUEADO
+  status         String   @default("HERDADO_DO_MODULO")
+  note           String?
+  updatedBy      String?
+  updatedByEmail String?
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+
+  @@unique([companyId, pageCode])
+  @@index([pageCode])
+  @@index([status])
 }
 
 model PlatformCompanyModule {

@@ -171,7 +171,7 @@ export const navSections: NavSection[] = [
       { href: '/indicators', label: 'Indicadores', description: 'Farol, ranking e histórico', icon: Target, permissions: ['indicators:view'], exact: true },
       { href: '/deviations', label: 'Desvios', description: 'Indicadores fora da meta, causas e tratativas', icon: AlertTriangle, permissions: ['deviations:view'] },
       { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },
-      { href: '/projects', label: 'Cronogramas', description: 'Projetos, marcos e tarefas', icon: GanttChartSquare, permissions: ['projects:view'] },
+      { href: '/projects', label: 'Ata da Reunião', description: 'Ações da reunião mensal por área, setor e responsável', icon: GanttChartSquare, permissions: ['projects:view', 'actions:view'], exact: true },
       { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: CalendarDays, permissions: ['meetings:view'] },
       { href: '/monthly-results', label: 'Reunião Mensal', description: 'Fechamento de resultados, pauta, ata e acompanhamento semanal', icon: CalendarDays, permissions: ['monthly:view'] },
       { href: '/okrs', label: 'OKRs', description: 'Ciclos e resultados-chave', icon: Goal, permissions: ['okrs:view'] },

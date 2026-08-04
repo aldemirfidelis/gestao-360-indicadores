@@ -68,6 +68,7 @@ export const BUSINESS_MODULES: BusinessModule[] = [
   // faz parte do Serviço Pessoal (aba do menu que a contém).
   { code: 'recrutamento', name: 'Recrutamento e Seleção', menuOrder: 83, members: ['recruitment'] },
   { code: 'servico-pessoal', name: 'Serviço Pessoal', menuOrder: 85, members: ['personnel', 'payroll'] },
+  { code: 'treinamento', name: 'Treinamento e Desenvolvimento', menuOrder: 89, members: ['training'] },
   { code: 'suprimentos', name: 'Suprimentos', menuOrder: 87, members: ['procurement', 'inventory'] },
   { code: 'comunicacao', name: 'Comunicação', menuOrder: 90, members: ['communication'] },
   { code: 'gestao-premio', name: 'Gestão de Prêmio', menuOrder: 100, members: ['prize'] },
@@ -108,6 +109,7 @@ export const PLAN_BUSINESS_MODULES: Record<string, string[]> = {
     'cargos-salarios',
     'recrutamento',
     'servico-pessoal',
+    'treinamento',
     'suprimentos',
     'seguranca-alimentos',
     'seguranca-patrimonial',
@@ -127,6 +129,19 @@ export function businessModuleMembers(code: string): string[] {
 export function alwaysOnModuleCodes(): string[] {
   const core = BUSINESS_MODULES.filter((m) => m.core).flatMap((m) => m.members);
   return Array.from(new Set([...core, ...SYSTEM_MODULE_CODES]));
+}
+
+/**
+ * Módulos que NUNCA podem ser bloqueados para uma empresa: só a infraestrutura
+ * do portal (login, permissões, configurações, auditoria, ajuda...). Sem eles o
+ * cliente não consegue nem entrar nem ser reconfigurado.
+ *
+ * As abas padrão de NEGÓCIO (Meu Dia, Tarefas, Atendimento, Administração) são
+ * ativas por padrão em qualquer plano, mas PODEM ser bloqueadas por exceção —
+ * é o que permite entregar uma empresa com um módulo só.
+ */
+export function nonBlockableModuleCodes(): string[] {
+  return [...SYSTEM_MODULE_CODES];
 }
 
 /**

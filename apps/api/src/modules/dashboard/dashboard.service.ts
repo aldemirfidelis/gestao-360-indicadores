@@ -293,7 +293,16 @@ export class DashboardService {
         deletedAt: null,
         status: 'ACTIVE',
         ...(wantedTypes.length ? { type: { in: wantedTypes } } : {}),
-        ...(ownerNodeIds ? { ownerNodeId: { in: ownerNodeIds } } : {}),
+        // Indicador compartilhado: entra na área pela dona OU pelo vínculo de
+        // compartilhamento, sem cadastro duplicado.
+        ...(ownerNodeIds
+          ? {
+              OR: [
+                { ownerNodeId: { in: ownerNodeIds } },
+                { sharedAreas: { some: { orgNodeId: { in: ownerNodeIds } } } },
+              ],
+            }
+          : {}),
       },
       select: {
         id: true,
@@ -305,6 +314,7 @@ export class DashboardService {
         periodicity: true,
         accumulation: true,
         yellowToleranceP: true,
+        ownerNodeId: true,
         ownerNode: { select: { id: true, name: true, type: true, parentId: true } },
       },
       orderBy: [{ name: 'asc' }],
@@ -442,6 +452,10 @@ export class DashboardService {
       }
     }
 
+    // Conjunto de áreas em foco: serve para dizer se o card é próprio da área
+    // selecionada ou veio compartilhado de outra (o painel marca com selo).
+    const focusNodeIds = ownerNodeIds ? new Set(ownerNodeIds) : null;
+
     return indicators.map((indicator) => {
       const last = resultMap.get(indicator.id) ?? null;
       const refToUse = periodRef ?? last?.periodRef ?? currentRefs.get(indicator.id);
@@ -449,6 +463,7 @@ export class DashboardService {
       // Acumulado só substitui o card quando há de fato dado YTD; senão mantém o mês.
       const cum = cumulative ? cumMap.get(indicator.id) : null;
       const useCum = Boolean(cum && cum.value !== null);
+      const shared = Boolean(focusNodeIds && indicator.ownerNodeId && !focusNodeIds.has(indicator.ownerNodeId));
       return {
         id: indicator.id,
         name: indicator.name,
@@ -457,6 +472,9 @@ export class DashboardService {
         unitLabel: indicator.unitLabel,
         direction: indicator.direction,
         ownerNode: indicator.ownerNode,
+        // Compartilhado: o indicador é de outra área e está aqui como participante.
+        shared,
+        ownerAreaName: shared ? indicator.ownerNode?.name ?? null : null,
         currentTarget: useCum
           ? cum!.target !== null
             ? { target: cum!.target, lowerBound: cum!.lower, upperBound: cum!.upper }

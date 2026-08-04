@@ -26,6 +26,7 @@ import { MessagesButton } from '@/components/communication/messages-button';
 import { UserAvatar } from '@/components/communication/user-avatar';
 import { api } from '@/lib/api';
 import { BrandLogo } from '@/components/brand/brand-logo';
+import { CompanyLogo } from '@/components/brand/company-logo';
 
 interface SearchResult {
   id: string;
@@ -117,7 +118,7 @@ export function Topbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-[#1b2b54]/50 bg-[#0a1128] px-3 pt-[env(safe-area-inset-top)] [height:calc(3.5rem+env(safe-area-inset-top))] backdrop-blur lg:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-[hsl(var(--shell-border)/0.5)] bg-[hsl(var(--shell-bg))] px-3 pt-[env(safe-area-inset-top)] [height:calc(3.5rem+env(safe-area-inset-top))] backdrop-blur lg:px-6">
       <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
         <DialogTrigger asChild>
           <Button variant="ghost" size="icon" className="lg:hidden text-slate-300 hover:text-white hover:bg-white/[0.05]" aria-label="Abrir menu">
@@ -125,12 +126,13 @@ export function Topbar() {
           </Button>
         </DialogTrigger>
         <DialogContent className="left-2 top-2 h-[calc(100vh-1rem)] max-w-[300px] translate-x-0 translate-y-0 p-0">
-          <DialogHeader className="border-b border-[#1b2b54]/50 px-4 py-3 bg-[#0a1128] text-white">
+          <DialogHeader className="border-b border-[hsl(var(--shell-border)/0.5)] px-4 py-3 bg-[hsl(var(--shell-bg))] text-white">
             <DialogTitle className="flex items-center gap-2 text-sm text-white">
               <BrandLogo variant="horizontal" size="sm" theme="dark" animated={true} />
+              <CompanyLogo imgClassName="h-6 max-w-[80px]" />
             </DialogTitle>
           </DialogHeader>
-          <div className="bg-[#0a1128] h-full">
+          <div className="bg-[hsl(var(--shell-bg))] h-full">
             <AccordionNavigation mobile onNavigate={() => setMenuOpen(false)} />
           </div>
         </DialogContent>
@@ -162,14 +164,14 @@ export function Topbar() {
           data-1p-ignore
           data-lpignore="true"
           placeholder="Buscar indicadores, ações, setores..."
-          className="h-9 border-[#203363] bg-[#121c38] pl-9 pr-8 text-sm text-white placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
+          className="h-9 border-[hsl(var(--shell-border))] bg-[hsl(var(--shell-bg-soft))] pl-9 pr-8 text-sm text-white placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
         />
         <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-1 rounded bg-[#1e293b] px-1.5 font-mono text-[10px] font-medium text-slate-400 opacity-100 sm:flex">
           <span className="text-[11px]">⌘</span>K
         </kbd>
         {searchOpen && search.trim().length >= 2 && (
-          <div className="absolute left-0 right-0 top-11 z-50 overflow-hidden border border-[#1b2b54]/80 bg-[#0c1938] shadow-lg rounded-lg text-white">
-            <div className="border-b border-[#1b2b54]/50 px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400 bg-[#0a1128]">
+          <div className="absolute left-0 right-0 top-11 z-50 overflow-hidden border border-[hsl(var(--shell-border)/0.8)] bg-[hsl(var(--shell-bg-soft))] shadow-lg rounded-lg text-white">
+            <div className="border-b border-[hsl(var(--shell-border)/0.5)] px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400 bg-[hsl(var(--shell-bg))]">
               Busca global
             </div>
             <div className="max-h-[420px] overflow-y-auto p-1">
@@ -193,7 +195,7 @@ export function Topbar() {
                     <span className="block truncate font-medium text-white">{item.label}</span>
                     <span className="block truncate text-xs text-slate-400">{item.description}</span>
                   </span>
-                  <span className="shrink-0 border border-[#1b2b54]/50 bg-[#121c38] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-300 rounded">
+                  <span className="shrink-0 border border-[hsl(var(--shell-border)/0.5)] bg-[hsl(var(--shell-bg-soft))] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-300 rounded">
                     {typeLabel(item.type)}
                   </span>
                 </Link>
@@ -222,7 +224,7 @@ export function Topbar() {
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
         {user && (
-          <div ref={profileRef} className="relative ml-1 flex items-center gap-2 border-l border-[#1b2b54]/50 pl-3 text-white">
+          <div ref={profileRef} className="relative ml-1 flex items-center gap-2 border-l border-[hsl(var(--shell-border)/0.5)] pl-3 text-white">
             <div className="hidden text-right leading-tight sm:block">
               <div className="text-xs font-medium text-white">{user.name}</div>
               <div className="text-[10px] text-slate-400">{profileRole}</div>

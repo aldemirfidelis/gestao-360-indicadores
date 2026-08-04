@@ -168,7 +168,7 @@ export function AccordionNavigation({
                         {/* Linha vertical do pai descendo ate o ultimo filho */}
                         <span
                           aria-hidden="true"
-                          className="pointer-events-none absolute left-0 top-0 h-full w-px bg-[#1b2b54]/50"
+                          className="pointer-events-none absolute left-0 top-0 h-full w-px bg-[hsl(var(--shell-border)/0.5)]"
                         />
                         <div className="space-y-0.5">
                           {section.items.map((item, idx) => {
@@ -194,14 +194,14 @@ export function AccordionNavigation({
                                   aria-hidden="true"
                                   className={cn(
                                     'pointer-events-none absolute left-0 top-1/2 h-px w-3 -translate-y-1/2',
-                                    active ? 'bg-blue-500' : 'bg-[#1b2b54]/50',
+                                    active ? 'bg-blue-500' : 'bg-[hsl(var(--shell-border)/0.5)]',
                                   )}
                                 />
                                 {/* Mascara para encerrar a linha vertical no ultimo filho */}
                                 {isLast && (
                                   <span
                                     aria-hidden="true"
-                                    className="pointer-events-none absolute -left-px top-1/2 h-1/2 w-px bg-[#0a1128]"
+                                    className="pointer-events-none absolute -left-px top-1/2 h-1/2 w-px bg-[hsl(var(--shell-bg))]"
                                   />
                                 )}
                                 {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-blue-500" />}

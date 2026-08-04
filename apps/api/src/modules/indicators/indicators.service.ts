@@ -44,6 +44,12 @@ type IndicatorWriteInput = {
   responsibleUserId?: string | null;
   feederUserId?: string | null;
   parentIndicatorId?: string | null;
+  /**
+   * Áreas PARTICIPANTES do indicador (além da dona, que é o ownerNodeId).
+   * Indicador compartilhado aparece no Painel Executivo e na Reunião Mensal
+   * dessas áreas sem virar um cadastro duplicado. `undefined` = não mexer.
+   */
+  sharedAreaIds?: string[] | null;
   name?: string | null;
   code?: string | null;
   description?: string | null;
@@ -111,7 +117,20 @@ export class IndicatorsService {
       where: {
         companyId: f.companyId,
         deletedAt: null,
-        ...(ownerNodeIds ? { ownerNodeId: { in: ownerNodeIds } } : {}),
+        // Área: o indicador entra pela área dona OU por compartilhamento.
+        // Vai em AND para não colidir com o OR da busca textual abaixo.
+        ...(ownerNodeIds
+          ? {
+              AND: [
+                {
+                  OR: [
+                    { ownerNodeId: { in: ownerNodeIds } },
+                    { sharedAreas: { some: { orgNodeId: { in: ownerNodeIds } } } },
+                  ],
+                },
+              ],
+            }
+          : {}),
         ...(f.type ? { type: f.type as IndicatorType } : {}),
         ...(f.periodicity ? { periodicity: f.periodicity as Periodicity } : {}),
         ...(f.status ? { status: f.status as IndicatorStatus } : {}),
@@ -152,6 +171,11 @@ export class IndicatorsService {
         childRelations: {
           select: {
             parent: { select: { id: true, name: true, code: true } },
+          },
+        },
+        sharedAreas: {
+          select: {
+            orgNode: { select: { id: true, name: true, type: true, parentId: true } },
           },
         },
         _count: {
@@ -208,6 +232,7 @@ export class IndicatorsService {
         isMacro: (indicator._count?.parentRelations ?? 0) > 0,
         areaMacro: area.areaMacro,
         areaMicro: area.areaMicro,
+        sharedAreas: (indicator.sharedAreas ?? []).map((link) => link.orgNode),
         currentTarget: currentTarget
           ? {
               periodRef: currentTarget.periodRef,
@@ -361,16 +386,43 @@ export class IndicatorsService {
           },
         },
         meetings: { select: { id: true, title: true, status: true, startsAt: true } },
+        // O detalhe também edita/visualiza o cadastro (mesmos diálogos da lista):
+        // sem o pai, salvar pela tela de detalhe apagaria o vínculo macro/micro.
+        childRelations: {
+          select: {
+            parent: { select: { id: true, name: true, code: true } },
+          },
+        },
+        sharedAreas: {
+          select: {
+            orgNode: { select: { id: true, name: true, type: true, parentId: true } },
+          },
+        },
+        _count: {
+          select: {
+            actions: true,
+            meetings: true,
+            targets: true,
+            results: true,
+            parentRelations: true,
+          },
+        },
       },
     });
     if (!indicator) throw new NotFoundException('Indicador nao encontrado');
     const area = deriveArea(indicator.ownerNode);
+    const parentIndicator = indicator.childRelations?.[0]?.parent ?? null;
+    const sharedAreas = (indicator.sharedAreas ?? []).map((link) => link.orgNode);
 
     // Restrição por área: bloqueia acesso direto a indicador de área não permitida
     // e aplica projeção RESUMIDA quando o nível de visibilidade for SUMMARY.
     if (me?.sub) {
       const permitted = await this.access.listAreaFilter(me.sub, 'indicators', 'view');
-      if (permitted && indicator.ownerNodeId && !permitted.includes(indicator.ownerNodeId)) {
+      // Indicador compartilhado: quem enxerga QUALQUER uma das áreas vinculadas
+      // (dona ou participante) tem acesso de leitura — é o mesmo indicador que
+      // aparece no Painel Executivo e na Reunião Mensal daquela área.
+      const linkedNodeIds = [indicator.ownerNodeId, ...sharedAreas.map((node) => node.id)].filter(Boolean) as string[];
+      if (permitted && linkedNodeIds.length && !linkedNodeIds.some((nodeId) => permitted.includes(nodeId))) {
         throw new ForbiddenException('Você não tem acesso aos indicadores desta área.');
       }
       const level = await this.access.visibilityLevel(me.sub, 'indicators', indicator.ownerNodeId);
@@ -378,7 +430,15 @@ export class IndicatorsService {
         return summarizeIndicator(indicator, area);
       }
     }
-    return { ...indicator, areaMacro: area.areaMacro, areaMicro: area.areaMicro };
+    const { childRelations: _childRelations, sharedAreas: _sharedAreas, ...rest } = indicator;
+    return {
+      ...rest,
+      sharedAreas,
+      parentIndicator,
+      isMacro: (indicator._count?.parentRelations ?? 0) > 0,
+      areaMacro: area.areaMacro,
+      areaMicro: area.areaMicro,
+    };
   }
 
   async create(me: AuthPayload, input: IndicatorWriteInput) {
@@ -394,6 +454,9 @@ export class IndicatorsService {
       await this.syncObjectiveLink(tx, indicator.id, indicator.strategicObjectiveId, me.sub);
       if (parentIndicatorId) {
         await this.syncParentRelation(tx, companyId, indicator.id, parentIndicatorId);
+      }
+      if (input.sharedAreaIds !== undefined) {
+        await this.syncSharedAreas(tx, companyId, indicator.id, indicator.ownerNodeId, input.sharedAreaIds, me.sub);
       }
       return indicator;
     });
@@ -432,6 +495,9 @@ export class IndicatorsService {
       }
       if (input.parentIndicatorId !== undefined) {
         await this.syncParentRelation(tx, current.companyId, indicator.id, cleanString(input.parentIndicatorId) ?? null);
+      }
+      if (input.sharedAreaIds !== undefined) {
+        await this.syncSharedAreas(tx, current.companyId, indicator.id, indicator.ownerNodeId, input.sharedAreaIds, me.sub);
       }
       return indicator;
     });
@@ -992,6 +1058,44 @@ export class IndicatorsService {
       create: { parentId, childId },
       update: {},
     });
+  }
+
+  /**
+   * Sincroniza as áreas PARTICIPANTES do indicador. A área dona (ownerNodeId)
+   * nunca entra aqui: ela já é dona, e repetir viraria card duplicado na
+   * Reunião Mensal. Lista vazia = deixa de ser compartilhado.
+   */
+  private async syncSharedAreas(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    indicatorId: string,
+    ownerNodeId: string | null,
+    sharedAreaIds: string[] | null,
+    userId: string,
+  ) {
+    const wanted = [...new Set((sharedAreaIds ?? []).map((id) => cleanString(id)).filter((id): id is string => Boolean(id)))]
+      .filter((id) => id !== ownerNodeId);
+
+    if (wanted.length) {
+      const nodes = await tx.orgNode.findMany({
+        where: { id: { in: wanted }, companyId, deletedAt: null },
+        select: { id: true },
+      });
+      if (nodes.length !== wanted.length) {
+        throw new BadRequestException('Área compartilhada inválida para esta empresa.');
+      }
+    }
+
+    await tx.indicatorSharedArea.deleteMany({
+      where: { indicatorId, ...(wanted.length ? { orgNodeId: { notIn: wanted } } : {}) },
+    });
+    for (const orgNodeId of wanted) {
+      await tx.indicatorSharedArea.upsert({
+        where: { indicatorId_orgNodeId: { indicatorId, orgNodeId } },
+        create: { indicatorId, orgNodeId, createdById: userId },
+        update: {},
+      });
+    }
   }
 
   private async syncObjectiveLink(

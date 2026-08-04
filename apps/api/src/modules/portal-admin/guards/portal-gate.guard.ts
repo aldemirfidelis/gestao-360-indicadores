@@ -94,6 +94,8 @@ export class PortalGateGuard implements CanActivate {
       }
 
       if (pageCode) {
+        // `config.pages` já vem com a exceção por empresa resolvida (uma tela
+        // pode estar bloqueada só para este cliente).
         const page = config.pages.find((p) => p.code === pageCode);
         if (page) {
           if (page.maintenance || config.maintenance.pages.includes(pageCode)) {
@@ -186,6 +188,7 @@ export class PortalGateGuard implements CanActivate {
       ['/api/payroll', 'payroll'],
       ['/api/recruitment', 'recruitment'],
       ['/api/careers', 'recruitment'],
+      ['/api/training', 'training'],
       ['/api/prize', 'prize'],
       ['/api/procurement', 'procurement'],
       ['/api/inventory', 'inventory'],

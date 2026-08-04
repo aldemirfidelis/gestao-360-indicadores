@@ -59,7 +59,7 @@ export const CATALOG_MODULES: CatalogModule[] = [
   { code: 'documents', name: 'Documentos', category: 'Qualidade e Compliance', route: '/documents', menuOrder: 53, criticality: 'medium' },
   { code: 'processes', name: 'Processos', category: 'Qualidade e Compliance', route: '/processes', menuOrder: 54, criticality: 'medium' },
   { code: 'forms', name: 'Formularios', category: 'Qualidade e Compliance', route: '/forms', menuOrder: 55, criticality: 'medium' },
-  { code: 'projects', name: 'Cronogramas', category: 'Qualidade e Compliance', route: '/projects', menuOrder: 56, criticality: 'low' },
+  { code: 'projects', name: 'Ata da Reuniao e Cronogramas', description: 'Ata integrada da reuniao mensal (acoes por area/setor/responsavel) e cronogramas de projeto', category: 'Qualidade e Compliance', route: '/projects', menuOrder: 56, criticality: 'low' },
   { code: 'vision360', name: 'Impactos', category: 'Qualidade e Compliance', route: '/central-impactos', menuOrder: 57, criticality: 'medium' },
 
   { code: 'food-safety', name: 'Seguranca dos Alimentos', description: 'FSMS, APPCC, processos, perigos, cadeia e inteligencia', category: 'Seguranca dos Alimentos', route: '/seguranca-alimentos', menuOrder: 60, criticality: 'medium' },
@@ -71,6 +71,7 @@ export const CATALOG_MODULES: CatalogModule[] = [
   { code: 'procurement', name: 'Compras', description: 'Requisicoes, fila do comprador, pedidos, alcadas e recebimentos', category: 'Suprimentos', route: '/suprimentos?tab=requisitions', menuOrder: 87, criticality: 'high' },
   { code: 'inventory', name: 'Estoque e Almoxarifado', description: 'Saldos, kardex, retiradas, transferencias e alertas de reposicao', category: 'Suprimentos', route: '/suprimentos?tab=stock', menuOrder: 88, criticality: 'high' },
   { code: 'communication', name: 'Comunicacao', category: 'Comunicacao', route: '/comunicacao', menuOrder: 90, criticality: 'medium' },
+  { code: 'training', name: 'Treinamento e Desenvolvimento', description: 'Matriz de treinamento, turmas, pendencias, eficacia, PDI e certificados', category: 'Treinamento e Desenvolvimento', route: '/treinamento', menuOrder: 89, criticality: 'high' },
   { code: 'prize', name: 'Gestao de Premio', description: 'Remuneracao variavel: anexos, competencias, apuracao, folha e espelho', category: 'Gestao de Premio', route: '/gestao-premio', menuOrder: 100, criticality: 'high' },
   { code: 'service-desk', name: 'Central de Atendimento', description: 'Chamados de suporte dos usuarios para a operacao do portal', category: 'Atendimento', route: '/central-atendimento', menuOrder: 105, criticality: 'medium' },
 
@@ -138,7 +139,8 @@ export const CATALOG_PAGES: CatalogPage[] = [
   { code: 'documents.list', moduleCode: 'documents', name: 'Documentos', title: 'Gestao Documental', route: '/documents', menuOrder: 53 },
   { code: 'processes.workflow', moduleCode: 'processes', name: 'Processos', title: 'Processos', route: '/processes', menuOrder: 54 },
   { code: 'forms.list', moduleCode: 'forms', name: 'Formularios', title: 'Formularios e Checklists', route: '/forms', menuOrder: 55 },
-  { code: 'projects.list', moduleCode: 'projects', name: 'Cronogramas', title: 'Cronogramas', route: '/projects', menuOrder: 56 },
+  { code: 'projects.minutes', moduleCode: 'projects', name: 'Ata da Reuniao', title: 'Ata da Reuniao Mensal', route: '/projects', menuOrder: 56 },
+  { code: 'projects.list', moduleCode: 'projects', name: 'Cronogramas', title: 'Cronogramas', route: '/projects/cronograma', menuOrder: 56.1 },
   { code: 'projects.detail', moduleCode: 'projects', name: 'Detalhe do Cronograma', title: 'Cronograma', route: '/projects/[id]', menuOrder: 56.1 },
   { code: 'vision360.impacts', moduleCode: 'vision360', name: 'Impactos', title: 'Central de Impactos', route: '/central-impactos', menuOrder: 57 },
 
@@ -192,6 +194,7 @@ export const CATALOG_PAGES: CatalogPage[] = [
   { code: 'personnel.employees', moduleCode: 'personnel', name: 'Colaboradores', title: 'Colaboradores', route: '/servico-pessoal/colaboradores', menuOrder: 94 },
   { code: 'personnel.time-clock', moduleCode: 'personnel', name: 'Controle de Ponto', title: 'Controle de Ponto', route: '/servico-pessoal/ponto', menuOrder: 95 },
   { code: 'personnel.facial', moduleCode: 'personnel', name: 'Ponto Facial (PWA)', title: 'Ponto Facial', route: '/servico-pessoal/ponto-facial', menuOrder: 95.1 },
+  { code: 'personnel.biometrics', moduleCode: 'personnel', name: 'Cadastros Faciais', title: 'Cadastros Faciais', route: '/servico-pessoal/biometrias', menuOrder: 95.2 },
   { code: 'personnel.kiosk', moduleCode: 'personnel', name: 'Totem de Reconhecimento Facial', title: 'Totem', route: '/totem', menuOrder: 95.2 },
   { code: 'personnel.vacations', moduleCode: 'personnel', name: 'Ferias e Afastamentos', title: 'Ferias e Afastamentos', route: '/servico-pessoal/ferias', menuOrder: 95.5 },
   { code: 'personnel.lifecycle', moduleCode: 'personnel', name: 'Admissao, Desligamento e ASO', title: 'Admissao, Desligamento e ASO', route: '/servico-pessoal/admissoes', menuOrder: 95.7 },
@@ -227,6 +230,14 @@ export const CATALOG_PAGES: CatalogPage[] = [
   // que permanece ativo fora do menu de Comunicacao.
   { code: 'communication.employee-feed', moduleCode: 'communication', name: 'Comunicacao Interna (colaborador)', title: 'Comunicacao Interna', route: '/servico-pessoal/meu-holerite?tab=comunicacao', menuOrder: 105 },
   { code: 'communication.chat', moduleCode: 'communication', name: 'Chat', title: 'Chat', route: '/comunicacao/chat', menuOrder: 106 },
+
+  { code: 'training.overview', moduleCode: 'training', name: 'Visao Geral', title: 'Treinamento e Desenvolvimento', route: '/treinamento', menuOrder: 105 },
+  { code: 'training.matrix', moduleCode: 'training', name: 'Matriz de Treinamento', title: 'Matriz de Treinamento', route: '/treinamento/matriz', menuOrder: 105.1 },
+  { code: 'training.pending', moduleCode: 'training', name: 'Pendencias e Vencimentos', title: 'Pendencias e Vencimentos', route: '/treinamento/pendencias', menuOrder: 105.2 },
+  { code: 'training.classes', moduleCode: 'training', name: 'Turmas e Agenda', title: 'Turmas e Agenda', route: '/treinamento/turmas', menuOrder: 105.3 },
+  { code: 'training.catalog', moduleCode: 'training', name: 'Treinamentos', title: 'Catalogo de Treinamentos', route: '/treinamento/treinamentos', menuOrder: 105.4 },
+  { code: 'training.development', moduleCode: 'training', name: 'Eficacia e PDI', title: 'Eficacia e PDI', route: '/treinamento/desenvolvimento', menuOrder: 105.5 },
+  { code: 'training.reports', moduleCode: 'training', name: 'Relatorios de Treinamento', title: 'Relatorios', route: '/treinamento/relatorios', menuOrder: 105.6 },
 
   { code: 'prize.overview', moduleCode: 'prize', name: 'Visao Geral do Premio', title: 'Gestao de Premio', route: '/gestao-premio', menuOrder: 110 },
   { code: 'prize.programs', moduleCode: 'prize', name: 'Programas de Premio', title: 'Programas de Premio', route: '/gestao-premio/programas', menuOrder: 111 },

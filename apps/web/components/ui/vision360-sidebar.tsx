@@ -83,7 +83,7 @@ function getEntityRoute(type: string, id: string): { url: string; hasDetail: boo
     AREA: '/organograma',
     FORM: '/forms',
     MEETING: '/meetings',
-    PROJECT: '/projects',
+    PROJECT: '/projects/cronograma',
   };
   if (detail[t]) return { url: detail[t], hasDetail: true };
   if (list[t]) return { url: list[t], hasDetail: false };

@@ -335,7 +335,18 @@ function SnapshotRow({ ind, can, run, pending, onCreateAction }: { ind: Snapshot
     <div className="rounded-md border p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="break-words text-sm font-semibold">{ind.name}</p>
+          <p className="break-words text-sm font-semibold">
+            {ind.name}
+            {ind.isShared && (
+              <Badge
+                variant="outline"
+                className="ml-2 align-middle text-[10px] font-medium"
+                title={`Indicador da área ${ind.ownerAreaName ?? 'dona'} — quem apresenta é ela; aqui a área prepara a própria leitura.`}
+              >
+                Compartilhado{ind.ownerAreaName ? ` · ${ind.ownerAreaName}` : ''}
+              </Badge>
+            )}
+          </p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>Real: {formatValue(ind.current, ind.unitLabel)}</span>
             <span>Meta: {formatValue(ind.target, ind.unitLabel)}</span>

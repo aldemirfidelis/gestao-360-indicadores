@@ -30,7 +30,7 @@ export class PortalConfigService {
     const env = process.env.NODE_ENV ?? 'development';
     const isSuper = user.role === 'SUPER_ADMIN';
 
-    const [flags, modules, pages, navOverrides, maintenanceWindows, announcements, companyModules, companyProfile, planModules] = await Promise.all([
+    const [flags, modules, pages, navOverrides, maintenanceWindows, announcements, companyModules, companyProfile, companyPages, planModules] = await Promise.all([
       this.flags.evaluateAllForUser({ userId: user.sub, role: user.role, environment: env, scopeIds: this.scopeIdsOf(user), now }),
       this.prisma.portalModule.findMany(),
       this.prisma.portalPage.findMany(),
@@ -39,6 +39,7 @@ export class PortalConfigService {
       this.prisma.portalAnnouncement.findMany({ where: { active: true } }),
       user.companyId ? this.prisma.platformCompanyModule.findMany({ where: { companyId: user.companyId } }).catch(swallow([], 'portalConfig.companyModules', 'debug')) : Promise.resolve([]),
       user.companyId ? this.prisma.platformCompanyProfile.findUnique({ where: { companyId: user.companyId }, select: { planCode: true } }).catch(swallow(null, 'portalConfig.companyProfile', 'debug')) : Promise.resolve(null),
+      user.companyId ? this.prisma.platformCompanyPage.findMany({ where: { companyId: user.companyId } }).catch(swallow([], 'portalConfig.companyPages', 'debug')) : Promise.resolve([]),
       this.prisma.platformPlanModule.findMany({
         select: { moduleCode: true, included: true, plan: { select: { code: true } } },
       }).catch(swallow([], 'portalConfig.planModules', 'debug')),
@@ -79,13 +80,21 @@ export class PortalConfigService {
           allowedRoles: parseArray(m.allowedRoles),
         };
       }),
-      pages: pages.map((p) => ({
-        code: p.code, route: p.route, status: p.status,
-        hidden: p.status === 'HIDDEN', maintenance: p.status === 'MAINTENANCE',
-        unavailable: ['INACTIVE', 'BLOCKED', 'DISCONTINUED', 'MAINTENANCE'].includes(p.status),
-        unavailableMessage: p.unavailableMessage,
-        allowedRoles: parseArray(p.allowedRoles),
-      })),
+      pages: pages.map((p) => {
+        // Exceção por empresa vence o catálogo global: dá para tirar uma tela de
+        // um cliente sem afetar os demais. Sem registro, segue o status global.
+        const companyPage = companyPages.find((item) => item.pageCode === p.code);
+        const companyStatus = companyPage?.status?.toUpperCase();
+        const effectiveStatus =
+          companyStatus && companyStatus !== 'HERDADO_DO_MODULO' ? toPortalStatus(companyStatus) : p.status;
+        return {
+          code: p.code, route: p.route, status: effectiveStatus,
+          hidden: effectiveStatus === 'HIDDEN', maintenance: effectiveStatus === 'MAINTENANCE',
+          unavailable: ['INACTIVE', 'BLOCKED', 'DISCONTINUED', 'MAINTENANCE'].includes(effectiveStatus),
+          unavailableMessage: companyPage?.note ?? p.unavailableMessage,
+          allowedRoles: parseArray(p.allowedRoles),
+        };
+      }),
       navOverrides: navOverrides.map((n) => ({ itemKey: n.itemKey, kind: n.kind, hidden: n.hidden, order: n.order, labelOverride: n.labelOverride, iconOverride: n.iconOverride, groupOverride: n.groupOverride })),
       announcements: announcements
         .filter((a) => withinWindow(a.startsAt, a.endsAt, now))

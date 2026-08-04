@@ -171,9 +171,23 @@ export class MonthlyResultsService {
           status: 'ACTIVE',
           // Reunião Mensal trata apenas indicadores estratégicos (operacionais ficam só em Indicadores/prêmio).
           type: 'STRATEGIC',
-          ...(areaFilter ? { ownerNodeId: { in: areaFilter } } : {}),
+          // Compartilhados entram pelas áreas participantes também.
+          ...(areaFilter
+            ? {
+                OR: [
+                  { ownerNodeId: { in: areaFilter } },
+                  { sharedAreas: { some: { orgNodeId: { in: areaFilter } } } },
+                ],
+              }
+            : {}),
         },
-        select: { id: true, name: true, code: true, ownerNodeId: true },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          ownerNodeId: true,
+          sharedAreas: { select: { orgNodeId: true } },
+        },
         orderBy: { name: 'asc' },
       }),
     ]);
@@ -445,7 +459,15 @@ export class MonthlyResultsService {
               // (Trava mantida aqui de propósito; o Painel Executivo passou a permitir operacionais.)
               where: { indicator: { type: 'STRATEGIC' } },
               orderBy: [{ isCritical: 'desc' }, { position: 'asc' }],
-              include: { indicator: { select: { id: true, name: true, code: true, unit: true, unitLabel: true, source: true, responsibleUserId: true, type: true } } },
+              include: {
+                indicator: {
+                  select: {
+                    id: true, name: true, code: true, unit: true, unitLabel: true, source: true, responsibleUserId: true, type: true,
+                    // Nome da área dona: o card compartilhado mostra de onde vem o indicador.
+                    ownerNode: { select: { id: true, name: true } },
+                  },
+                },
+              },
             },
           },
         },
@@ -689,6 +711,12 @@ export class MonthlyResultsService {
     const areaRecords = await this.prisma.monthlyMeetingArea.findMany({ where: { meetingId, orgNodeId: { in: areaIds } }, select: { id: true, orgNodeId: true } });
     const areaIdByNode = new Map(areaRecords.map((a) => [a.orgNodeId, a.id]));
 
+    // Todas as áreas da reunião (não só as que estão sendo semeadas agora):
+    // é o que diz se a área DONA de um indicador compartilhado participa da
+    // reunião. Se ela não estiver, quem apresenta é a área participante.
+    const allMeetingAreas = await this.prisma.monthlyMeetingArea.findMany({ where: { meetingId }, select: { orgNodeId: true } });
+    const nodeToMeetingArea = await this.mapNodesToAreas(me.companyId, allMeetingAreas.map((a) => a.orgNodeId));
+
     const existing = await this.prisma.monthlyMeetingIndicator.findMany({ where: { meetingId }, select: { id: true, meetingAreaId: true, indicatorId: true, deviationId: true, actionPlanId: true } });
     const existingByKey = new Map(existing.map((e) => [`${e.meetingAreaId}:${e.indicatorId}`, e]));
 
@@ -713,38 +741,64 @@ export class MonthlyResultsService {
 
     let position = 0;
     for (const indicator of indicators) {
-      const selectedAreaNode = nodeToArea.get(indicator.ownerNodeId);
-      if (!selectedAreaNode) continue;
-      const meetingAreaId = areaIdByNode.get(selectedAreaNode);
-      if (!meetingAreaId) continue;
       const snap = this.computeSnapshot(indicator, periodRef, 'period');
       const isCritical = snap.light === TrafficLight.RED || snap.light === TrafficLight.YELLOW;
-      const key = `${meetingAreaId}:${indicator.id}`;
-      const prev = existingByKey.get(key);
-      if (prev) {
-        await this.prisma.monthlyMeetingIndicator.update({
-          where: { id: prev.id },
-          data: {
-            ...this.persistSnapshotFields(snap),
-            isCritical,
-            // não sobrescreve vínculos manuais; preenche se ainda vazio
-            deviationId: prev.deviationId ?? primaryDeviation.get(indicator.id) ?? null,
-            actionPlanId: prev.actionPlanId ?? primaryAction.get(indicator.id) ?? null,
-          },
-        });
-      } else {
-        await this.prisma.monthlyMeetingIndicator.create({
-          data: {
-            meetingId,
-            meetingAreaId,
-            indicatorId: indicator.id,
-            ...this.persistSnapshotFields(snap),
-            isCritical,
-            deviationId: primaryDeviation.get(indicator.id) ?? null,
-            actionPlanId: primaryAction.get(indicator.id) ?? null,
-            position: position++,
-          },
-        });
+
+      // Indicador compartilhado prepara em TODAS as áreas da reunião a que está
+      // vinculado (dona + participantes). Cada uma tem seu próprio comentário e
+      // vínculo de desvio/plano; quem leva ao telão é só a dona.
+      const targetAreas = new Map<string, boolean>(); // meetingAreaId -> isShared
+      const ownerAreaNode = nodeToArea.get(indicator.ownerNodeId);
+      const ownerMeetingAreaId = ownerAreaNode ? areaIdByNode.get(ownerAreaNode) : undefined;
+      if (ownerMeetingAreaId) targetAreas.set(ownerMeetingAreaId, false);
+      for (const link of (indicator.sharedAreas ?? []) as Array<{ orgNodeId: string }>) {
+        const sharedAreaNode = nodeToArea.get(link.orgNodeId);
+        const sharedMeetingAreaId = sharedAreaNode ? areaIdByNode.get(sharedAreaNode) : undefined;
+        if (!sharedMeetingAreaId) continue;
+        // A área dona ganha o card "próprio" mesmo que também esteja na lista.
+        if (!targetAreas.has(sharedMeetingAreaId)) targetAreas.set(sharedMeetingAreaId, true);
+      }
+      if (!targetAreas.size) continue;
+
+      // A área dona está nesta reunião? Se não estiver, o card compartilhado é o
+      // único que existe — então ele vai ao telão normalmente.
+      const ownerInMeeting = Boolean(nodeToMeetingArea.get(indicator.ownerNodeId));
+
+      for (const [meetingAreaId, isShared] of targetAreas) {
+        const key = `${meetingAreaId}:${indicator.id}`;
+        const prev = existingByKey.get(key);
+        if (prev) {
+          await this.prisma.monthlyMeetingIndicator.update({
+            where: { id: prev.id },
+            data: {
+              ...this.persistSnapshotFields(snap),
+              isCritical,
+              isShared,
+              // não sobrescreve vínculos manuais; preenche se ainda vazio
+              deviationId: prev.deviationId ?? primaryDeviation.get(indicator.id) ?? null,
+              actionPlanId: prev.actionPlanId ?? primaryAction.get(indicator.id) ?? null,
+            },
+          });
+        } else {
+          await this.prisma.monthlyMeetingIndicator.create({
+            data: {
+              meetingId,
+              meetingAreaId,
+              indicatorId: indicator.id,
+              ...this.persistSnapshotFields(snap),
+              isCritical,
+              isShared,
+              // Na área participante o card nasce fora da apresentação para o
+              // mesmo gráfico não passar duas vezes no telão — mas só quando a
+              // área dona também está na reunião para apresentá-lo. O gestor
+              // ainda pode ligá-lo manualmente se quiser mostrar o recorte dele.
+              showInPresentation: !isShared || !ownerInMeeting,
+              deviationId: primaryDeviation.get(indicator.id) ?? null,
+              actionPlanId: primaryAction.get(indicator.id) ?? null,
+              position: position++,
+            },
+          });
+        }
       }
     }
   }
@@ -1465,6 +1519,10 @@ export class MonthlyResultsService {
       executiveStatus: ind.executiveStatus ?? this.executiveStatus(light === TrafficLight.GREEN && snapshot.attainment !== null && snapshot.attainment !== undefined && snapshot.attainment >= 1.1 ? 'BLUE' : light, validationIssues),
       showInPresentation: ind.showInPresentation,
       isCritical: ind.isCritical || light === TrafficLight.RED || light === TrafficLight.YELLOW,
+      // Card de indicador compartilhado por outra área: esta área prepara e
+      // comenta, mas quem apresenta é a área dona.
+      isShared: Boolean(ind.isShared),
+      ownerAreaName: ind.indicator?.ownerNode?.name ?? null,
       financialImpact: ind.financialImpact,
       responsibleUserId: ind.indicator?.responsibleUserId ?? null,
       deviationId: ind.deviationId,
@@ -1590,7 +1648,22 @@ export class MonthlyResultsService {
 
   private async loadIndicatorsForAreas(companyId: string, areaIds: string[] | null, periodRef: string): Promise<any[]> {
     const includeAccumulation = await this.shouldSelectIndicatorAccumulation();
-    const where: any = { companyId, deletedAt: null, status: 'ACTIVE', type: 'STRATEGIC', ...(areaIds ? { ownerNodeId: { in: areaIds } } : {}) };
+    const where: any = {
+      companyId,
+      deletedAt: null,
+      status: 'ACTIVE',
+      type: 'STRATEGIC',
+      // Indicador compartilhado entra na reunião pela área dona OU pelas áreas
+      // participantes: o mesmo número, sem cadastro duplicado.
+      ...(areaIds
+        ? {
+            OR: [
+              { ownerNodeId: { in: areaIds } },
+              { sharedAreas: { some: { orgNodeId: { in: areaIds } } } },
+            ],
+          }
+        : {}),
+    };
     const select: any = {
       id: true,
       name: true,
@@ -1603,6 +1676,7 @@ export class MonthlyResultsService {
       yellowToleranceP: true,
       ownerNodeId: true,
       ownerNode: { select: { id: true, name: true, type: true, parentId: true } },
+      sharedAreas: { select: { orgNodeId: true } },
       responsibleUserId: true,
       responsibleUser: { select: { id: true, name: true } },
       targets: { orderBy: { periodRef: 'desc' }, select: { periodRef: true, target: true, lowerBound: true, upperBound: true }, take: 24 },

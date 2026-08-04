@@ -5,15 +5,18 @@ import { PlatformAdminAuditService } from './platform-admin-audit.service';
 import { PlatformAdminIdentity } from '../platform-admin.types';
 import { PLATFORM_MODULES, PLATFORM_PLANS } from '../platform-admin.catalog';
 import { isModuleEffectivelyActive } from '../platform-admin.access';
-import { alwaysOnModuleCodes, BUSINESS_MODULES, businessModuleMembers, expandPlanModules } from '../../portal-admin/business-modules';
+import { alwaysOnModuleCodes, BUSINESS_MODULES, businessModuleMembers, expandPlanModules, nonBlockableModuleCodes } from '../../portal-admin/business-modules';
 import { prepareTenantFields } from '../../../common/tenant-fields';
 import { resolveSmtpConfig, buildTransport, smtpFrom } from '../../../common/smtp';
 
 
 const BLOCKED_MODULE_STATUSES = ['BLOQUEADO', 'SUSPENSO', 'BLOCKED', 'SUSPENDED'];
-// Sempre ativos em qualquer plano: Meu Dia, Tarefas, Administração (usuários,
-// aprovações, períodos, automações, relatórios) + módulos de sistema/Portal Global.
+// Ativos por padrão em qualquer plano: Meu Dia, Tarefas, Atendimento e
+// Administração + módulos de sistema. "Padrão" ≠ "obrigatório": só a
+// infraestrutura do portal é inbloqueável (senão o cliente fica sem login/
+// configuração e sem como ser reconfigurado).
 const COMPANY_CORE_MODULES = new Set<string>(alwaysOnModuleCodes());
+const NON_BLOCKABLE_MODULES = new Set<string>(nonBlockableModuleCodes());
 const SEO_GROUP = 'SEO_PRESENCE';
 const SEO_DEFAULTS: Record<string, string> = {
   defaultTitle: 'Gestao 360 | Plataforma de gestao corporativa integrada',
@@ -527,12 +530,80 @@ export class PlatformAdminService {
     let changed = 0;
     for (const moduleCode of members) {
       if (!catalog.has(moduleCode)) continue;
-      // Núcleo nunca é bloqueado — pula silenciosamente nesse caso (defesa).
-      if (COMPANY_CORE_MODULES.has(moduleCode) && BLOCKED_MODULE_STATUSES.includes(input.status)) continue;
+      // Infraestrutura do portal nunca é bloqueada — pula silenciosamente.
+      if (NON_BLOCKABLE_MODULES.has(moduleCode) && BLOCKED_MODULE_STATUSES.includes(input.status)) continue;
       await this.setCompanyModule(user, companyId, moduleCode, { status: input.status, reason: input.reason });
       changed += 1;
     }
     return { businessCode, status: input.status, changed };
+  }
+
+  /**
+   * Telas (páginas) de uma empresa: catálogo do portal + a exceção gravada para
+   * ela. O catálogo de páginas é global; aqui é onde se tira UMA tela de UM
+   * cliente sem afetar os demais.
+   */
+  async companyPages(companyId: string) {
+    const company = await this.prisma.company.findFirst({
+      where: { id: companyId, deletedAt: null },
+      select: { id: true, name: true, tradeName: true },
+    });
+    if (!company) throw new NotFoundException('Empresa nao encontrada.');
+    const [pages, overrides] = await Promise.all([
+      this.prisma.portalPage.findMany({ orderBy: [{ menuOrder: 'asc' }, { name: 'asc' }] }),
+      this.prisma.platformCompanyPage.findMany({ where: { companyId } }),
+    ]);
+    const byCode = new Map(overrides.map((item) => [item.pageCode, item]));
+    return {
+      company,
+      pages: pages.map((page) => ({
+        code: page.code,
+        name: page.name,
+        route: page.route,
+        moduleCode: page.moduleCode,
+        globalStatus: page.status,
+        companyStatus: byCode.get(page.code)?.status ?? 'HERDADO_DO_MODULO',
+        note: byCode.get(page.code)?.note ?? null,
+      })),
+    };
+  }
+
+  async setCompanyPage(
+    user: PlatformAdminIdentity,
+    companyId: string,
+    pageCode: string,
+    input: { status: string; reason?: string; note?: string },
+  ) {
+    const company = await this.prisma.company.findFirst({ where: { id: companyId, deletedAt: null } });
+    if (!company) throw new NotFoundException('Empresa nao encontrada.');
+    const page = await this.prisma.portalPage.findUnique({ where: { code: pageCode } });
+    if (!page) throw new NotFoundException('Tela nao encontrada no catalogo do portal.');
+    const status = String(input.status ?? '').toUpperCase();
+    // SOMENTE_LEITURA não é suportado por tela (o overlay do frontend só sabe
+    // esconder/liberar) — melhor recusar do que prometer o que não se cumpre.
+    if (!['HERDADO_DO_MODULO', 'ATIVO', 'BLOQUEADO'].includes(status)) {
+      throw new BadRequestException('Status de tela invalido. Use HERDADO_DO_MODULO, ATIVO ou BLOQUEADO.');
+    }
+
+    const before = await this.prisma.platformCompanyPage.findUnique({ where: { companyId_pageCode: { companyId, pageCode } } });
+    const updated = await this.prisma.platformCompanyPage.upsert({
+      where: { companyId_pageCode: { companyId, pageCode } },
+      create: { companyId, pageCode, status, note: input.note ?? null, updatedBy: user.sub, updatedByEmail: user.email },
+      update: { status, note: input.note ?? null, updatedBy: user.sub, updatedByEmail: user.email },
+    });
+    await this.audit.record({
+      user,
+      action: status === 'BLOQUEADO' ? 'MODULE_BLOCK' : 'MODULE_CHANGE',
+      permissionKey: 'platform.modules.manage',
+      companyId,
+      targetType: 'PlatformCompanyPage',
+      targetId: updated.id,
+      targetLabel: `${company.name} / ${page.name}`,
+      beforeValue: before,
+      afterValue: updated,
+      justification: input.reason ?? null,
+    });
+    return updated;
   }
 
   async setCompanyModule(user: PlatformAdminIdentity, companyId: string, moduleCode: string, input: ModuleUpdateInput) {
@@ -541,8 +612,8 @@ export class PlatformAdminService {
     await this.ensureModuleCatalog();
     const module = await this.prisma.platformModuleCatalog.findUnique({ where: { code: moduleCode } });
     if (!module) throw new NotFoundException('Modulo nao encontrado.');
-    if (COMPANY_CORE_MODULES.has(moduleCode) && BLOCKED_MODULE_STATUSES.includes(input.status)) {
-      throw new ConflictException('Modulo essencial da empresa nao pode ser bloqueado.');
+    if (NON_BLOCKABLE_MODULES.has(moduleCode) && BLOCKED_MODULE_STATUSES.includes(input.status)) {
+      throw new ConflictException('Modulo de infraestrutura do portal (login, permissoes, configuracoes) nao pode ser bloqueado.');
     }
 
     const before = await this.prisma.platformCompanyModule.findUnique({ where: { companyId_moduleCode: { companyId, moduleCode } } });

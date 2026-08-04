@@ -53,6 +53,7 @@ import { attainmentFor } from '@/lib/farol';
 import { exportNodeToPng } from '@/lib/export-image';
 import { useVision360 } from '@/components/ui/vision360-context';
 import { useAuth } from '@/components/auth/auth-provider';
+import { IndicatorActionsBar } from '@/components/platform/indicator-actions-bar';
 
 interface IndicatorDetail {
   id: string;
@@ -70,6 +71,8 @@ interface IndicatorDetail {
   ownerNode: { id: string; name: string; type: string; parent?: { id: string; name: string; type: string } | null };
   areaMacro?: { id: string; name: string; type: string } | null;
   areaMicro?: { id: string; name: string; type: string } | null;
+  /** Áreas participantes: veem este mesmo indicador no painel e na reunião. */
+  sharedAreas?: Array<{ id: string; name: string }> | null;
   guidelineNode?: { id: string; name: string; type: string } | null;
   responsibleUser: { id: string; name: string } | null;
   strategicObjective?: { id: string; name: string; perspective?: { id: string; name: string; color: string } | null } | null;
@@ -549,6 +552,10 @@ export function IndicatorDetailView({
       />
       )}
 
+      {/* Mesmas ações da tela de Indicadores: quem chegou pelo detalhe lança,
+          edita, ajusta metas ou inativa daqui mesmo, sem voltar para a lista. */}
+      {!embedded && <IndicatorActionsBar indicatorId={ind.id} />}
+
       {/* Fluxo Lógico e Rastreabilidade Superior — fora da apresentação: no telão
           a hierarquia completa é informação demais para o tempo do fórum. */}
       {!embedded && (
@@ -582,6 +589,14 @@ export function IndicatorDetailView({
               Objetivo Estratégico: {ind.strategicObjective.name}
             </span>
           </>
+        )}
+        {(ind.sharedAreas?.length ?? 0) > 0 && (
+          <span
+            className="ml-auto rounded border border-border bg-muted/45 px-1.5 py-0.5 font-medium text-muted-foreground"
+            title="O mesmo indicador aparece no Painel Executivo e na Reunião Mensal destas áreas."
+          >
+            Compartilhado com: {(ind.sharedAreas ?? []).map((area) => area.name).join(', ')}
+          </span>
         )}
       </div>
       )}

@@ -159,7 +159,7 @@ export default function ProjectDetailPage() {
 
   return (
     <div>
-      <Link href="/projects" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
+      <Link href="/projects/cronograma" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
         <ArrowLeft className="h-4 w-4 mr-1" /> Projetos
       </Link>
 

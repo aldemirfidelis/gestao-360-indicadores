@@ -45,7 +45,7 @@ export function PortalServicesMenu({
   return (
     <div
       className={cn(
-        'flex shrink-0 items-center gap-1 border-t border-[#1b2b54]/30 p-3',
+        'flex shrink-0 items-center gap-1 border-t border-[hsl(var(--shell-border)/0.3)] p-3',
         collapsed ? 'flex-col justify-center' : 'justify-end',
       )}
     >

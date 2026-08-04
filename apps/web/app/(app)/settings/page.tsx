@@ -13,6 +13,7 @@ import {
   GitBranch,
   KeyRound,
   Layers3,
+  Palette,
   Plus,
   Save,
   ScrollText,
@@ -38,6 +39,7 @@ import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 import { useAuth } from '@/components/auth/auth-provider';
 import { AccessRoleGuide, PermissionMatrix } from '@/components/access-control/permission-matrix';
+import { BrandingSection } from '@/components/settings/branding-section';
 import {
   ACCESS_ROLE_DEFINITIONS,
   getRoleDefinition,
@@ -45,7 +47,7 @@ import {
   type PermissionRecord,
 } from '@/lib/access-control';
 
-type ModuleKey = 'users' | 'audit' | 'parameters' | 'security' | 'system';
+type ModuleKey = 'users' | 'audit' | 'parameters' | 'security' | 'system' | 'branding';
 type ParamView = 'companies' | 'branches' | 'structure' | 'categories' | 'items';
 
 interface Company {
@@ -182,6 +184,7 @@ const adminCards: Array<{ title: string; description: string; icon: any; active:
   { title: 'Empresas', description: 'Empresas, dados cadastrais e status.', icon: Building2, active: 'parameters', view: 'companies', tone: 'text-status-blue bg-status-blue/10' },
   { title: 'Filiais', description: 'Unidades de negócio e localizações.', icon: GitBranch, active: 'parameters', view: 'branches', tone: 'text-status-purple bg-status-purple/10' },
   { title: 'Áreas e Setores', description: 'Hierarquia organizacional e processos.', icon: Layers3, active: 'parameters', view: 'structure', tone: 'text-status-green bg-status-green/10' },
+  { title: 'Identidade visual', description: 'Cor do portal e logo da empresa no topo.', icon: Palette, active: 'branding', tone: 'text-status-purple bg-status-purple/10' },
   { title: 'Notificações', description: 'Preferências, alertas e regras globais.', icon: Settings, active: 'system', tone: 'text-status-yellow bg-status-yellow/10' },
   { title: 'Sistema', description: 'Configurações gerais e comportamento global.', icon: Settings, active: 'system', tone: 'text-muted-foreground bg-muted' },
 ];
@@ -569,6 +572,8 @@ export default function SettingsPage() {
             );
           })}
       </SectionCard>}
+
+      {active === 'branding' && <BrandingSection canManage={canManageSettings} />}
 
       {active === 'users' && canViewUsers && (
         <SectionCard

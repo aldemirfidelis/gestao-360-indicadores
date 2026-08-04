@@ -39,6 +39,16 @@
     --status-blue: 211 92% 47%;
     --status-purple: 258 60% 55%;
 
+    /* Shell (cabeçalho + menu lateral). Azul padrão do Gestão 360; cada empresa
+       pode sobrescrever pela identidade visual (Configurações > Identidade
+       visual), que reescreve estas mesmas variáveis no <html>. */
+    --shell-bg: 226 60% 10%;
+    --shell-bg-soft: 224 51% 15%;
+    --shell-border: 223 51% 22%;
+    --shell-foreground: 0 0% 100%;
+    --shell-muted: 215 20% 76%;
+    --brand: 226 60% 10%;
+
     --radius: 0.5rem;
   }
 

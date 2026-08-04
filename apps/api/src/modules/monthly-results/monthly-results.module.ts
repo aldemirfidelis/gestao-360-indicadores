@@ -4,10 +4,11 @@ import { ActionsModule } from '../actions/actions.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MonthlyResultsController } from './monthly-results.controller';
 import { MonthlyResultsService } from './monthly-results.service';
+import { MeetingMinutesService } from './meeting-minutes.service';
 
 @Module({
   imports: [AiModule, ActionsModule, NotificationsModule],
   controllers: [MonthlyResultsController],
-  providers: [MonthlyResultsService],
+  providers: [MonthlyResultsService, MeetingMinutesService],
 })
 export class MonthlyResultsModule {}

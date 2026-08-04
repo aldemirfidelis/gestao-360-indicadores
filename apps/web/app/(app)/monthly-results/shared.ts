@@ -154,6 +154,9 @@ export interface SnapshotIndicator {
   executiveStatus: string | null;
   showInPresentation: boolean;
   isCritical: boolean;
+  /** Indicador de outra área, compartilhado com esta (quem apresenta é a dona). */
+  isShared?: boolean;
+  ownerAreaName?: string | null;
   financialImpact: number | null;
   responsibleUserId: string | null;
   deviationId: string | null;

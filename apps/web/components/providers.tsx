@@ -6,6 +6,7 @@ import { ThemeProvider } from 'next-themes';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { PortalConfigProvider } from '@/components/portal-admin/portal-config-provider';
+import { CompanyBrandingProvider } from '@/components/brand/company-branding-provider';
 import { PwaManager } from '@/components/pwa/pwa-manager';
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -22,9 +23,11 @@ export function Providers({ children }: { children: ReactNode }) {
       <QueryClientProvider client={qc}>
         <AuthProvider>
           <PortalConfigProvider>
-            {children}
-            <Toaster position="top-right" richColors />
-            <PwaManager />
+            <CompanyBrandingProvider>
+              {children}
+              <Toaster position="top-right" richColors />
+              <PwaManager />
+            </CompanyBrandingProvider>
           </PortalConfigProvider>
         </AuthProvider>
       </QueryClientProvider>

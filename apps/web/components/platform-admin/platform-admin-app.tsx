@@ -1816,7 +1816,12 @@ function ModulesSection() {
   if (matrix.isLoading || business.isLoading) return <LoadingGrid />;
   if (!matrix.data || !business.data) return <EmptyState title="Matriz indisponível" />;
   const businessModules = [...business.data].sort((a, b) => a.menuOrder - b.menuOrder);
-  const optionalModules = businessModules.filter((bm) => !bm.core);
+  // Todas as abas entram na matriz — inclusive as padrão (Meu Dia, Tarefas,
+  // Atendimento, Administração). Elas vêm ligadas em qualquer plano, mas podem
+  // ser bloqueadas por exceção: é o que permite entregar uma empresa com um
+  // módulo só. Apenas a infraestrutura do portal (login, permissões,
+  // configurações) não é bloqueável, e ela nem aparece como aba.
+  const optionalModules = businessModules;
   const planByCode = new Map((matrix.data.plans ?? []).map((plan) => [plan.code, plan]));
 
   return (
@@ -1826,11 +1831,17 @@ function ModulesSection() {
           <p>
             <strong className="text-foreground">O plano da empresa define as abas liberadas.</strong>{' '}
             O plano é escolhido em Empresas &gt; Editar; ao trocá-lo, os módulos realinham automaticamente.
-            Abas padrão (Meu Dia, Tarefas e Administração) ficam sempre ativas em qualquer plano.
+            Abas padrão (Meu Dia, Tarefas, Atendimento e Administração) vêm ligadas em qualquer plano.
           </p>
           <p>
-            Aqui você só administra <strong className="text-foreground">exceções</strong>: liberar uma aba fora do plano ou bloquear uma aba que o plano inclui.
-            &ldquo;Voltar ao plano&rdquo; remove todas as exceções da empresa de uma vez.
+            Aqui você administra <strong className="text-foreground">exceções</strong>: liberar uma aba fora do plano ou bloquear
+            qualquer aba — inclusive as padrão, se a empresa deve ficar com um módulo só. &ldquo;Voltar ao plano&rdquo; remove
+            todas as exceções da empresa de uma vez.
+          </p>
+          <p className="text-xs">
+            Só o que sustenta o portal (login, permissões, configurações, auditoria e ajuda) não pode ser bloqueado — sem isso o
+            cliente não entraria nem poderia ser reconfigurado. <strong className="text-foreground">Super Admin nunca é bloqueado:</strong>{' '}
+            para conferir o efeito, entre com um usuário comum da empresa.
           </p>
         </div>
       </Panel>
@@ -1842,7 +1853,12 @@ function ModulesSection() {
               <tr>
                 <th>Empresa</th>
                 <th>Plano</th>
-                {optionalModules.map((bm) => <th key={bm.code}>{bm.name}</th>)}
+                {optionalModules.map((bm) => (
+                  <th key={bm.code}>
+                    {bm.name}
+                    {bm.core && <span className="ml-1 text-[10px] font-normal text-muted-foreground" title="Aba padrão: vem ligada em qualquer plano, mas pode ser bloqueada por exceção">(padrão)</span>}
+                  </th>
+                ))}
                 <th>Ações</th>
               </tr>
             </thead>
@@ -1856,7 +1872,8 @@ function ModulesSection() {
                     <td><span className="pill pill-gray whitespace-nowrap" title={plan?.name ?? company.planCode}>{company.planCode}</span></td>
                     {optionalModules.map((bm) => {
                       const mode = deriveTabMode(company, bm.members);
-                      const inPlan = plan?.businessModules.includes(bm.code) ?? false;
+                      // Aba padrão está sempre "no plano" — o plano não a lista, mas ela vem ligada.
+                      const inPlan = bm.core || (plan?.businessModules.includes(bm.code) ?? false);
                       return (
                         <td key={`${company.id}:${bm.code}`} className="min-w-[190px]">
                           <div className="flex flex-col gap-1.5">
@@ -1900,6 +1917,8 @@ function ModulesSection() {
         </div>
       </Panel>
 
+      <CompanyPagesPanel companies={matrix.data.companies} />
+
       <Panel title="Composição dos planos (abas por plano)">
         <div className="overflow-x-auto">
           <table className="table-modern">
@@ -1941,6 +1960,125 @@ function ModulesSection() {
         }}
       />
     </div>
+  );
+}
+
+interface CompanyPageRow {
+  code: string;
+  name: string;
+  route: string | null;
+  moduleCode: string | null;
+  globalStatus: string;
+  companyStatus: string;
+  note: string | null;
+}
+
+/**
+ * Telas por empresa. O catálogo de páginas é global (Central do Portal);
+ * aqui se tira UMA tela de UM cliente sem afetar os demais.
+ */
+function CompanyPagesPanel({ companies }: { companies: MatrixCompany[] }) {
+  const queryClient = useQueryClient();
+  const [companyId, setCompanyId] = useState('');
+  const [search, setSearch] = useState('');
+  const selectedId = companyId || companies[0]?.id || '';
+
+  const pages = useQuery({
+    queryKey: ['platform-admin', 'company-pages', selectedId],
+    enabled: Boolean(selectedId),
+    queryFn: () => platformAdminApi<{ company: { id: string; name: string }; pages: CompanyPageRow[] }>(`/companies/${selectedId}/pages`),
+  });
+  const update = useMutation({
+    mutationFn: ({ pageCode, status }: { pageCode: string; status: string }) =>
+      platformAdminApi(`/companies/${selectedId}/pages/${pageCode}`, {
+        method: 'PATCH',
+        json: { status, reason: `Tela ${pageCode} → ${status}` },
+      }),
+    onSuccess: () => {
+      toast.success('Tela atualizada');
+      void queryClient.invalidateQueries({ queryKey: ['platform-admin', 'company-pages', selectedId] });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao atualizar tela'),
+  });
+
+  const term = search.trim().toLowerCase();
+  const rows = (pages.data?.pages ?? []).filter(
+    (page) => !term || page.name.toLowerCase().includes(term) || (page.route ?? '').toLowerCase().includes(term) || (page.moduleCode ?? '').toLowerCase().includes(term),
+  );
+  const blockedCount = (pages.data?.pages ?? []).filter((page) => page.companyStatus === 'BLOQUEADO').length;
+
+  return (
+    <Panel title="Telas por empresa (bloqueio individual)">
+      <p className="mb-3 text-sm text-muted-foreground">
+        Bloquear uma aba inteira é o controle grosso. Aqui você tira <strong className="text-foreground">telas específicas</strong> de
+        uma empresa sem mexer nas outras — a tela some do menu e a rota fica bloqueada para os usuários dela.
+        A API do módulo continua respondendo: para cortar o acesso por completo, bloqueie a aba na matriz acima.
+      </p>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <select
+          className="h-9 border bg-background px-2 text-sm"
+          value={selectedId}
+          onChange={(event) => setCompanyId(event.target.value)}
+        >
+          {companies.map((company) => (
+            <option key={company.id} value={company.id}>{company.tradeName || company.name}</option>
+          ))}
+        </select>
+        <input
+          className="h-9 min-w-[220px] flex-1 border bg-background px-2 text-sm"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Buscar tela, rota ou módulo..."
+        />
+        <span className="text-xs text-muted-foreground">
+          {blockedCount > 0 ? `${blockedCount} tela(s) bloqueada(s) nesta empresa` : 'Nenhuma tela bloqueada'}
+        </span>
+      </div>
+      {pages.isLoading && <LoadingGrid />}
+      {!pages.isLoading && rows.length === 0 && <EmptyState title="Nenhuma tela encontrada" />}
+      {!pages.isLoading && rows.length > 0 && (
+        <div className="max-h-[420px] overflow-auto">
+          <table className="table-modern min-w-[720px]">
+            <thead>
+              <tr>
+                <th>Tela</th>
+                <th>Rota</th>
+                <th>Módulo</th>
+                <th>Estado nesta empresa</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((page) => (
+                <tr key={page.code}>
+                  <td className="font-medium">{page.name}</td>
+                  <td className="text-xs text-muted-foreground">{page.route ?? '—'}</td>
+                  <td className="text-xs text-muted-foreground">{page.moduleCode ?? '—'}</td>
+                  <td className="min-w-[210px]">
+                    <div className="flex items-center gap-2">
+                      {page.companyStatus === 'BLOQUEADO'
+                        ? <span className="pill pill-red whitespace-nowrap">Bloqueada</span>
+                        : page.companyStatus === 'ATIVO'
+                          ? <span className="pill pill-yellow whitespace-nowrap">Liberada (exceção)</span>
+                          : <span className="pill pill-gray whitespace-nowrap">Segue o módulo</span>}
+                      <select
+                        className="h-8 w-full border bg-background px-2 text-xs"
+                        value={page.companyStatus}
+                        disabled={update.isPending}
+                        onChange={(event) => update.mutate({ pageCode: page.code, status: event.target.value })}
+                      >
+                        <option value="HERDADO_DO_MODULO">Seguir o módulo</option>
+                        <option value="ATIVO">Liberar (exceção)</option>
+                        <option value="BLOQUEADO">Bloquear nesta empresa</option>
+                      </select>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Panel>
   );
 }
 

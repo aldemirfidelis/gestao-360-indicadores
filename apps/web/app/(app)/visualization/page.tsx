@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Download } from 'lucide-react';
+import { Download, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { exportNodeToPng } from '@/lib/export-image';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,9 @@ interface IndicatorRow {
   unitLabel: string | null;
   direction: string;
   ownerNode: { id: string; name: string; type: string; parentId: string | null };
+  /** O indicador é de outra área e aparece aqui por compartilhamento. */
+  shared?: boolean;
+  ownerAreaName?: string | null;
   currentTarget: { target: number; lowerBound: number | null; upperBound: number | null } | null;
   last: {
     value: number;
@@ -334,6 +337,15 @@ function ExecutiveIndicatorCard({
             {indicator.name}
           </h2>
           {indicator.code && <div className="mt-1 truncate text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{indicator.code}</div>}
+          {indicator.shared && (
+            <div
+              className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-muted/45 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+              title={`Indicador compartilhado — área dona: ${indicator.ownerAreaName ?? indicator.ownerNode?.name ?? '-'}`}
+            >
+              <Share2 className="h-3 w-3 shrink-0" />
+              <span className="truncate">Compartilhado · {indicator.ownerAreaName ?? indicator.ownerNode?.name ?? '-'}</span>
+            </div>
+          )}
         </div>
         <span className={cn('mt-0.5 h-3 w-3 shrink-0 rounded-full ring-4 ring-background', LIGHT_DOT[light] ?? LIGHT_DOT.GRAY)} />
       </div>

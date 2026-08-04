@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type * as React from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -28,14 +27,12 @@ import {
   Eye,
   FileClock,
   History,
-  MessageSquare,
   Minus,
-  Paperclip,
   Pencil,
   Plus,
   RefreshCcw,
-  Save,
   Search,
+  Share2,
   Target,
   Trash2,
   TrendingDown,
@@ -53,13 +50,28 @@ import { useInView } from '@/hooks/use-in-view';
 import { ImpactConfirmationModal } from '@/components/ui/impact-confirmation-modal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { StatusLight } from '@/components/ui/status-light';
-import { Textarea } from '@/components/ui/textarea';
-import { IndicatorResultEditor, ResultNotesDialog } from '@/components/platform/indicator-result-editor';
+import {
+  EMPTY_INDICATOR_FORM,
+  IndicatorFormDialog,
+  IndicatorHistoryDialog,
+  IndicatorResultDialog,
+  IndicatorTargetDialog,
+  IndicatorViewDialog,
+  buildIndicatorPayload,
+  currentMonthRef,
+  grainPeriodLabel,
+  indicatorFormFromRow,
+  monthOptionsForYear,
+  type GrainResponse,
+  type IndicatorForm,
+  type IndicatorHistory,
+  type IndicatorOptions,
+  type IndicatorRow,
+} from '@/components/platform/indicator-dialogs';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
@@ -67,161 +79,12 @@ import { CHART_COLORS, ChartLegend, computeStubValue, isWithinGain, realizadoBar
 import { attainmentFor } from '@/lib/farol';
 import {
   PERIODICITY_LABEL,
-  DIRECTION_LABEL,
   DIRECTION_SHORT_LABEL,
   INDICATOR_TYPE_LABEL,
-  INDICATOR_UNIT_LABEL,
   INDICATOR_STATUS_LABEL,
   TRAFFIC_LIGHT_LABEL,
 } from '@/lib/labels';
 
-interface CompanyOption {
-  id: string;
-  name: string;
-  tradeName: string | null;
-}
-
-interface OrgNodeOption {
-  id: string;
-  companyId: string;
-  parentId: string | null;
-  name: string;
-  code: string | null;
-  type: string;
-  responsibleUserId: string | null;
-  parent?: { id: string; name: string; type: string; parentId: string | null } | null;
-  _count?: { children: number; indicatorsOwned: number };
-}
-
-interface UserOption {
-  id: string;
-  name: string;
-  email?: string;
-}
-
-interface StrategicObjectiveOption {
-  id: string;
-  name: string;
-  perspective: { id: string; name: string; color: string | null };
-  map: { id: string; name: string };
-}
-
-interface IndicatorOptions {
-  companies: CompanyOption[];
-  orgNodes: OrgNodeOption[];
-  users: UserOption[];
-  strategicObjectives: StrategicObjectiveOption[];
-  currentPeriod: { year: number; startsAt: string; endsAt: string };
-  indicatorTypes: string[];
-  units: string[];
-  periodicities: string[];
-  directions: string[];
-  statuses: string[];
-}
-
-interface MonthlyPoint {
-  periodRef: string;
-  month: string;
-  meta: number | null;
-  target: number | null;
-  secondaryTarget: number | null;
-  gainLower: number | null;
-  gainUpper: number | null;
-  realizado: number | null;
-  value: number | null;
-  attainment: number | null;
-  status: string;
-}
-
-interface IndicatorRow {
-  id: string;
-  companyId: string;
-  name: string;
-  code: string | null;
-  description: string | null;
-  type: string;
-  category: string | null;
-  unit: string;
-  unitLabel: string | null;
-  periodicity: string;
-  direction: string;
-  accumulation?: string | null;
-  formula: string | null;
-  source: string | null;
-  formTemplateId?: string | null;
-  status: string;
-  weight: number;
-  yellowToleranceP: number;
-  createdAt: string;
-  updatedAt: string;
-  company: CompanyOption;
-  ownerNode: { id: string; name: string; type: string; parentId: string | null; parent?: { id: string; name: string; type: string } | null };
-  guidelineNode: { id: string; name: string; type: string } | null;
-  strategicObjective: StrategicObjectiveOption | null;
-  responsibleUser: { id: string; name: string } | null;
-  areaMacro: { id: string; name: string; type: string | null };
-  areaMicro: { id: string; name: string; type: string | null } | null;
-  parentIndicator: { id: string; name: string; code: string | null } | null;
-  isMacro: boolean;
-  currentTarget: { periodRef: string; target: number; lowerBound: number | null; upperBound: number | null } | null;
-  last: {
-    id: string;
-    periodRef: string;
-    value: number;
-    light: string;
-    attainment: number | null;
-    deviationPct: number | null;
-    note: string | null;
-    updatedAt: string;
-  } | null;
-  monthlyHistory: MonthlyPoint[];
-  _count: { actions: number; meetings: number; targets: number; results: number };
-}
-
-interface AuditLogRow {
-  id: string;
-  action: string;
-  recordLabel: string | null;
-  beforeValue: string | null;
-  afterValue: string | null;
-  createdAt: string;
-  user: { id: string; name: string; email: string } | null;
-}
-
-interface IndicatorHistory {
-  logs: AuditLogRow[];
-}
-
-type IndicatorForm = {
-  id: string;
-  companyId: string;
-  areaMacroId: string;
-  areaMicroId: string;
-  ownerNodeId: string;
-  guidelineNodeId: string;
-  strategicObjectiveId: string;
-  responsibleUserId: string;
-  parentIndicatorId: string;
-  name: string;
-  code: string;
-  description: string;
-  type: string;
-  category: string;
-  unit: string;
-  unitLabel: string;
-  periodicity: string;
-  direction: string;
-  accumulation: string;
-  formula: string;
-  source: string;
-  /** Formulário/checklist cujas inspeções alimentam este indicador. */
-  formTemplateId: string;
-  status: string;
-  weight: string;
-  yellowToleranceP: string;
-  initialTarget: string;
-  initialResult: string;
-};
 
 type Filters = {
   companyId: string;
@@ -237,39 +100,8 @@ type Filters = {
 };
 
 const TYPE_LABEL = INDICATOR_TYPE_LABEL;
-const UNIT_LABEL = INDICATOR_UNIT_LABEL;
 const STATUS_LABEL = INDICATOR_STATUS_LABEL;
 const LIGHT_LABEL = TRAFFIC_LIGHT_LABEL;
-
-const EMPTY_FORM: IndicatorForm = {
-  id: '',
-  companyId: '',
-  areaMacroId: '',
-  areaMicroId: '',
-  ownerNodeId: '',
-  guidelineNodeId: '',
-  strategicObjectiveId: '',
-  responsibleUserId: '',
-  parentIndicatorId: '',
-  name: '',
-  code: '',
-  description: '',
-  type: 'OPERATIONAL',
-  category: '',
-  unit: 'PERCENT',
-  unitLabel: '',
-  periodicity: 'MONTHLY',
-  direction: 'HIGHER_BETTER',
-  accumulation: 'AVERAGE',
-  formula: '',
-  source: '',
-  formTemplateId: '',
-  status: 'ACTIVE',
-  weight: '1',
-  yellowToleranceP: '10',
-  initialTarget: '',
-  initialResult: '',
-};
 
 const renderCustomBarLabel = (props: any, fill: string) => {
   const { x, y, width, value } = props;
@@ -318,7 +150,7 @@ export default function IndicatorsPage() {
     year: '',
   });
   const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState<IndicatorForm>(EMPTY_FORM);
+  const [form, setForm] = useState<IndicatorForm>(EMPTY_INDICATOR_FORM);
   const [viewing, setViewing] = useState<IndicatorRow | null>(null);
   const [targetEditing, setTargetEditing] = useState<IndicatorRow | null>(null);
   const [resultEditing, setResultEditing] = useState<IndicatorRow | null>(null);
@@ -500,37 +332,7 @@ export default function IndicatorsPage() {
 
   const saveIndicator = useMutation({
     mutationFn: () => {
-      const ownerNodeId = form.areaMicroId || form.areaMacroId || form.ownerNodeId;
-      if (!form.name.trim()) throw new Error('Informe o nome do indicador');
-      if (!ownerNodeId) throw new Error('Selecione a área ou setor');
-      if (!form.unit) throw new Error('Selecione a unidade de medida');
-      if (!form.periodicity) throw new Error('Selecione a periodicidade');
-      const payload = {
-        companyId: form.companyId || companies[0]?.id,
-        ownerNodeId,
-        guidelineNodeId: form.guidelineNodeId || null,
-        strategicObjectiveId: form.strategicObjectiveId || null,
-        responsibleUserId: form.responsibleUserId || null,
-        parentIndicatorId: form.parentIndicatorId || null,
-        name: form.name,
-        code: form.code || null,
-        description: form.description || null,
-        type: form.type,
-        category: form.category || null,
-        unit: form.unit,
-        unitLabel: form.unitLabel || null,
-        periodicity: form.periodicity,
-        direction: form.direction,
-        accumulation: form.accumulation,
-        formula: form.formula || null,
-        source: form.source || null,
-        formTemplateId: form.formTemplateId || null,
-        status: form.status,
-        weight: numberOrUndefined(form.weight),
-        yellowToleranceP: numberOrUndefined(form.yellowToleranceP),
-        initialTarget: form.id ? undefined : numberOrUndefined(form.initialTarget),
-        initialResult: form.id ? undefined : numberOrUndefined(form.initialResult),
-      };
+      const payload = buildIndicatorPayload(form, companies[0]?.id);
       return form.id
         ? api(`/indicators/${form.id}`, { method: 'PATCH', json: payload })
         : api('/indicators', { method: 'POST', json: payload });
@@ -538,7 +340,7 @@ export default function IndicatorsPage() {
     onSuccess: () => {
       toast.success(form.id ? 'Indicador atualizado' : 'Indicador incluido');
       setFormOpen(false);
-      setForm(EMPTY_FORM);
+      setForm(EMPTY_INDICATOR_FORM);
       qc.invalidateQueries({ queryKey: ['indicators'] });
     },
     onError: (error: Error) => toast.error(error.message || 'Falha ao salvar indicador'),
@@ -554,39 +356,12 @@ export default function IndicatorsPage() {
   });
 
   function openCreate() {
-    setForm({ ...EMPTY_FORM, companyId: filters.companyId || companies[0]?.id || '' });
+    setForm({ ...EMPTY_INDICATOR_FORM, companyId: filters.companyId || companies[0]?.id || '' });
     setFormOpen(true);
   }
 
   function openEdit(indicator: IndicatorRow) {
-    setForm({
-      ...EMPTY_FORM,
-      id: indicator.id,
-      companyId: indicator.companyId,
-      areaMacroId: indicator.areaMacro?.id ?? '',
-      areaMicroId: indicator.areaMicro?.id ?? '',
-      ownerNodeId: indicator.ownerNode.id,
-      guidelineNodeId: indicator.guidelineNode?.id ?? '',
-      strategicObjectiveId: indicator.strategicObjective?.id ?? '',
-      responsibleUserId: indicator.responsibleUser?.id ?? '',
-      parentIndicatorId: indicator.parentIndicator?.id ?? '',
-      name: indicator.name,
-      code: indicator.code ?? '',
-      description: indicator.description ?? '',
-      type: indicator.type,
-      category: indicator.category ?? '',
-      unit: indicator.unit,
-      unitLabel: indicator.unitLabel ?? '',
-      periodicity: indicator.periodicity,
-      direction: indicator.direction,
-      accumulation: indicator.accumulation ?? 'AVERAGE',
-      formula: indicator.formula ?? '',
-      source: indicator.source ?? '',
-      formTemplateId: indicator.formTemplateId ?? '',
-      status: indicator.status,
-      weight: String(indicator.weight ?? 1),
-      yellowToleranceP: String(indicator.yellowToleranceP ?? 10),
-    });
+    setForm(indicatorFormFromRow(indicator));
     setFormOpen(true);
   }
 
@@ -825,6 +600,7 @@ export default function IndicatorsPage() {
         macroOptions={formMacroOptions}
         microOptions={formMicroOptions}
         guidelineOptions={guidelineOptions}
+        areaOptions={formOrgNodes}
         users={users}
         strategicObjectives={strategicObjectives}
         parentIndicatorOptions={rows.filter((row) => row.id !== form.id)}
@@ -835,17 +611,17 @@ export default function IndicatorsPage() {
 
       <IndicatorViewDialog indicator={viewing} onOpenChange={(open) => !open && setViewing(null)} />
 
-      <TargetDialog
+      <IndicatorTargetDialog
         indicator={targetEditing}
         onOpenChange={(open) => !open && setTargetEditing(null)}
       />
 
-      <ResultDialog
+      <IndicatorResultDialog
         indicator={resultEditing}
         onOpenChange={(open) => !open && setResultEditing(null)}
       />
 
-      <HistoryDialog
+      <IndicatorHistoryDialog
         indicator={historyIndicator}
         history={history.data}
         isLoading={history.isLoading}
@@ -997,54 +773,6 @@ interface ChartPoint {
   gainLower: number | null;
   gainUpper: number | null;
   noValueStub: number | null;
-}
-
-interface GrainCell {
-  periodRef: string;
-  target: number | null;
-  secondaryTarget?: number | null;
-  gainLower?: number | null;
-  gainUpper?: number | null;
-  value: number | null;
-  status: string;
-  light: string;
-  isClosed?: boolean;
-}
-
-interface GrainResponse {
-  indicator: { id: string; name: string };
-  granularity: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
-  monthRef: string;
-  cells: GrainCell[];
-}
-
-function grainPeriodLabel(periodRef: string): string {
-  // DAILY: 2026-05-15 -> 15
-  if (/^\d{4}-\d{2}-\d{2}$/.test(periodRef)) {
-    return periodRef.slice(8, 10);
-  }
-  // WEEKLY: 2026-W21 -> S21
-  const wMatch = /^\d{4}-W(\d{2})$/.exec(periodRef);
-  if (wMatch) return `S${wMatch[1]}`;
-  // BIWEEKLY: 2026-BW3 -> Q3
-  const bwMatch = /^\d{4}-BW(\d+)$/.exec(periodRef);
-  if (bwMatch) return `Q${bwMatch[1]}`;
-  return periodRef;
-}
-
-function currentMonthRef(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-}
-
-function monthOptionsForYear(year: number): { value: string; label: string }[] {
-  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return monthNames.map((label, i) => ({
-    value: `${year}-${pad(i + 1)}`,
-    label: `${label}/${String(year).slice(2)}`,
-  }));
 }
 
 function buildCumulative(values: Array<number | null | undefined>, accumulation?: string | null): Array<number | null> {
@@ -1243,6 +971,15 @@ function IndicatorManagementCard({
             <span className="flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5" />{indicator.areaMicro?.name ?? indicator.ownerNode.name}</span>
             <span className="flex items-center gap-1.5"><UserRound className="h-3.5 w-3.5" />{indicator.responsibleUser?.name ?? 'Sem responsável'}</span>
             <span className="flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" />{indicator.last ? periodRefLabel(indicator.last.periodRef) : (PERIODICITY_LABEL[indicator.periodicity] ?? indicator.periodicity)}</span>
+            {(indicator.sharedAreas?.length ?? 0) > 0 && (
+              <span
+                className="flex items-center gap-1.5"
+                title={`Compartilhado com: ${(indicator.sharedAreas ?? []).map((area) => area.name).join(', ')}`}
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                Compartilhado com {indicator.sharedAreas!.length} área(s)
+              </span>
+            )}
           </div>
         </div>
         <StatusLight light={light} size="md" />
@@ -1617,586 +1354,6 @@ function MicroIndicatorRow({
   );
 }
 
-function IndicatorFormDialog({
-  open,
-  onOpenChange,
-  form,
-  setForm,
-  companies,
-  macroOptions,
-  microOptions,
-  guidelineOptions,
-  users,
-  strategicObjectives,
-  parentIndicatorOptions,
-  options,
-  isSaving,
-  onSave,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  form: IndicatorForm;
-  setForm: React.Dispatch<React.SetStateAction<IndicatorForm>>;
-  companies: CompanyOption[];
-  macroOptions: OrgNodeOption[];
-  microOptions: OrgNodeOption[];
-  guidelineOptions: OrgNodeOption[];
-  users: UserOption[];
-  strategicObjectives: StrategicObjectiveOption[];
-  parentIndicatorOptions: IndicatorRow[];
-  options?: IndicatorOptions;
-  isSaving: boolean;
-  onSave: () => void;
-}) {
-  // Formulários disponíveis para alimentar o indicador automaticamente.
-  // Não dá para filtrar por um status só: um formulário aceita preenchimento
-  // quando está PUBLISHED, APPROVED **ou** ACTIVE — pedir `?status=ACTIVE`
-  // deixava a lista vazia justamente para os formulários publicados.
-  const formTemplatesQuery = useQuery<Array<{ id: string; title: string; version: string | null; status: string }>>({
-    queryKey: ['indicator-form-templates'],
-    queryFn: () => api('/forms'),
-    staleTime: 5 * 60 * 1000,
-    select: (rows) => rows.filter((row) => ['PUBLISHED', 'APPROVED', 'ACTIVE'].includes(row.status)),
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
-        <DialogHeader>
-          <DialogTitle>{form.id ? 'Editar indicador' : 'Incluir indicador'}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <Field label="Nome do indicador" required className="xl:col-span-2">
-            <Input value={form.name} onChange={(e) => patchForm(setForm, { name: e.target.value })} placeholder="Ex.: Absenteismo" />
-          </Field>
-          <Field label="Código">
-            <Input value={form.code} onChange={(e) => patchForm(setForm, { code: e.target.value })} placeholder="Ex.: RH-001" />
-          </Field>
-          <Field label="Empresa" required>
-            <NativeSelect value={form.companyId} onChange={(e) => patchForm(setForm, { companyId: e.target.value, areaMacroId: '', areaMicroId: '', guidelineNodeId: '' })}>
-              <option value="">Selecione</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>{company.tradeName || company.name}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Área" required>
-            <NativeSelect value={form.areaMacroId} onChange={(e) => patchForm(setForm, { areaMacroId: e.target.value, areaMicroId: '' })}>
-              <option value="">Selecione</option>
-              {macroOptions.map((node) => (
-                <option key={node.id} value={node.id}>{node.name}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Setor">
-            <NativeSelect value={form.areaMicroId} onChange={(e) => patchForm(setForm, { areaMicroId: e.target.value })}>
-              <option value="">Usar área</option>
-              {microOptions.map((node) => (
-                <option key={node.id} value={node.id}>{node.name}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Indicador macro (pai)">
-            <NativeSelect value={form.parentIndicatorId} onChange={(e) => patchForm(setForm, { parentIndicatorId: e.target.value })}>
-              <option value="">Sem vínculo (indicador macro próprio)</option>
-              {parentIndicatorOptions.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.code ? `${row.code} - ` : ''}{row.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Diretriz vinculada">
-            <NativeSelect value={form.guidelineNodeId} onChange={(e) => patchForm(setForm, { guidelineNodeId: e.target.value })}>
-              <option value="">Não vinculada</option>
-              {guidelineOptions.map((node) => (
-                <option key={node.id} value={node.id}>{node.name}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Objetivo estratégico">
-            <NativeSelect value={form.strategicObjectiveId} onChange={(e) => patchForm(setForm, { strategicObjectiveId: e.target.value })}>
-              <option value="">Não vinculado</option>
-              {strategicObjectives.map((objective) => (
-                <option key={objective.id} value={objective.id}>{objective.perspective.name} - {objective.name}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Responsável">
-            <NativeSelect value={form.responsibleUserId} onChange={(e) => patchForm(setForm, { responsibleUserId: e.target.value })}>
-              <option value="">Sem responsável</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>{user.name}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Tipo">
-            <NativeSelect value={form.type} onChange={(e) => patchForm(setForm, { type: e.target.value })}>
-              {options?.indicatorTypes.map((type) => (
-                <option key={type} value={type}>{TYPE_LABEL[type] ?? type}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Unidade" required>
-            <NativeSelect value={form.unit} onChange={(e) => patchForm(setForm, { unit: e.target.value })}>
-              {options?.units.map((unit) => (
-                <option key={unit} value={unit}>{UNIT_LABEL[unit] ?? unit}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Rótulo da unidade">
-            <Input value={form.unitLabel} onChange={(e) => patchForm(setForm, { unitLabel: e.target.value })} placeholder="Ex.: R$/t" />
-          </Field>
-          <Field label="Periodicidade" required>
-            <NativeSelect value={form.periodicity} onChange={(e) => patchForm(setForm, { periodicity: e.target.value })}>
-              {options?.periodicities.map((periodicity) => (
-                <option key={periodicity} value={periodicity}>{PERIODICITY_LABEL[periodicity] ?? periodicity}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Sentido do indicador">
-            <NativeSelect value={form.direction} onChange={(e) => patchForm(setForm, { direction: e.target.value })}>
-              {options?.directions.map((direction) => (
-                <option key={direction} value={direction}>{DIRECTION_LABEL[direction] ?? direction}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Cálculo do acumulado (YTD)">
-            <NativeSelect value={form.accumulation} onChange={(e) => patchForm(setForm, { accumulation: e.target.value })}>
-              <option value="AVERAGE">Média do ano até o mês (padrão)</option>
-              <option value="SUM">Soma mês a mês (ex.: entrada de cana, volumes)</option>
-              <option value="FIXED">Fixo — não acumula (usa o valor do mês)</option>
-            </NativeSelect>
-          </Field>
-          <Field label="Status">
-            <NativeSelect value={form.status} onChange={(e) => patchForm(setForm, { status: e.target.value })}>
-              {options?.statuses.map((status) => (
-                <option key={status} value={status}>{STATUS_LABEL[status] ?? status}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Peso">
-            <Input type="number" step="0.1" value={form.weight} onChange={(e) => patchForm(setForm, { weight: e.target.value })} />
-          </Field>
-          <Field label="Tolerância amarela (%)">
-            <Input type="number" step="0.1" value={form.yellowToleranceP} onChange={(e) => patchForm(setForm, { yellowToleranceP: e.target.value })} />
-          </Field>
-          {!form.id && (
-            <>
-              <Field label="Meta inicial">
-                <Input type="number" step="0.01" value={form.initialTarget} onChange={(e) => patchForm(setForm, { initialTarget: e.target.value })} />
-              </Field>
-              <Field label="Realizado inicial">
-                <Input type="number" step="0.01" value={form.initialResult} onChange={(e) => patchForm(setForm, { initialResult: e.target.value })} />
-              </Field>
-            </>
-          )}
-          <Field label="Fonte dos dados">
-            <Input value={form.source} onChange={(e) => patchForm(setForm, { source: e.target.value })} placeholder="ERP, planilha, sistema interno" />
-          </Field>
-          {/* Vínculo direto formulário → indicador. (área, setor) não basta:
-              um setor pode ter vários indicadores diferentes. */}
-          <Field label="Alimentado pelo formulário" className="md:col-span-2">
-            <NativeSelect value={form.formTemplateId} onChange={(e) => patchForm(setForm, { formTemplateId: e.target.value })}>
-              <option value="">Lançamento manual (sem formulário)</option>
-              {(formTemplatesQuery.data ?? []).map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.title}{template.version ? ` - rev ${template.version}` : ''}
-                </option>
-              ))}
-            </NativeSelect>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {formTemplatesQuery.data?.length === 0
-                ? 'Nenhum formulário publicado ainda. Publique o modelo em Formulários e Checklists para poder vinculá-lo aqui.'
-                : 'Ao concluir uma inspeção deste formulário nesta área/setor, o sistema lança a média de conformidade do mês neste indicador.'}
-            </p>
-          </Field>
-          <Field label="Formula de cálculo" className="md:col-span-2">
-            <Input value={form.formula} onChange={(e) => patchForm(setForm, { formula: e.target.value })} placeholder="Ex.: (faltas / horas previstas) * 100" />
-          </Field>
-          <Field label="Categoria">
-            <Input value={form.category} onChange={(e) => patchForm(setForm, { category: e.target.value })} placeholder="Opcional" />
-          </Field>
-          <Field label="Descrição e observações" className="md:col-span-2 xl:col-span-3">
-            <Textarea rows={3} value={form.description} onChange={(e) => patchForm(setForm, { description: e.target.value })} />
-          </Field>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={onSave} disabled={isSaving}>{isSaving ? 'Salvando...' : 'Salvar indicador'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function IndicatorViewDialog({ indicator, onOpenChange }: { indicator: IndicatorRow | null; onOpenChange: (open: boolean) => void }) {
-  return (
-    <Dialog open={Boolean(indicator)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>{indicator?.name}</DialogTitle>
-        </DialogHeader>
-        {indicator && (
-          <div className="space-y-5">
-            <div className="grid gap-3 md:grid-cols-3">
-              <Info label="Empresa" value={indicator.company.tradeName || indicator.company.name} />
-              <Info label="Área" value={indicator.areaMacro?.name} />
-              <Info label="Setor" value={indicator.areaMicro?.name ?? indicator.ownerNode.name} />
-              <Info label="Diretriz" value={indicator.guidelineNode?.name ?? '-'} />
-              <Info label="Objetivo estratégico" value={indicator.strategicObjective?.name ?? '-'} />
-              <Info label="Responsável" value={indicator.responsibleUser?.name ?? 'Sem responsável'} />
-              <Info label="Periodicidade" value={PERIODICITY_LABEL[indicator.periodicity] ?? indicator.periodicity} />
-              <Info label="Sentido" value={DIRECTION_LABEL[indicator.direction] ?? indicator.direction} />
-              <Info label="Status" value={STATUS_LABEL[indicator.status] ?? indicator.status} />
-            </div>
-            <div className="rounded-lg border p-4">
-              <h3 className="text-sm font-semibold">Dados relacionados</h3>
-              <div className="mt-3 grid gap-3 text-sm md:grid-cols-4">
-                <Info label="Metas" value={formatNumber(indicator._count.targets)} />
-                <Info label="Realizados" value={formatNumber(indicator._count.results)} />
-                <Info label="Planos de ação" value={formatNumber(indicator._count.actions)} />
-                <Info label="Reuniões" value={formatNumber(indicator._count.meetings)} />
-              </div>
-            </div>
-            {indicator.description && <p className="text-sm text-muted-foreground">{indicator.description}</p>}
-            <div className="flex justify-end">
-              <Button variant="outline" asChild>
-                <Link href={`/indicators/${indicator.id}`}>Abrir detalhe completo</Link>
-              </Button>
-            </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-type LaunchGranularity = 'MONTHLY' | 'WEEKLY' | 'DAILY';
-
-function TargetDialog({
-  indicator,
-  onOpenChange,
-}: {
-  indicator: IndicatorRow | null;
-  onOpenChange: (open: boolean) => void;
-}) {
-  return (
-    <UnifiedLaunchDialog
-      indicator={indicator}
-      mode="target"
-      onOpenChange={onOpenChange}
-    />
-  );
-}
-
-function ResultDialog({
-  indicator,
-  onOpenChange,
-}: {
-  indicator: IndicatorRow | null;
-  onOpenChange: (open: boolean) => void;
-}) {
-  return (
-    <UnifiedLaunchDialog
-      indicator={indicator}
-      mode="result"
-      onOpenChange={onOpenChange}
-    />
-  );
-}
-
-function UnifiedLaunchDialog({
-  indicator,
-  mode,
-  onOpenChange,
-}: {
-  indicator: IndicatorRow | null;
-  mode: 'result' | 'target';
-  onOpenChange: (open: boolean) => void;
-}) {
-  const [granularity, setGranularity] = useState<LaunchGranularity>('MONTHLY');
-
-  useEffect(() => {
-    if (indicator) setGranularity('MONTHLY');
-  }, [indicator?.id]);
-
-  const isResult = mode === 'result';
-  const monthlyLabel = isResult ? 'Lançar Realizado' : 'Meta Mensal';
-  const weeklyLabel = isResult ? 'Lançar Semanal' : 'Meta Semanal';
-  const dailyLabel = isResult ? 'Lançar Diário' : 'Meta Diária';
-  const title = isResult ? `Lançar Realizado · ${indicator?.name ?? ''}` : `Alterar metas · ${indicator?.name ?? ''}`;
-
-  const tabs: Array<{ key: LaunchGranularity; label: string }> = [
-    { key: 'MONTHLY', label: monthlyLabel },
-    { key: 'WEEKLY', label: weeklyLabel },
-    { key: 'DAILY', label: dailyLabel },
-  ];
-
-  return (
-    <Dialog open={Boolean(indicator)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        {indicator && (
-          <div className="space-y-4">
-            <div className="inline-flex border border-border/60 bg-muted/40 p-0.5">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setGranularity(tab.key)}
-                  className={cn(
-                    'px-3 py-1.5 text-xs font-medium transition-colors',
-                    granularity === tab.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {granularity === 'MONTHLY' && (
-              <IndicatorResultEditor
-                mode={mode}
-                indicatorId={indicator.id}
-                fallbackName={indicator.name}
-                unitLabel={indicator.unitLabel ?? indicator.unit}
-              />
-            )}
-            {granularity !== 'MONTHLY' && (
-              <GrainEditor
-                indicator={indicator}
-                mode={mode}
-                granularity={granularity}
-              />
-            )}
-          </div>
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function GrainEditor({
-  indicator,
-  mode,
-  granularity,
-}: {
-  indicator: IndicatorRow;
-  mode: 'result' | 'target';
-  granularity: 'WEEKLY' | 'DAILY';
-}) {
-  const qc = useQueryClient();
-  const [month, setMonth] = useState<string>(currentMonthRef());
-  const [edits, setEdits] = useState<Record<string, string>>({});
-  const [notesCell, setNotesCell] = useState<string | null>(null);
-
-  useEffect(() => {
-    setEdits({});
-    setNotesCell(null);
-  }, [indicator.id, granularity, month]);
-
-  const query = useQuery<GrainResponse>({
-    queryKey: ['grain', indicator.id, granularity, month],
-    queryFn: () => api<GrainResponse>(`/results/grain?indicatorId=${indicator.id}&granularity=${granularity}&month=${month}`),
-  });
-
-  const save = useMutation({
-    mutationFn: () => {
-      const items: { indicatorId: string; periodRef: string; value: number }[] = [];
-      for (const [periodRef, raw] of Object.entries(edits)) {
-        const trimmed = raw.trim().replace(',', '.');
-        if (trimmed === '') continue;
-        const num = Number(trimmed);
-        if (!Number.isFinite(num)) continue;
-        items.push({ indicatorId: indicator.id, periodRef, value: num });
-      }
-      if (items.length === 0) return Promise.reject(new Error('Nada para salvar'));
-      const endpoint = mode === 'target' ? '/results/batch' : '/results/batch';
-      return api<{ count: number }>(endpoint, { method: 'POST', json: { items } });
-    },
-    onSuccess: (out) => {
-      toast.success(`${out.count} lançamento(s) salvos`);
-      setEdits({});
-      qc.invalidateQueries({ queryKey: ['grain', indicator.id] });
-      qc.invalidateQueries({ queryKey: ['indicators'] });
-      qc.invalidateQueries({ queryKey: ['indicator', indicator.id, 'grain'] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar'),
-  });
-
-  const cells = query.data?.cells ?? [];
-  const editedCount = Object.values(edits).filter((v) => v.trim() !== '').length;
-  const valueColLabel = mode === 'target' ? 'Meta' : 'Realizado';
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <Label className="text-xs uppercase text-muted-foreground">Mês</Label>
-        <NativeSelect value={month} onChange={(e) => { setMonth(e.target.value); setEdits({}); }} className="h-9 w-40">
-          {monthOptionsForYear(new Date().getFullYear()).map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </NativeSelect>
-        <span className="text-xs text-muted-foreground">
-          {granularity === 'WEEKLY' ? `${cells.length} semana(s) no mês` : `${cells.length} dia(s) no mês`}
-        </span>
-      </div>
-
-      {query.isLoading && <LoadingState className="min-h-40" />}
-      {!query.isLoading && cells.length === 0 && (
-        <EmptyState title="Sem períodos" description="Selecione outro mês." />
-      )}
-      {!query.isLoading && cells.length > 0 && (
-        <div className="overflow-x-auto border">
-          <table className="table-modern min-w-[480px]">
-            <thead>
-              <tr>
-                <th className="text-left">{granularity === 'WEEKLY' ? 'Semana' : 'Dia'}</th>
-                <th className="text-left">Meta</th>
-                <th className="text-left">{valueColLabel}</th>
-                {mode === 'result' && <th className="text-left">Registros</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {cells.map((cell) => {
-                const editVal = edits[cell.periodRef] ?? '';
-                const persisted = mode === 'target' ? cell.target : cell.value;
-                const display = editVal !== ''
-                  ? editVal
-                  : persisted !== null && persisted !== undefined ? String(persisted) : '';
-                return (
-                  <tr key={cell.periodRef}>
-                    <td>
-                      <div className="font-medium">{grainPeriodLabel(cell.periodRef)}</div>
-                      <div className="text-xs text-muted-foreground">{cell.periodRef}</div>
-                    </td>
-                    <td>
-                      <div className="text-sm">{cell.target !== null ? formatNumber(cell.target) : '-'}</div>
-                    </td>
-                    <td>
-                      <Input
-                        value={display}
-                        onChange={(e) => setEdits((prev) => ({ ...prev, [cell.periodRef]: e.target.value }))}
-                        placeholder={cell.target !== null ? String(cell.target) : '-'}
-                        className="h-9 w-32 text-sm"
-                      />
-                    </td>
-                    {mode === 'result' && (
-                      <td>
-                        <div className="flex gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2"
-                            onClick={() => setNotesCell(cell.periodRef)}
-                            title="Anexos"
-                          >
-                            <Paperclip className="mr-1 h-3.5 w-3.5" />
-                            Anexo
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2"
-                            onClick={() => setNotesCell(cell.periodRef)}
-                            title="Comentários"
-                          >
-                            <MessageSquare className="mr-1 h-3.5 w-3.5" />
-                            Comentários
-                          </Button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div className="flex justify-end">
-        <Button onClick={() => save.mutate()} disabled={editedCount === 0 || save.isPending}>
-          <Save className="mr-2 h-4 w-4" />
-          {save.isPending ? 'Salvando...' : `Salvar (${editedCount})`}
-        </Button>
-      </div>
-
-      {notesCell && (
-        <ResultNotesDialog
-          indicatorId={indicator.id}
-          periodRef={notesCell}
-          open={!!notesCell}
-          onClose={() => setNotesCell(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function HistoryDialog({
-  indicator,
-  history,
-  isLoading,
-  onOpenChange,
-}: {
-  indicator: IndicatorRow | null;
-  history?: IndicatorHistory;
-  isLoading: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  return (
-    <Dialog open={Boolean(indicator)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Histórico do indicador</DialogTitle>
-        </DialogHeader>
-        {isLoading && <LoadingState />}
-        {!isLoading && (history?.logs.length ?? 0) === 0 && (
-          <p className="text-sm text-muted-foreground">Nenhum registro de auditoria encontrado para este indicador.</p>
-        )}
-        <div className="max-h-[55vh] space-y-3 overflow-y-auto">
-          {history?.logs.map((log) => (
-            <div key={log.id} className="rounded-lg border p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="font-medium">{historyActionLabel(log.action)}</div>
-                <div className="text-xs text-muted-foreground">{formatDate(log.createdAt)} - {log.user?.name ?? 'Sistema'}</div>
-              </div>
-              {log.recordLabel && <p className="mt-1 text-sm text-muted-foreground">{log.recordLabel}</p>}
-            </div>
-          ))}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function Field({ label, required, className, children }: { label: string; required?: boolean; className?: string; children: React.ReactNode }) {
-  return (
-    <div className={className}>
-      <Label className={required ? 'field-required' : undefined}>{label}</Label>
-      {children}
-    </div>
-  );
-}
-
-function Info({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 font-medium">{value || '-'}</div>
-    </div>
-  );
-}
-
 function ChartTooltip({ active, payload, label, viewMode }: any) {
   if (!active || !payload?.length) return null;
   const point = payload[0]?.payload as ChartPoint | undefined;
@@ -2218,15 +1375,6 @@ function ChartTooltip({ active, payload, label, viewMode }: any) {
   );
 }
 
-function patchForm(setForm: React.Dispatch<React.SetStateAction<IndicatorForm>>, patch: Partial<IndicatorForm>) {
-  setForm((prev) => ({ ...prev, ...patch }));
-}
-
-function numberOrUndefined(value: string) {
-  if (!value.trim()) return undefined;
-  return Number(value.replace(',', '.'));
-}
-
 function toQueryString(filters: Filters) {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
@@ -2241,17 +1389,4 @@ function statusBadgeClass(light: string) {
   if (light === 'YELLOW') return 'border-amber-200 bg-amber-50 text-amber-700';
   if (light === 'RED') return 'border-red-200 bg-red-50 text-red-700';
   return 'border-slate-200 bg-slate-50 text-slate-600';
-}
-
-function historyActionLabel(action: string) {
-  const labels: Record<string, string> = {
-    CREATE: 'Criação do indicador',
-    UPDATE: 'Edição cadastral',
-    DELETE: 'Exclusão lógica',
-    CREATE_TARGET: 'Meta criada',
-    UPDATE_TARGET: 'Meta alterada',
-    CREATE_RESULT: 'Realizado lancado',
-    UPDATE_RESULT: 'Realizado alterado',
-  };
-  return labels[action] ?? action;
 }
