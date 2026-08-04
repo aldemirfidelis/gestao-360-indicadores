@@ -430,8 +430,10 @@ export function IshikawaVisualAnalysis({
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div ref={scrollRef} className="max-h-[560px] overflow-auto bg-slate-50">
+      {/* Sem coluna lateral: o diagrama ocupa a largura toda. Edição e ações da
+          causa acontecem no próprio card ao selecioná-lo. */}
+      <div>
+        <div ref={scrollRef} className="max-h-[620px] overflow-auto bg-slate-50">
           <div
             ref={canvasRef}
             className="relative m-0 origin-top-left"
@@ -481,28 +483,18 @@ export function IshikawaVisualAnalysis({
                     moved: false,
                   };
                 }}
+                onUpdate={(patch) => updateCause(cause.id, patch)}
+                onSave={() => handleSave()}
+                onDelete={() => deleteCause(cause)}
+                onSendToFiveWhys={onSendToFiveWhys ? () => {
+                  updateCause(cause.id, { status: 'LIKELY_CAUSE' });
+                  handleSave();
+                  onSendToFiveWhys(cause.title, cause.id);
+                } : undefined}
               />
             ))}
           </div>
         </div>
-
-        <CauseDrawer
-          cause={selectedCause}
-          users={users}
-          canEdit={canEdit}
-          onUpdate={(patch) => selectedCause && updateCause(selectedCause.id, patch)}
-          onSave={() => handleSave()}
-          onDelete={() => selectedCause && deleteCause(selectedCause)}
-          onMarkLikely={() => selectedCause && updateCause(selectedCause.id, { status: 'LIKELY_CAUSE' })}
-          onMarkRoot={() => selectedCause && markRootCause(selectedCause)}
-          onConvert={() => selectedCause && convertToAction(selectedCause)}
-          onSendToFiveWhys={onSendToFiveWhys ? () => {
-            if (!selectedCause) return;
-            updateCause(selectedCause.id, { status: 'LIKELY_CAUSE' });
-            handleSave();
-            onSendToFiveWhys(selectedCause.title, selectedCause.id);
-          } : undefined}
-        />
       </div>
 
       <Legend lastSavedAt={lastSavedAt} saving={saving} />
@@ -670,27 +662,41 @@ function FishHead({ problem }: { problem: string }) {
   );
 }
 
+/**
+ * Card da causa: edição e ações acontecem no próprio bloco, sem painel lateral.
+ * O diagrama é o que importa nesta tela — tirar a coluna da direita devolveu
+ * ~300px de largura e dispensou o zoom para enxergar a espinha inteira.
+ */
 function CauseCard({
   cause,
   selected,
   canEdit,
   onSelect,
   onPointerDown,
+  onUpdate,
+  onSave,
+  onDelete,
+  onSendToFiveWhys,
 }: {
   cause: IshikawaCause;
   selected: boolean;
   canEdit: boolean;
   onSelect: () => void;
   onPointerDown: (event: React.PointerEvent<Element>) => void;
+  onUpdate: (patch: Partial<IshikawaCause>) => void;
+  onSave: () => void;
+  onDelete: () => void;
+  onSendToFiveWhys?: () => void;
 }) {
   const category = getCategory(cause.category);
+  const hasRootCause = (cause.rootCause ?? '').trim().length > 0;
   return (
     <div
       role="button"
       tabIndex={0}
       className={cn(
         'absolute z-20 min-h-[60px] w-[218px] resize-y overflow-auto rounded-lg border bg-white p-3 text-left shadow-sm transition',
-        selected ? 'border-blue-500 shadow-lg ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
+        selected ? 'z-30 border-blue-500 shadow-lg ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
         cause.isRootCause && 'border-emerald-500 ring-2 ring-emerald-100',
       )}
       style={{ left: cause.positionX, top: cause.positionY }}
@@ -705,111 +711,78 @@ function CauseCard({
           onPointerDown={onPointerDown}
         />
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold leading-4 text-slate-900">{cause.title}</div>
+          {selected && canEdit ? (
+            // Selecionado: o texto vira campo no lugar, sem tirar os olhos do diagrama.
+            <Textarea
+              autoFocus
+              rows={3}
+              value={cause.title}
+              maxLength={500}
+              onChange={(event) => onUpdate({ title: event.target.value, description: event.target.value })}
+              onBlur={onSave}
+              onClick={(event) => event.stopPropagation()}
+              className="min-h-[56px] resize-none border-slate-200 p-1.5 text-xs leading-4"
+              placeholder="Descreva a causa"
+            />
+          ) : (
+            <div className="text-xs font-semibold leading-4 text-slate-900">{cause.title}</div>
+          )}
           <div className="mt-2 flex flex-wrap gap-1">
-            <PriorityBadge priority={cause.priority} />
+            {selected && canEdit ? (
+              <NativeSelect
+                value={cause.priority}
+                onChange={(event) => onUpdate({ priority: event.target.value as Priority })}
+                onBlur={onSave}
+                onClick={(event) => event.stopPropagation()}
+                className="h-7 w-full text-[11px]"
+              >
+                {Object.entries(PRIORITY_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              </NativeSelect>
+            ) : (
+              <PriorityBadge priority={cause.priority} />
+            )}
             {cause.isAiSuggested && <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">IA</Badge>}
             {cause.isRootCause && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Causa raiz</Badge>}
-            {(cause.rootCause ?? '').trim() && <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700" title={cause.rootCause ?? undefined}>✔ Causa raiz encontrada</Badge>}
+            {hasRootCause && <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700" title={cause.rootCause ?? undefined}>✔ Causa raiz encontrada</Badge>}
             {cause.convertedToTaskId && <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">Plano criado</Badge>}
           </div>
+
+          {selected && (
+            <div className="mt-2 space-y-1.5 border-t border-slate-100 pt-2">
+              {onSendToFiveWhys && (
+                <Button
+                  size="sm"
+                  className="h-7 w-full justify-center bg-emerald-600 px-2 text-[11px] hover:bg-emerald-700"
+                  disabled={!canEdit}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSendToFiveWhys();
+                  }}
+                >
+                  <ArrowRight className="mr-1 h-3.5 w-3.5" />
+                  {hasRootCause ? 'Reabrir no 5 Porquês' : 'Investigar nos 5 Porquês'}
+                </Button>
+              )}
+              {canEdit && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-full justify-center px-2 text-[11px] text-red-600 hover:text-red-700"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete();
+                  }}
+                >
+                  <Trash2 className="mr-1 h-3.5 w-3.5" />
+                  Excluir causa
+                </Button>
+              )}
+            </div>
+          )}
         </div>
         <span className="mt-1 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: category.color }} />
       </div>
     </div>
-  );
-}
-
-function CauseDrawer({
-  cause,
-  users,
-  canEdit,
-  onUpdate,
-  onSave,
-  onDelete,
-  onMarkLikely,
-  onMarkRoot,
-  onConvert,
-  onSendToFiveWhys,
-}: {
-  cause: IshikawaCause | null;
-  users: UserOption[];
-  canEdit: boolean;
-  onUpdate: (patch: Partial<IshikawaCause>) => void;
-  onSave: () => void;
-  onDelete: () => void;
-  onMarkLikely: () => void;
-  onMarkRoot: () => void;
-  onConvert: () => void;
-  onSendToFiveWhys?: () => void;
-}) {
-  if (!cause) {
-    return (
-      <aside className="border-l border-slate-200 bg-white p-4">
-        <div className="text-sm font-semibold text-slate-900">Causa selecionada</div>
-        <p className="mt-2 text-sm text-slate-500">Selecione um card no diagrama para editar detalhes, responsáveis e evidências.</p>
-      </aside>
-    );
-  }
-  return (
-    <aside className="border-l border-slate-200 bg-white">
-      <div className="flex items-start justify-between gap-2 border-b border-slate-200 p-3">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-900">Causa selecionada</div>
-          <div className="mt-1.5 flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600" />
-            <span className="truncate text-sm font-medium text-slate-800">{cause.title}</span>
-          </div>
-        </div>
-        <PriorityBadge priority={cause.priority} />
-      </div>
-      <div className="max-h-[520px] space-y-3 overflow-y-auto p-3">
-        <fieldset disabled={!canEdit} className="space-y-3">
-          <div>
-            <Label>Nome da causa</Label>
-            <Input value={cause.title} onChange={(event) => onUpdate({ title: event.target.value })} onBlur={onSave} />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label>Categoria</Label>
-              <NativeSelect value={normalizeCategory(cause.category)} onChange={(event) => onUpdate({ category: event.target.value })} onBlur={onSave}>
-                {CATEGORIES.map((category) => <option key={category.key} value={category.key}>{category.label}</option>)}
-              </NativeSelect>
-            </div>
-            <div>
-              <Label>Prioridade</Label>
-              <NativeSelect value={cause.priority} onChange={(event) => onUpdate({ priority: event.target.value as Priority })} onBlur={onSave}>
-                {Object.entries(PRIORITY_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-              </NativeSelect>
-            </div>
-          </div>
-          <div>
-            <Label>Descrição</Label>
-            <Textarea rows={4} value={cause.description ?? ''} onChange={(event) => onUpdate({ description: event.target.value })} onBlur={onSave} />
-            <div className="mt-1 text-right text-[11px] text-slate-400">{cause.description?.length ?? 0}/500</div>
-          </div>
-        </fieldset>
-
-        <div className="space-y-2 border-t border-slate-200 pt-4">
-          {(cause.rootCause ?? '').trim() && (
-            <div className="rounded-md border border-teal-200 bg-teal-50 p-2.5 text-xs text-teal-800">
-              <div className="font-semibold">✔ Causa raiz encontrada nesta causa</div>
-              <div className="mt-1">{cause.rootCause}</div>
-            </div>
-          )}
-          {onSendToFiveWhys && (
-            <Button className="w-full justify-start bg-emerald-600 hover:bg-emerald-700" onClick={onSendToFiveWhys} disabled={!canEdit}>
-              <ArrowRight className="mr-2 h-4 w-4" />
-              {(cause.rootCause ?? '').trim() ? 'Reabrir no 5 Porquês' : 'Investigar nos 5 Porquês'}
-            </Button>
-          )}
-          <Button variant="ghost" className="w-full justify-start text-red-600 hover:text-red-700" onClick={onDelete} disabled={!canEdit}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            Excluir causa
-          </Button>
-        </div>
-      </div>
-    </aside>
   );
 }
 

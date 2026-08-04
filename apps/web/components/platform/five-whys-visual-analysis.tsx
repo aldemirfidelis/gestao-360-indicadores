@@ -493,15 +493,23 @@ function WhyBlock({
         <fieldset disabled={!canEdit} className="mt-3 space-y-2">
           <div>
             <Label className="text-[11px] text-slate-500">
-              Pergunta{questionLocked && <span className="ml-1 font-normal text-slate-400">(herdada da resposta anterior)</span>}
+              {index === 0 ? 'Fato analisado' : 'Causa do nível anterior'}
+              {questionLocked && <span className="ml-1 font-normal text-slate-400">(herdada da resposta anterior)</span>}
             </Label>
             {questionLocked ? (
               <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-                <span>{item.question || 'Responda o porquê anterior para herdar a pergunta.'}</span>
+                <span>{item.question || 'Responda o porquê anterior para herdar a causa.'}</span>
               </div>
             ) : (
-              <Textarea rows={2} value={item.question} placeholder="Por quê?" onChange={(event) => onQuestion(event.target.value)} onBlur={onBlurSave} className="text-sm" />
+              <Textarea
+                rows={2}
+                value={item.question}
+                placeholder={index === 0 ? 'O que aconteceu?' : 'Causa apontada no nível anterior'}
+                onChange={(event) => onQuestion(event.target.value)}
+                onBlur={onBlurSave}
+                className="text-sm"
+              />
             )}
           </div>
           <div>
@@ -608,10 +616,28 @@ function isAnswered(item: WhyItem) {
   return Boolean(item.question?.trim()) && Boolean(item.answer?.trim());
 }
 
-/** A pergunta do nível N (N≥2) é herdada da resposta do nível anterior — encadeamento dos 5 Porquês. */
+/**
+ * A pergunta do nível N (N≥2) é herdada da resposta do nível anterior.
+ * Fica só o FATO, sem embrulhar em `Por que "..." acontece?`: a ferramenta já
+ * é o porquê, e o rótulo acima do campo diz isso. O texto embrulhado poluía a
+ * leitura e atrapalhava quem exporta a análise.
+ */
 function inheritedQuestionFor(prevAnswer: string | undefined) {
-  const answer = (prevAnswer ?? '').trim();
-  return answer ? `Por que "${answer}" acontece?` : '';
+  return stripWhyWrapper(prevAnswer ?? '');
+}
+
+/**
+ * Tira o embrulho `Por que "..." acontece?/ocorreu?/ocorre?` do texto — inclusive
+ * nas análises antigas, gravadas quando a pergunta vinha montada assim.
+ */
+function stripWhyWrapper(value: string): string {
+  const text = (value ?? '').trim();
+  if (!text) return '';
+  const match = /^por\s*qu[eê]\s*"?(.+?)"?\s*(acontece|ocorre|ocorreu|aconteceu)?\s*\??$/i.exec(text);
+  if (match?.[1]) return match[1].trim();
+  // "Por quê?" puro não carrega conteúdo: vira campo vazio.
+  if (/^por\s*qu[eê]\s*\??$/i.test(text)) return '';
+  return text;
 }
 
 /** Reescreve as perguntas dos níveis ≥2 a partir da resposta do nível anterior (mantém o nível 1 livre). */
@@ -631,11 +657,12 @@ function normalizeItems(rows: any[] | undefined, problem: string): WhyItem[] {
 }
 
 function makeItem(row: any, level: number, problem: string): WhyItem {
-  const defaultQuestion = level === 1 ? (problem?.trim() ? `Por que "${problem.trim()}" ocorreu?` : 'Por que o problema ocorreu?') : 'Por quê?';
+  // Nível 1 começa com o próprio fato; os demais herdam a resposta anterior.
+  const defaultQuestion = level === 1 ? (problem?.trim() ?? '') : '';
   return {
     id: typeof row?.id === 'string' && row.id ? row.id : `${level}-${newTempId()}`,
     level,
-    question: typeof row?.question === 'string' ? row.question : defaultQuestion,
+    question: typeof row?.question === 'string' ? stripWhyWrapper(row.question) : defaultQuestion,
     answer: typeof row?.answer === 'string' ? row.answer : '',
     causeType: normalizeCauseType(row?.causeType, row?.isRootCause),
     confidence: clampPercent(row?.confidence ?? 60),
@@ -662,7 +689,7 @@ function defaultSuggestions(problem: string, items: WhyItem[]): WhySuggestion[] 
   for (let level = start; level <= 5; level += 1) {
     out.push({
       level,
-      question: level === 1 ? `Por que "${base}" aconteceu?` : `Por que a causa do nível ${level - 1} ocorre?`,
+      question: level === 1 ? base : `Causa apontada no nível ${level - 1}`,
       answer: '',
       justification: 'Encadeie a pergunta à resposta anterior, baseando-se em fatos e evidências, até atingir uma causa acionável.',
       confidence: 60,
