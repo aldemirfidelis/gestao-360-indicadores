@@ -26,8 +26,16 @@ export class MonthlyResultsController {
     @Query('meetingId') meetingId?: string,
     @Query('periodRef') periodRef?: string,
     @Query('onlyOpen') onlyOpen?: string,
+    @Query('source') source?: string,
   ) {
-    return this.minutes.minutes(me, { meetingId, periodRef, onlyOpen });
+    return this.minutes.minutes(me, { meetingId, periodRef, onlyOpen, source });
+  }
+
+  /** Acompanhamento das acoes de reunioes anteriores (card da apresentacao). */
+  @Get('meetings/:id/outcome-follow-up')
+  @RequirePermissions('monthly:view', 'actions:view')
+  outcomeFollowUp(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.minutes.outcomeFollowUp(me, id);
   }
 
   @Get('minutes/actions/:actionId/curve')

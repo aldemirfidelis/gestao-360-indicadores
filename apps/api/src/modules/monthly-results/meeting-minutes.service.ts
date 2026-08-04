@@ -12,12 +12,23 @@ const CANCELLED_STATUSES: ActionStatus[] = [ActionStatus.CANCELLED];
 
 export type MinuteActionState = 'NAO_INICIADA' | 'EM_ANDAMENTO' | 'ENCERRADA' | 'CANCELADA';
 
+/**
+ * De onde a ação veio — os dois tipos que a reunião trata de forma diferente:
+ * - `DA_AREA`: plano que a área já tinha e levou para a reunião prestar contas.
+ * - `SAIDA_REUNIAO`: ação decidida no próprio fórum (decisão, escalonamento ou
+ *   plano aberto durante a apresentação).
+ */
+export type MinuteActionSource = 'DA_AREA' | 'SAIDA_REUNIAO';
+
 interface MinuteAction {
   id: string;
   title: string;
   status: ActionStatus;
   /** Estado consolidado para a ata (o que o gestor lê na coluna Status). */
   state: MinuteActionState;
+  source: MinuteActionSource;
+  /** O que originou a ação de saída (decisão, escalonamento, indicador). */
+  sourceDetail: string | null;
   overdue: boolean;
   progress: number;
   startDate: string | null;
@@ -63,9 +74,9 @@ export class MeetingMinutesService {
    * Ata de uma reunião (ou de todas as reuniões de uma competência), agrupada
    * em Área → Setor → Responsável.
    */
-  async minutes(me: AuthPayload, query: { meetingId?: string; periodRef?: string; onlyOpen?: string }) {
+  async minutes(me: AuthPayload, query: { meetingId?: string; periodRef?: string; onlyOpen?: string; source?: string }) {
     const meetingIds = await this.resolveMeetingIds(me, query);
-    const actionIds = await this.actionIdsFromMeetings(me, meetingIds);
+    const { ids: actionIds, sources } = await this.actionIdsFromMeetings(me, meetingIds);
 
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     const actions = actionIds.length
@@ -112,10 +123,16 @@ export class MeetingMinutesService {
     const meetingOfAction = await this.meetingByAction(meetingIds);
 
     const onlyOpen = query.onlyOpen === '1' || query.onlyOpen === 'true';
+    const wantedSource = query.source === 'DA_AREA' || query.source === 'SAIDA_REUNIAO' ? query.source : null;
     const rows: MinuteAction[] = [];
     for (const action of actions) {
       const state = this.stateOf(action.status);
       if (onlyOpen && (state === 'ENCERRADA' || state === 'CANCELADA')) continue;
+      // origin=MEETING vence qualquer vínculo: nasceu no fórum.
+      const classified = sources.get(action.id);
+      const source: MinuteActionSource =
+        action.origin === 'MEETING' ? 'SAIDA_REUNIAO' : classified?.source ?? 'DA_AREA';
+      if (wantedSource && source !== wantedSource) continue;
       const meetingId = meetingOfAction.get(action.id) ?? action.meeting?.id ?? null;
       const meeting = meetingId ? meetingById.get(meetingId) ?? null : null;
       // Área/setor: quando o nó tem pai, o pai é a área e o nó é o setor.
@@ -127,6 +144,8 @@ export class MeetingMinutesService {
         title: action.title,
         status: action.status,
         state,
+        source,
+        sourceDetail: classified?.detail ?? null,
         overdue:
           state !== 'ENCERRADA' &&
           state !== 'CANCELADA' &&
@@ -156,7 +175,96 @@ export class MeetingMinutesService {
     return {
       meetings: meetingIds.map((id) => meetingById.get(id)).filter(Boolean),
       summary: this.summarize(rows),
+      // Os dois tipos lado a lado: o que a área trouxe e o que o fórum decidiu.
+      bySource: {
+        DA_AREA: this.summarize(rows.filter((r) => r.source === 'DA_AREA')),
+        SAIDA_REUNIAO: this.summarize(rows.filter((r) => r.source === 'SAIDA_REUNIAO')),
+      },
       areas: this.groupByArea(rows),
+    };
+  }
+
+  /**
+   * Ações de SAÍDA das reuniões anteriores, para o card de acompanhamento na
+   * apresentação: é o que o fórum decidiu no passado e precisa prestar contas
+   * na reunião de hoje.
+   */
+  async outcomeFollowUp(me: AuthPayload, meetingId: string) {
+    const meeting = await this.prisma.monthlyMeeting.findFirst({
+      where: { id: meetingId, companyId: me.companyId, deletedAt: null },
+      select: { id: true, periodRef: true, startsAt: true },
+    });
+    if (!meeting) throw new NotFoundException('Reunião mensal não encontrada.');
+
+    // Reuniões anteriores (inclui a atual: ações abertas nela também entram).
+    const previous = await this.prisma.monthlyMeeting.findMany({
+      where: { companyId: me.companyId, deletedAt: null, periodRef: { lte: meeting.periodRef } },
+      select: { id: true, periodRef: true, title: true },
+      orderBy: { periodRef: 'desc' },
+      take: 12,
+    });
+    const previousIds = previous.map((m) => m.id);
+    const { ids, sources } = await this.actionIdsFromMeetings(me, previousIds);
+    if (!ids.length) return { meeting, items: [], summary: this.summarize([]) };
+
+    const actions = await this.prisma.actionPlan.findMany({
+      where: { id: { in: ids }, companyId: me.companyId, deletedAt: null },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        origin: true,
+        progress: true,
+        startDate: true,
+        dueDate: true,
+        completedAt: true,
+        responsibleUser: { select: { id: true, name: true } },
+        ownerNode: { select: { id: true, name: true, parent: { select: { id: true, name: true } } } },
+        indicator: { select: { id: true, name: true, code: true } },
+        tasks: { select: { done: true } },
+      },
+      orderBy: [{ dueDate: 'asc' }],
+    });
+    const meetingOfAction = await this.meetingByAction(previousIds);
+    const meetingById = new Map(previous.map((m) => [m.id, m]));
+
+    const items = actions.map((action) => {
+      const state = this.stateOf(action.status);
+      const classified = sources.get(action.id);
+      const source: MinuteActionSource =
+        action.origin === 'MEETING' ? 'SAIDA_REUNIAO' : classified?.source ?? 'DA_AREA';
+      const from = meetingOfAction.get(action.id);
+      const node = action.ownerNode;
+      return {
+        id: action.id,
+        title: action.title,
+        state,
+        source,
+        sourceDetail: classified?.detail ?? null,
+        progress: action.progress ?? 0,
+        dueDate: action.dueDate?.toISOString() ?? null,
+        overdue:
+          state !== 'ENCERRADA' && state !== 'CANCELADA' && Boolean(action.dueDate) && (action.dueDate as Date).getTime() < Date.now(),
+        responsible: action.responsibleUser,
+        area: node ? (node.parent?.name ?? node.name) : null,
+        sector: node?.parent ? node.name : null,
+        indicator: action.indicator,
+        fromMeeting: from ? meetingById.get(from)?.periodRef ?? null : null,
+        taskCount: action.tasks.length,
+        taskDone: action.tasks.filter((t) => t.done).length,
+        links: { action: `/actions/${action.id}` },
+      };
+    });
+
+    const asRows = items.map((item) => ({ state: item.state, overdue: item.overdue, progress: item.progress, source: item.source })) as MinuteAction[];
+    return {
+      meeting,
+      items,
+      summary: this.summarize(asRows),
+      bySource: {
+        DA_AREA: this.summarize(asRows.filter((r) => r.source === 'DA_AREA')),
+        SAIDA_REUNIAO: this.summarize(asRows.filter((r) => r.source === 'SAIDA_REUNIAO')),
+      },
     };
   }
 
@@ -301,36 +409,60 @@ export class MeetingMinutesService {
   }
 
   /**
-   * Toda saída da reunião que virou ação: decisões, planos vinculados aos
-   * indicadores apresentados, escalonamentos e ações criadas com a reunião
-   * como origem.
+   * Toda ação ligada às reuniões, com a classificação dos dois tipos:
+   * o que a ÁREA levou (plano vinculado ao indicador apresentado) e o que SAIU
+   * do fórum (decisão, escalonamento ou plano aberto durante a reunião).
    */
   private async actionIdsFromMeetings(me: AuthPayload, meetingIds: string[]) {
-    if (!meetingIds.length) return [];
+    if (!meetingIds.length) return { ids: [] as string[], sources: new Map<string, { source: MinuteActionSource; detail: string | null }>() };
     const [indicators, decisions, followUps, byOrigin] = await Promise.all([
       this.prisma.monthlyMeetingIndicator.findMany({
         where: { meetingId: { in: meetingIds }, actionPlanId: { not: null } },
-        select: { actionPlanId: true },
+        select: { actionPlanId: true, indicator: { select: { name: true } } },
       }),
       this.prisma.monthlyMeetingDecision.findMany({
         where: { meetingId: { in: meetingIds }, actionPlanId: { not: null } },
-        select: { actionPlanId: true },
+        select: { actionPlanId: true, kind: true, topic: true },
       }),
       this.prisma.monthlyMeetingFollowUp.findMany({
         where: { meetingId: { in: meetingIds }, actionPlanId: { not: null } },
-        select: { actionPlanId: true },
+        select: { actionPlanId: true, level: true, title: true },
       }),
       this.prisma.actionPlan.findMany({
         where: { companyId: me.companyId, deletedAt: null, origin: 'MEETING', originRefId: { in: meetingIds } },
         select: { id: true },
       }),
     ]);
+
     const ids = new Set<string>();
-    for (const row of indicators) if (row.actionPlanId) ids.add(row.actionPlanId);
-    for (const row of decisions) if (row.actionPlanId) ids.add(row.actionPlanId);
-    for (const row of followUps) if (row.actionPlanId) ids.add(row.actionPlanId);
-    for (const row of byOrigin) ids.add(row.id);
-    return [...ids];
+    const sources = new Map<string, { source: MinuteActionSource; detail: string | null }>();
+
+    // Vinculada ao indicador: em regra é o plano que a área trouxe. Se tiver
+    // nascido no fórum, o passo seguinte (origin=MEETING) reclassifica.
+    for (const row of indicators) {
+      if (!row.actionPlanId) continue;
+      ids.add(row.actionPlanId);
+      sources.set(row.actionPlanId, { source: 'DA_AREA', detail: row.indicator?.name ?? null });
+    }
+    // Decisão e escalonamento nascem no fórum: sempre saída da reunião.
+    for (const row of decisions) {
+      if (!row.actionPlanId) continue;
+      ids.add(row.actionPlanId);
+      sources.set(row.actionPlanId, { source: 'SAIDA_REUNIAO', detail: row.topic || decisionKindLabel(row.kind) });
+    }
+    for (const row of followUps) {
+      if (!row.actionPlanId) continue;
+      ids.add(row.actionPlanId);
+      sources.set(row.actionPlanId, { source: 'SAIDA_REUNIAO', detail: row.title || 'Acompanhamento' });
+    }
+    // Criada com a reunião como origem: saída do fórum, mesmo que também esteja
+    // pendurada num indicador (foi aberta durante a apresentação dele).
+    for (const row of byOrigin) {
+      ids.add(row.id);
+      const previous = sources.get(row.id);
+      sources.set(row.id, { source: 'SAIDA_REUNIAO', detail: previous?.detail ?? null });
+    }
+    return { ids: [...ids], sources };
   }
 
   /** De qual reunião veio cada ação (para exibir a origem na linha da ata). */
@@ -423,6 +555,16 @@ export class MeetingMinutesService {
       }))
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   }
+}
+
+function decisionKindLabel(kind: string): string {
+  const labels: Record<string, string> = {
+    DECISION: 'Decisão',
+    RISK: 'Risco',
+    ESCALATION: 'Escalonamento',
+    COMMITMENT: 'Compromisso',
+  };
+  return labels[kind] ?? 'Decisão';
 }
 
 function startOfDay(date: Date | string): number {

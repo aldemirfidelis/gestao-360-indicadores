@@ -39,12 +39,15 @@ import { cn, formatDate, formatNumber } from '@/lib/utils';
 import { ActionCurveDialog } from '@/components/platform/action-curve-dialog';
 
 type MinuteState = 'NAO_INICIADA' | 'EM_ANDAMENTO' | 'ENCERRADA' | 'CANCELADA';
+type MinuteSource = 'DA_AREA' | 'SAIDA_REUNIAO';
 
 export interface MinuteAction {
   id: string;
   title: string;
   status: string;
   state: MinuteState;
+  source: MinuteSource;
+  sourceDetail: string | null;
   overdue: boolean;
   progress: number;
   startDate: string | null;
@@ -75,6 +78,7 @@ interface MinuteSummary {
 interface MinutesResponse {
   meetings: Array<{ id: string; title: string; periodRef: string }>;
   summary: MinuteSummary;
+  bySource: Record<MinuteSource, MinuteSummary>;
   areas: Array<{
     id: string;
     name: string;
@@ -101,9 +105,25 @@ const STATE_CLASS: Record<MinuteState, string> = {
   CANCELADA: 'border-slate-200 bg-slate-100 text-slate-500',
 };
 
+const SOURCE_LABEL: Record<MinuteSource, string> = {
+  DA_AREA: 'Plano da área',
+  SAIDA_REUNIAO: 'Saída da reunião',
+};
+
+const SOURCE_CLASS: Record<MinuteSource, string> = {
+  DA_AREA: 'border-slate-300 bg-slate-50 text-slate-700',
+  SAIDA_REUNIAO: 'border-violet-200 bg-violet-50 text-violet-700',
+};
+
+const SOURCE_HINT: Record<MinuteSource, string> = {
+  DA_AREA: 'Plano que a área já tinha e levou à reunião para prestar contas.',
+  SAIDA_REUNIAO: 'Ação decidida no próprio fórum: decisão, escalonamento ou plano aberto durante a apresentação.',
+};
+
 export default function MeetingMinutesPage() {
   const [meetingId, setMeetingId] = useState('');
   const [onlyOpen, setOnlyOpen] = useState(false);
+  const [source, setSource] = useState<'' | MinuteSource>('');
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [curveActionId, setCurveActionId] = useState<string | null>(null);
@@ -114,12 +134,13 @@ export default function MeetingMinutesPage() {
   });
 
   const minutes = useQuery<MinutesResponse>({
-    queryKey: ['minutes', meetingId, onlyOpen],
+    queryKey: ['minutes', meetingId, onlyOpen, source],
     queryFn: () =>
       api<MinutesResponse>(
         `/monthly-results/minutes?${new URLSearchParams({
           ...(meetingId ? { meetingId } : {}),
           ...(onlyOpen ? { onlyOpen: '1' } : {}),
+          ...(source ? { source } : {}),
         }).toString()}`,
       ),
   });
@@ -172,11 +193,49 @@ export default function MeetingMinutesPage() {
         }
       />
 
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard compact title="Ações da ata" value={formatNumber(summary?.total ?? 0)} description={`${formatNumber(summary?.closed ?? 0)} encerradas`} icon={<ClipboardList className="h-4 w-4" />} tone="blue" />
         <MetricCard compact title="Em andamento" value={formatNumber(summary?.inProgress ?? 0)} description={`${formatNumber(summary?.notStarted ?? 0)} não iniciadas`} icon={<Loader2 className="h-4 w-4" />} tone="purple" />
         <MetricCard compact title="Atrasadas" value={formatNumber(summary?.overdue ?? 0)} description="Prazo vencido e ainda abertas" icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
         <MetricCard compact title="Avanço médio" value={`${formatNumber(summary?.avgProgress ?? 0)}%`} description="Das ações ainda abertas" icon={<TrendingUp className="h-4 w-4" />} tone="green" />
+      </div>
+
+      {/* Os dois tipos de ação que a reunião trata de forma diferente. Clicar
+          filtra a ata inteira pelo tipo. */}
+      <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+        {(['DA_AREA', 'SAIDA_REUNIAO'] as const).map((key) => {
+          const stats = minutes.data?.bySource?.[key];
+          const selected = source === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setSource(selected ? '' : key)}
+              title={SOURCE_HINT[key]}
+              className={cn(
+                'panel p-4 text-left transition-colors hover:bg-accent/25',
+                selected && 'border-primary/50 bg-primary/5',
+              )}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <Badge variant="outline" className={cn('text-[10px]', SOURCE_CLASS[key])}>{SOURCE_LABEL[key]}</Badge>
+                  <span className="text-lg font-semibold tabular-nums">{formatNumber(stats?.total ?? 0)}</span>
+                  <span className="text-xs text-muted-foreground">ação(ões)</span>
+                </span>
+                <span className="text-xs text-muted-foreground">{selected ? 'filtrando — clique para limpar' : 'clique para filtrar'}</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>{formatNumber(stats?.closed ?? 0)} encerradas</span>
+                <span>{formatNumber(stats?.inProgress ?? 0)} em andamento</span>
+                <span className={cn((stats?.overdue ?? 0) > 0 && 'font-medium text-red-600')}>
+                  {formatNumber(stats?.overdue ?? 0)} atrasadas
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{SOURCE_HINT[key]}</p>
+            </button>
+          );
+        })}
       </div>
 
       <section className="panel mb-6 p-4">
@@ -267,10 +326,11 @@ export default function MeetingMinutesPage() {
                           </div>
 
                           <div className="overflow-x-auto">
-                            <table className="table-modern min-w-[860px]">
+                            <table className="table-modern min-w-[1000px]">
                               <thead>
                                 <tr>
                                   <th className="text-left">Ação</th>
+                                  <th className="text-left">Tipo</th>
                                   <th className="text-left">Previsão de início</th>
                                   <th className="text-left">Previsão de fim</th>
                                   <th className="text-left">Avanço</th>
@@ -293,6 +353,16 @@ export default function MeetingMinutesPage() {
                                         {action.deviation && <span>Desvio #{formatNumber(action.deviation.number)}</span>}
                                         {action.meeting && <span>{action.meeting.periodRef}</span>}
                                       </div>
+                                    </td>
+                                    <td>
+                                      <Badge variant="outline" className={cn('whitespace-nowrap text-[10px]', SOURCE_CLASS[action.source])} title={SOURCE_HINT[action.source]}>
+                                        {SOURCE_LABEL[action.source]}
+                                      </Badge>
+                                      {action.sourceDetail && (
+                                        <div className="mt-0.5 max-w-[160px] truncate text-[10px] text-muted-foreground" title={action.sourceDetail}>
+                                          {action.sourceDetail}
+                                        </div>
+                                      )}
                                     </td>
                                     <td className="text-xs">{action.startDate ? formatDate(action.startDate) : '—'}</td>
                                     <td className="text-xs">

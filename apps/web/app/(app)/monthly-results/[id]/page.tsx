@@ -66,6 +66,7 @@ import {
   type MonthlyOptions,
   type SnapshotIndicator,
 } from '../shared';
+import { MeetingOutcomeActionsCard } from '@/components/platform/meeting-outcome-actions-card';
 import { exportAtaPdf, exportAcoesXlsx, exportFarolXlsx, exportResumoPdf } from '../exports';
 import { PresentationChartSettings, PresentationHeaderBanner, PresentationHeaderSettings, usePresentationBranding } from '../presentation-header';
 
@@ -692,6 +693,10 @@ function ConductTab({ meeting, can, run }: { meeting: MeetingDetail; can: Can; r
               {keyMessage && <KeyMessageCard message={keyMessage} />}
 
               <AreaPlansKanban inProgress={plansInProgress} closed={plansClosed} onOpenAction={openAction} />
+
+              {/* O outro lado da moeda: o que a REUNIÃO decidiu (e não o que a
+                  área trouxe pronto), com o andamento para cobrar hoje. */}
+              <MeetingOutcomeActionsCard meetingId={meeting.id} areaName={area?.name ?? null} onOpenAction={openAction} />
             </>
           )}
         </>

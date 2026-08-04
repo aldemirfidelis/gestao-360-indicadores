@@ -954,6 +954,9 @@ export class MonthlyResultsService {
           title: this.truncate(description, 120),
           description,
           origin: ActionOrigin.MEETING,
+          // Marca de qual reunião a ação saiu: é o que separa, na ata, o que o
+          // fórum decidiu do que a área já trouxe pronto.
+          originRefId: id,
           priority: ActionPriority.HIGH,
           status: ActionStatus.NOT_STARTED,
           responsibleUserId: this.clean(body.ownerUserId),
@@ -1031,6 +1034,8 @@ export class MonthlyResultsService {
         title,
         description: this.clean(body.description),
         origin: ActionOrigin.MEETING,
+        // Idem: ação nascida no fórum carrega a reunião de origem.
+        originRefId: id,
         priority: body.priority ?? ActionPriority.HIGH,
         status: ActionStatus.NOT_STARTED,
         responsibleUserId: this.clean(body.responsibleUserId),
