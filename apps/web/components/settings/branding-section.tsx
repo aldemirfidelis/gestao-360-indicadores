@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { BRAND_COLOR_PRESETS, brandPaletteFrom, normalizeHex } from '@/lib/brand-color';
+import { BRAND_COLOR_PRESETS, BRAND_TEXT_COLOR_PRESETS, brandPaletteFrom, normalizeHex } from '@/lib/brand-color';
 import { companyBrandingQueryKey, useCompanyBranding } from '@/components/brand/company-branding-provider';
 
 const DEFAULT_PREVIEW: CSSProperties = { backgroundColor: '#0a1128', borderColor: '#1b2b54', color: '#ffffff' };
@@ -26,6 +26,7 @@ export function BrandingSection({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
   const { branding, loading } = useCompanyBranding();
   const [color, setColor] = useState('');
+  const [textColor, setTextColor] = useState('');
   const [logo, setLogo] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
 
@@ -33,12 +34,16 @@ export function BrandingSection({ canManage }: { canManage: boolean }) {
   useEffect(() => {
     if (touched) return;
     setColor(branding?.brandColor ?? '');
+    setTextColor(branding?.brandTextColor ?? '');
     setLogo(branding?.logoUrl ?? null);
   }, [branding, touched]);
 
   const save = useMutation({
     mutationFn: () =>
-      api('/companies/me/branding', { method: 'PATCH', json: { brandColor: color || null, logoUrl: logo } }),
+      api('/companies/me/branding', {
+        method: 'PATCH',
+        json: { brandColor: color || null, brandTextColor: textColor || null, logoUrl: logo },
+      }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: companyBrandingQueryKey });
       setTouched(false);
@@ -68,7 +73,7 @@ export function BrandingSection({ canManage }: { canManage: boolean }) {
     reader.readAsDataURL(file);
   };
 
-  const palette = brandPaletteFrom(color);
+  const palette = brandPaletteFrom(color, textColor);
   const previewStyle: CSSProperties = palette
     ? {
         backgroundColor: `hsl(${palette.shellBg})`,
@@ -76,7 +81,11 @@ export function BrandingSection({ canManage }: { canManage: boolean }) {
         color: `hsl(${palette.shellForeground})`,
       }
     : DEFAULT_PREVIEW;
-  const dirty = (color || null) !== (branding?.brandColor ?? null) || (logo || null) !== (branding?.logoUrl ?? null);
+  const mutedPreview = palette ? `hsl(${palette.shellMuted})` : '#94a3b8';
+  const dirty =
+    (color || null) !== (branding?.brandColor ?? null) ||
+    (textColor || null) !== (branding?.brandTextColor ?? null) ||
+    (logo || null) !== (branding?.logoUrl ?? null);
 
   if (loading) return <LoadingState />;
 
@@ -92,6 +101,7 @@ export function BrandingSection({ canManage }: { canManage: boolean }) {
                 variant="outline"
                 onClick={() => {
                   setColor(branding?.brandColor ?? '');
+                  setTextColor(branding?.brandTextColor ?? '');
                   setLogo(branding?.logoUrl ?? null);
                   setTouched(false);
                 }}
@@ -173,8 +183,71 @@ export function BrandingSection({ canManage }: { canManage: boolean }) {
               ))}
             </div>
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              O tom do cabeçalho e do menu é calculado a partir da cor da marca, mantendo o texto legível mesmo com
-              cores claras. O conteúdo das telas segue neutro, para os dados continuarem em primeiro plano.
+              O tom do cabeçalho e do menu é calculado a partir da cor da marca. O conteúdo das telas segue neutro,
+              para os dados continuarem em primeiro plano.
+            </p>
+          </div>
+
+          <div>
+            <Label>Cor das letras do cabeçalho e do menu</Label>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <input
+                type="color"
+                value={normalizeHex(textColor) ?? '#ffffff'}
+                disabled={!canManage}
+                onChange={(event) => {
+                  setTextColor(event.target.value);
+                  setTouched(true);
+                }}
+                className="h-9 w-14 cursor-pointer rounded border bg-background p-1"
+                aria-label="Escolher cor das letras"
+              />
+              <Input
+                value={textColor}
+                disabled={!canManage}
+                onChange={(event) => {
+                  setTextColor(event.target.value);
+                  setTouched(true);
+                }}
+                placeholder="#FFFFFF"
+                className="h-9 w-36 font-mono text-sm"
+              />
+              {textColor && canManage && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setTextColor('');
+                    setTouched(true);
+                  }}
+                >
+                  Automático
+                </Button>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {BRAND_TEXT_COLOR_PRESETS.map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  disabled={!canManage}
+                  title={preset.label}
+                  aria-label={preset.label}
+                  onClick={() => {
+                    setTextColor(preset.value);
+                    setTouched(true);
+                  }}
+                  className={cn(
+                    'h-7 w-7 rounded-full border shadow-sm transition-transform hover:scale-110 disabled:cursor-not-allowed',
+                    normalizeHex(textColor) === preset.value && 'ring-2 ring-primary ring-offset-2',
+                  )}
+                  style={{ backgroundColor: preset.value }}
+                />
+              ))}
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              Vale para os títulos e itens do menu e do cabeçalho. Em &ldquo;Automático&rdquo;, a cor é escolhida pelo
+              contraste com o fundo — o mais seguro na maioria dos casos. Escolha manual só quando a marca pedir.
             </p>
           </div>
 
@@ -220,22 +293,26 @@ export function BrandingSection({ canManage }: { canManage: boolean }) {
         <div>
           <Label>Prévia</Label>
           <div className="mt-1.5 overflow-hidden rounded-lg border">
-            <div className="flex h-14 items-center gap-3 border-b px-4" style={previewStyle}>
-              <span className="text-sm font-semibold tracking-tight">Gestão 360</span>
+            <div className="flex h-14 items-center gap-2.5 overflow-hidden border-b px-4" style={previewStyle}>
+              <span className="shrink-0 text-sm font-semibold tracking-tight">G360</span>
               {logo && (
                 <>
-                  <span aria-hidden className="h-5 w-px" style={{ backgroundColor: String(previewStyle.borderColor) }} />
+                  <span aria-hidden className="h-5 w-px shrink-0" style={{ backgroundColor: String(previewStyle.borderColor) }} />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={logo} alt="" className="h-6 w-auto max-w-[96px] object-contain" />
+                  <img src={logo} alt="" className="h-7 w-auto max-w-[120px] object-contain object-left" />
                 </>
               )}
-              <span className="ml-auto text-[11px] opacity-70">usuário</span>
+              <span className="ml-auto shrink-0 text-[11px]" style={{ color: mutedPreview }}>usuário</span>
             </div>
             <div className="flex">
-              <div className="w-28 shrink-0 space-y-2 p-3" style={previewStyle}>
-                <div className="h-2 w-16 rounded bg-current opacity-50" />
-                <div className="h-2 w-12 rounded bg-current opacity-30" />
-                <div className="h-2 w-14 rounded bg-current opacity-30" />
+              {/* Menu de mentira com texto real: é o que revela se a cor das
+                  letras escolhida fica legível sobre a cor da marca. */}
+              <div className="w-36 shrink-0 space-y-1.5 p-3 text-xs" style={previewStyle}>
+                <div className="font-semibold">Gestão à Vista</div>
+                <div style={{ color: mutedPreview }}>Indicadores</div>
+                <div style={{ color: mutedPreview }}>Plano de Ação</div>
+                <div className="font-semibold">Qualidade</div>
+                <div style={{ color: mutedPreview }}>Documentos</div>
               </div>
               <div className="flex-1 space-y-2 bg-background p-3">
                 <div className="h-2 w-2/3 rounded bg-muted" />

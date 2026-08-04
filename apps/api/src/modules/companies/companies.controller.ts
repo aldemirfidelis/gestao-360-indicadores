@@ -28,7 +28,7 @@ export class CompaniesController {
   @RequirePermissions('settings:manage')
   updateMyBranding(
     @CurrentUser() me: AuthPayload,
-    @Body() body: { brandColor?: string | null; logoUrl?: string | null },
+    @Body() body: { brandColor?: string | null; brandTextColor?: string | null; logoUrl?: string | null },
   ) {
     return this.service.updateBranding(me.companyId, body);
   }

@@ -522,6 +522,9 @@ model Company {
   /// Cor principal do portal desta empresa (hex, ex.: "#0a1128"). Pinta o
   /// cabeçalho/menu e os realces. Vazio = azul padrão do Gestão 360.
   brandColor        String?
+  /// Cor das letras do cabeçalho e do menu (hex). Vazio = calculada a partir da
+  /// cor principal, pelo contraste.
+  brandTextColor    String?
   // Subdomínio do tenant (ex.: "goiasa" -> goiasa.gestao360.org). Usado para
   // branding da tela de login e validação do login por host.
   slug              String?       @unique

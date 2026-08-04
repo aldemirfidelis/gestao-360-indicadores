@@ -17,14 +17,22 @@ export function CompanyLogo({ className, imgClassName }: { className?: string; i
 
   const label = branding?.tradeName || branding?.name || 'Empresa';
   return (
-    <span className={cn('flex min-w-0 items-center gap-2', className)}>
+    // min-w-0 + shrink deixam o conjunto encolher junto com a barra em vez de
+    // vazar e ser cortado pela borda.
+    <span className={cn('flex min-w-0 shrink items-center gap-2 overflow-hidden', className)}>
       <span aria-hidden className="h-5 w-px shrink-0 bg-[hsl(var(--shell-border))]" />
       <img
         src={logo}
         alt={label}
         title={label}
-        className={cn('h-7 w-auto max-w-[104px] shrink-0 object-contain', imgClassName)}
+        className={cn('h-7 w-auto max-w-full object-contain object-left', imgClassName)}
       />
     </span>
   );
+}
+
+/** Há logo da empresa configurado? Usado para escolher o formato da marca. */
+export function useHasCompanyLogo(): boolean {
+  const { branding } = useCompanyBranding();
+  return Boolean(branding?.logoUrl);
 }

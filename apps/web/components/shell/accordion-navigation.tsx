@@ -83,7 +83,7 @@ export function AccordionNavigation({
         {!mobile && (
           <div className={cn('mb-2 flex items-center', collapsed ? 'justify-center' : 'justify-between px-2')}>
             {!collapsed && (
-              <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500">
+              <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--shell-muted)/0.75)]">
                 Navegação
               </div>
             )}
@@ -91,7 +91,7 @@ export function AccordionNavigation({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-slate-400 hover:text-white hover:bg-white/[0.05]"
+                className="h-7 w-7 text-[hsl(var(--shell-muted))] hover:text-[hsl(var(--shell-foreground))] hover:bg-white/[0.05]"
                 onClick={() => onCollapsedChange(!collapsed)}
                 aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
                 title={collapsed ? 'Expandir menu' : 'Recolher menu'}
@@ -123,7 +123,7 @@ export function AccordionNavigation({
                   className={cn(
                     'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold uppercase tracking-[0.08em] transition-colors',
                     collapsed && 'justify-center',
-                    flatActive ? 'bg-blue-600 text-white shadow-sm font-medium' : 'text-slate-400 hover:text-white hover:bg-white/[0.04]',
+                    flatActive ? 'bg-blue-600 text-white shadow-sm font-medium' : 'text-[hsl(var(--shell-muted))] hover:text-[hsl(var(--shell-foreground))] hover:bg-white/[0.04]',
                   )}
                 >
                   <FlatIcon className={cn("h-4 w-4 shrink-0", flatActive ? "opacity-100" : "opacity-70")} />
@@ -140,7 +140,7 @@ export function AccordionNavigation({
                     onClick={() => toggle(section.heading)}
                     className={cn(
                       'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] font-semibold uppercase tracking-[0.08em] transition-colors',
-                      sectionActive ? 'text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-white/[0.04]',
+                      sectionActive ? 'text-[hsl(var(--shell-foreground))] font-bold' : 'text-[hsl(var(--shell-muted))] hover:text-[hsl(var(--shell-foreground))] hover:bg-white/[0.04]',
                     )}
                     title={section.description}
                   >
@@ -151,7 +151,7 @@ export function AccordionNavigation({
                 )}
 
                 {collapsed && (
-                  <div className="px-1 pb-1 pt-2 text-center text-slate-500" title={section.heading}>
+                  <div className="px-1 pb-1 pt-2 text-center text-[hsl(var(--shell-muted)/0.75)]" title={section.heading}>
                     <SectionIcon className="mx-auto h-3.5 w-3.5" />
                   </div>
                 )}
@@ -185,8 +185,8 @@ export function AccordionNavigation({
                                 className={cn(
                                   'group relative flex items-center gap-2.5 py-2 pl-5 pr-3 text-[13px] transition-colors rounded-md',
                                   active
-                                    ? 'bg-white/[0.08] font-medium text-white shadow-sm'
-                                    : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
+                                    ? 'bg-white/[0.08] font-medium text-[hsl(var(--shell-foreground))] shadow-sm'
+                                    : 'text-[hsl(var(--shell-muted))] hover:bg-white/[0.04] hover:text-[hsl(var(--shell-foreground))]',
                                 )}
                               >
                                 {/* Conector horizontal pai -> filho (L invertido) */}
@@ -205,7 +205,7 @@ export function AccordionNavigation({
                                   />
                                 )}
                                 {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-blue-500" />}
-                                <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300')} />
+                                <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-[hsl(var(--shell-foreground))]' : 'text-[hsl(var(--shell-muted)/0.75)] group-hover:text-[hsl(var(--shell-foreground))]')} />
                                 <span className="min-w-0 flex-1 leading-tight line-clamp-2">{item.label}</span>
                                 {itemUnread > 0 && (
                                   <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-status-red px-1.5 text-[10px] font-semibold text-white">
@@ -232,12 +232,12 @@ export function AccordionNavigation({
                               className={cn(
                                 'group relative flex items-center justify-center gap-2.5 py-2 px-2 text-sm transition-colors rounded-md',
                                 active
-                                  ? 'bg-white/[0.08] font-medium text-white shadow-sm'
-                                  : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
+                                  ? 'bg-white/[0.08] font-medium text-[hsl(var(--shell-foreground))] shadow-sm'
+                                  : 'text-[hsl(var(--shell-muted))] hover:bg-white/[0.04] hover:text-[hsl(var(--shell-foreground))]',
                               )}
                             >
                               {active && <span className="absolute left-0 top-0 h-full w-[2px] bg-blue-500" />}
-                              <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300')} />
+                              <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-[hsl(var(--shell-foreground))]' : 'text-[hsl(var(--shell-muted)/0.75)] group-hover:text-[hsl(var(--shell-foreground))]')} />
                               {itemUnread > 0 && (
                                 <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-status-red" />
                               )}

@@ -20,6 +20,7 @@ export interface CompanyBranding {
   tradeName: string | null;
   logoUrl: string | null;
   brandColor: string | null;
+  brandTextColor: string | null;
 }
 
 interface BrandingCtx {
@@ -43,7 +44,10 @@ export function CompanyBrandingProvider({ children }: { children: ReactNode }) {
   });
 
   const branding = query.data ?? null;
-  const palette = useMemo(() => brandPaletteFrom(branding?.brandColor ?? null), [branding?.brandColor]);
+  const palette = useMemo(
+    () => brandPaletteFrom(branding?.brandColor ?? null, branding?.brandTextColor ?? null),
+    [branding?.brandColor, branding?.brandTextColor],
+  );
 
   useEffect(() => {
     const root = document.documentElement;

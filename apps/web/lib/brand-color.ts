@@ -82,12 +82,31 @@ const hsl = ({ h, s, l }: Hsl) => `${h} ${s}% ${l}%`;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 /**
- * Monta a paleta do shell. `null` quando não há cor configurada — nesse caso o
- * portal segue com o azul padrão definido no CSS.
+ * Monta a paleta do shell. `null` quando não há cor nem cor de letra
+ * configuradas — nesse caso o portal segue com o azul padrão definido no CSS.
+ *
+ * `textColor` sobrescreve a cor das letras do cabeçalho/menu. Sem ela, a cor é
+ * escolhida pelo contraste com o fundo calculado.
  */
-export function brandPaletteFrom(color: string | null | undefined): BrandPalette | null {
+export function brandPaletteFrom(
+  color: string | null | undefined,
+  textColor?: string | null,
+): BrandPalette | null {
   const hex = normalizeHex(color);
-  if (!hex) return null;
+  const textHex = normalizeHex(textColor);
+  // Só a cor das letras configurada: mantém o azul padrão do fundo e troca o texto.
+  if (!hex) {
+    if (!textHex) return null;
+    const text = hexToHsl(textHex);
+    return {
+      shellBg: '226 60% 10%',
+      shellBgSoft: '224 51% 15%',
+      shellBorder: '223 51% 22%',
+      shellForeground: hsl(text),
+      shellMuted: hsl({ ...text, s: clamp(text.s, 0, 40), l: clamp(text.l - 18, 8, 92) }),
+      brand: '226 60% 10%',
+    };
+  }
 
   const base = hexToHsl(hex);
   // O shell é uma faixa sólida e grande: usar a cor da marca crua deixaria a tela
@@ -105,12 +124,22 @@ export function brandPaletteFrom(color: string | null | undefined): BrandPalette
   const shellBgHex = hslToHex(shellBg);
   const light = luminance(shellBgHex) < 0.35;
 
+  // Cor das letras escolhida pela empresa vence o cálculo automático; o tom
+  // secundário (itens inativos do menu) é derivado dela para manter a hierarquia.
+  const text = textHex ? hexToHsl(textHex) : null;
+  const foreground = text ? hsl(text) : light ? '0 0% 100%' : `${base.h} 40% 12%`;
+  const muted = text
+    ? hsl({ h: text.h, s: clamp(text.s, 0, 40), l: light ? clamp(text.l - 20, 8, 92) : clamp(text.l + 20, 8, 92) })
+    : light
+      ? `${base.h} 18% 76%`
+      : `${base.h} 25% 30%`;
+
   return {
     shellBg: hsl(shellBg),
     shellBgSoft: hsl(shellBgSoft),
     shellBorder: hsl(shellBorder),
-    shellForeground: light ? '0 0% 100%' : `${base.h} 40% 12%`,
-    shellMuted: light ? `${base.h} 18% 76%` : `${base.h} 25% 30%`,
+    shellForeground: foreground,
+    shellMuted: muted,
     brand: hsl(base),
   };
 }
@@ -131,6 +160,16 @@ function hslToHex({ h, s, l }: Hsl): string {
   const toHex = (value: number) => Math.round((value + m) * 255).toString(16).padStart(2, '0');
   return `#${toHex(rgb[0])}${toHex(rgb[1])}${toHex(rgb[2])}`;
 }
+
+/** Cores de letra sugeridas para o cabeçalho e o menu. */
+export const BRAND_TEXT_COLOR_PRESETS: Array<{ label: string; value: string }> = [
+  { label: 'Branco', value: '#ffffff' },
+  { label: 'Branco suave', value: '#e8eef7' },
+  { label: 'Bege claro', value: '#f5efe0' },
+  { label: 'Cinza claro', value: '#cbd5e1' },
+  { label: 'Grafite', value: '#1f2937' },
+  { label: 'Preto', value: '#0b0b0c' },
+];
 
 /** Cores sugeridas na tela de identidade visual (atalho para o usuário). */
 export const BRAND_COLOR_PRESETS: Array<{ label: string; value: string }> = [

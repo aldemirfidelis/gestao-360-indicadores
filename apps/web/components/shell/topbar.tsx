@@ -121,13 +121,13 @@ export function Topbar() {
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-[hsl(var(--shell-border)/0.5)] bg-[hsl(var(--shell-bg))] px-3 pt-[env(safe-area-inset-top)] [height:calc(3.5rem+env(safe-area-inset-top))] backdrop-blur lg:px-6">
       <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
         <DialogTrigger asChild>
-          <Button variant="ghost" size="icon" className="lg:hidden text-slate-300 hover:text-white hover:bg-white/[0.05]" aria-label="Abrir menu">
+          <Button variant="ghost" size="icon" className="lg:hidden text-[hsl(var(--shell-muted))] hover:text-[hsl(var(--shell-foreground))] hover:bg-white/[0.05]" aria-label="Abrir menu">
             <Menu className="h-4 w-4" />
           </Button>
         </DialogTrigger>
         <DialogContent className="left-2 top-2 h-[calc(100vh-1rem)] max-w-[300px] translate-x-0 translate-y-0 p-0">
-          <DialogHeader className="border-b border-[hsl(var(--shell-border)/0.5)] px-4 py-3 bg-[hsl(var(--shell-bg))] text-white">
-            <DialogTitle className="flex items-center gap-2 text-sm text-white">
+          <DialogHeader className="border-b border-[hsl(var(--shell-border)/0.5)] px-4 py-3 bg-[hsl(var(--shell-bg))] text-[hsl(var(--shell-foreground))]">
+            <DialogTitle className="flex items-center gap-2 text-sm text-[hsl(var(--shell-foreground))]">
               <BrandLogo variant="horizontal" size="sm" theme="dark" animated={true} />
               <CompanyLogo imgClassName="h-6 max-w-[80px]" />
             </DialogTitle>
@@ -139,7 +139,7 @@ export function Topbar() {
       </Dialog>
 
       <div className="hidden min-w-[140px] lg:block">
-        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">
+        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--shell-muted))]">
           {section?.heading ?? 'Início'}
         </div>
       </div>
@@ -147,7 +147,7 @@ export function Topbar() {
       <CompanySwitcher />
 
       <div className="relative min-w-0 flex-1 lg:max-w-xl">
-        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[hsl(var(--shell-muted))]" />
         <Input
           value={search}
           onChange={(event) => {
@@ -164,22 +164,22 @@ export function Topbar() {
           data-1p-ignore
           data-lpignore="true"
           placeholder="Buscar indicadores, ações, setores..."
-          className="h-9 border-[hsl(var(--shell-border))] bg-[hsl(var(--shell-bg-soft))] pl-9 pr-8 text-sm text-white placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
+          className="h-9 border-[hsl(var(--shell-border))] bg-[hsl(var(--shell-bg-soft))] pl-9 pr-8 text-sm text-[hsl(var(--shell-foreground))] placeholder:text-[hsl(var(--shell-muted))] focus-visible:ring-1 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
         />
-        <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-1 rounded bg-[#1e293b] px-1.5 font-mono text-[10px] font-medium text-slate-400 opacity-100 sm:flex">
+        <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-1 rounded bg-[#1e293b] px-1.5 font-mono text-[10px] font-medium text-[hsl(var(--shell-muted))] opacity-100 sm:flex">
           <span className="text-[11px]">⌘</span>K
         </kbd>
         {searchOpen && search.trim().length >= 2 && (
-          <div className="absolute left-0 right-0 top-11 z-50 overflow-hidden border border-[hsl(var(--shell-border)/0.8)] bg-[hsl(var(--shell-bg-soft))] shadow-lg rounded-lg text-white">
-            <div className="border-b border-[hsl(var(--shell-border)/0.5)] px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400 bg-[hsl(var(--shell-bg))]">
+          <div className="absolute left-0 right-0 top-11 z-50 overflow-hidden border border-[hsl(var(--shell-border)/0.8)] bg-[hsl(var(--shell-bg-soft))] shadow-lg rounded-lg text-[hsl(var(--shell-foreground))]">
+            <div className="border-b border-[hsl(var(--shell-border)/0.5)] px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[hsl(var(--shell-muted))] bg-[hsl(var(--shell-bg))]">
               Busca global
             </div>
             <div className="max-h-[420px] overflow-y-auto p-1">
               {globalSearch.isLoading && (
-                <div className="px-3 py-6 text-center text-sm text-slate-400">Buscando...</div>
+                <div className="px-3 py-6 text-center text-sm text-[hsl(var(--shell-muted))]">Buscando...</div>
               )}
               {!globalSearch.isLoading && (globalSearch.data?.length ?? 0) === 0 && (
-                <div className="px-3 py-6 text-center text-sm text-slate-400">Nada encontrado.</div>
+                <div className="px-3 py-6 text-center text-sm text-[hsl(var(--shell-muted))]">Nada encontrado.</div>
               )}
               {globalSearch.data?.map((item) => (
                 <Link
@@ -192,10 +192,10 @@ export function Topbar() {
                   className="flex items-start justify-between gap-3 px-3 py-2 text-sm transition-colors hover:bg-white/[0.05] rounded-md"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate font-medium text-white">{item.label}</span>
-                    <span className="block truncate text-xs text-slate-400">{item.description}</span>
+                    <span className="block truncate font-medium text-[hsl(var(--shell-foreground))]">{item.label}</span>
+                    <span className="block truncate text-xs text-[hsl(var(--shell-muted))]">{item.description}</span>
                   </span>
-                  <span className="shrink-0 border border-[hsl(var(--shell-border)/0.5)] bg-[hsl(var(--shell-bg-soft))] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-300 rounded">
+                  <span className="shrink-0 border border-[hsl(var(--shell-border)/0.5)] bg-[hsl(var(--shell-bg-soft))] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[hsl(var(--shell-muted))] rounded">
                     {typeLabel(item.type)}
                   </span>
                 </Link>
@@ -205,8 +205,8 @@ export function Topbar() {
         )}
       </div>
 
-      <div className="flex items-center gap-0.5 text-slate-300 [&_button]:text-slate-300 [&_button:hover]:text-white [&_button:hover]:bg-white/[0.05]">
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/[0.05]" aria-label="Ajuda" asChild>
+      <div className="flex items-center gap-0.5 text-[hsl(var(--shell-muted))] [&_button]:text-[hsl(var(--shell-muted))] [&_button:hover]:text-[hsl(var(--shell-foreground))] [&_button:hover]:bg-white/[0.05]">
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-[hsl(var(--shell-muted))] hover:text-[hsl(var(--shell-foreground))] hover:bg-white/[0.05]" aria-label="Ajuda" asChild>
           <Link href="/ajuda" title="Ajuda">
             <LifeBuoy className="h-4 w-4" />
           </Link>
@@ -217,17 +217,17 @@ export function Topbar() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/[0.05]"
+          className="h-9 w-9 text-[hsl(var(--shell-muted))] hover:text-[hsl(var(--shell-foreground))] hover:bg-white/[0.05]"
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           aria-label="Alternar tema"
         >
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
         {user && (
-          <div ref={profileRef} className="relative ml-1 flex items-center gap-2 border-l border-[hsl(var(--shell-border)/0.5)] pl-3 text-white">
+          <div ref={profileRef} className="relative ml-1 flex items-center gap-2 border-l border-[hsl(var(--shell-border)/0.5)] pl-3 text-[hsl(var(--shell-foreground))]">
             <div className="hidden text-right leading-tight sm:block">
-              <div className="text-xs font-medium text-white">{user.name}</div>
-              <div className="text-[10px] text-slate-400">{profileRole}</div>
+              <div className="text-xs font-medium text-[hsl(var(--shell-foreground))]">{user.name}</div>
+              <div className="text-[10px] text-[hsl(var(--shell-muted))]">{profileRole}</div>
             </div>
             <button
               type="button"
@@ -238,7 +238,7 @@ export function Topbar() {
             >
               <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="sm" />
             </button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/[0.05]" onClick={logout} aria-label="Sair">
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-[hsl(var(--shell-muted))] hover:text-[hsl(var(--shell-foreground))] hover:bg-white/[0.05]" onClick={logout} aria-label="Sair">
               <LogOut className="h-4 w-4" />
             </Button>
             {profileOpen && (

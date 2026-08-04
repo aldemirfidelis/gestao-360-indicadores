@@ -14,14 +14,17 @@ export class CompaniesService {
   async branding(companyId: string) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
-      select: { id: true, name: true, tradeName: true, logoUrl: true, brandColor: true },
+      select: { id: true, name: true, tradeName: true, logoUrl: true, brandColor: true, brandTextColor: true },
     });
     if (!company) throw new NotFoundException('Empresa nao encontrada.');
     return company;
   }
 
-  async updateBranding(companyId: string, input: { brandColor?: string | null; logoUrl?: string | null }) {
-    const data: { brandColor?: string | null; logoUrl?: string | null } = {};
+  async updateBranding(
+    companyId: string,
+    input: { brandColor?: string | null; brandTextColor?: string | null; logoUrl?: string | null },
+  ) {
+    const data: { brandColor?: string | null; brandTextColor?: string | null; logoUrl?: string | null } = {};
 
     if (input.brandColor !== undefined) {
       const color = (input.brandColor ?? '').trim();
@@ -29,6 +32,14 @@ export class CompaniesService {
         throw new BadRequestException('Informe a cor em hexadecimal, por exemplo #1B4B8F.');
       }
       data.brandColor = color || null; // vazio volta ao padrão Gestão 360
+    }
+
+    if (input.brandTextColor !== undefined) {
+      const textColor = (input.brandTextColor ?? '').trim();
+      if (textColor && !HEX_COLOR.test(textColor)) {
+        throw new BadRequestException('Informe a cor das letras em hexadecimal, por exemplo #FFFFFF.');
+      }
+      data.brandTextColor = textColor || null; // vazio = contraste automático
     }
 
     if (input.logoUrl !== undefined) {
