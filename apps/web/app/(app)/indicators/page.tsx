@@ -75,7 +75,23 @@ import {
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
-import { CHART_COLORS, ChartLegend, computeStubValue, isWithinGain, realizadoBarColor } from '@/lib/indicator-chart';
+import {
+  barLabelSlotWidth,
+  chartAxisTickFormatter,
+  chartLabelTopMargin,
+  CHART_COLORS,
+  ChartLabelModeButton,
+  ChartLegend,
+  computeStubValue,
+  isWithinGain,
+  planChartLabels,
+  plotWidthFrom,
+  pointLabelSlotWidth,
+  realizadoBarColor,
+  renderChartValueLabel,
+  useChartLabelMode,
+  useChartWidth,
+} from '@/lib/indicator-chart';
 import { attainmentFor } from '@/lib/farol';
 import {
   PERIODICITY_LABEL,
@@ -102,28 +118,6 @@ type Filters = {
 const TYPE_LABEL = INDICATOR_TYPE_LABEL;
 const STATUS_LABEL = INDICATOR_STATUS_LABEL;
 const LIGHT_LABEL = TRAFFIC_LIGHT_LABEL;
-
-const renderCustomBarLabel = (props: any, fill: string) => {
-  const { x, y, width, value } = props;
-  if (value === null || value === undefined || value === '') return null;
-
-  const formatted = formatNumber(value);
-  const cx = x + width / 2;
-  const cy = y - 6;
-
-  return (
-    <text
-      x={cx}
-      y={cy}
-      fill={fill}
-      textAnchor="middle"
-      fontSize={9}
-      fontWeight={600}
-    >
-      {formatted}
-    </text>
-  );
-};
 
 export default function IndicatorsPage() {
   const searchParams = useSearchParams();
@@ -924,6 +918,27 @@ function IndicatorManagementCard({
   const hasGainHit = chartData.some((p) => isWithinGain(p.displayRealizado, p.gainLower, p.gainUpper));
   const hasNoValueBar = chartData.some((p) => p.noValueStub !== null && p.noValueStub !== undefined);
 
+  // Rótulos de dados: mede o espaço real de cada rótulo e decide entre número
+  // completo, abreviado ("30 mil") ou girado 90°, evitando a sobreposição.
+  const [labelMode, setLabelMode] = useChartLabelMode();
+  const chartWidth = useChartWidth(chartRef);
+  const plotWidth = plotWidthFrom(chartWidth);
+  const labelValues = chartData.flatMap((p) => [p.displayMeta, p.displaySecondary, p.displayRealizado]);
+  const barSeriesCount = 2 + (hasSecondaryBar ? 1 : 0) + (hasNoValueBar ? 1 : 0);
+  const barLabelPlan = planChartLabels({
+    values: labelValues,
+    mode: labelMode,
+    fontSize: 9,
+    slotWidth: barLabelSlotWidth({ plotWidth, pointCount: chartData.length, seriesCount: barSeriesCount }),
+  });
+  const lineLabelPlan = planChartLabels({
+    values: labelValues,
+    mode: labelMode,
+    fontSize: 10,
+    slotWidth: pointLabelSlotWidth({ plotWidth, pointCount: chartData.length }),
+  });
+  const secondaryLineLabelPlan = { ...lineLabelPlan, fontSize: Math.max(8, lineLabelPlan.fontSize - 1) };
+
   const safeSelectedIdx = Math.min(selectedIdx, Math.max(0, chartData.length - 1));
   const selectedChart = chartData[safeSelectedIdx] ?? null;
   const selectedPoint = isGrainMode
@@ -1019,23 +1034,26 @@ function IndicatorManagementCard({
                 </NativeSelect>
               )}
             </div>
-            <div className="inline-flex rounded-md border bg-card/60 p-0.5">
-              <button
-                type="button"
-                onClick={() => setChartType('bar')}
-                className={cn('inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors', chartType === 'bar' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
-              >
-                <BarChart3 className="h-3.5 w-3.5" />
-                Barras
-              </button>
-              <button
-                type="button"
-                onClick={() => setChartType('s-curve')}
-                className={cn('inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors', chartType === 's-curve' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
-              >
-                <Activity className="h-3.5 w-3.5" />
-                Curva S
-              </button>
+            <div className="flex items-center gap-2">
+              <ChartLabelModeButton mode={labelMode} onChange={setLabelMode} />
+              <div className="inline-flex rounded-md border bg-card/60 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setChartType('bar')}
+                  className={cn('inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors', chartType === 'bar' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+                >
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  Barras
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartType('s-curve')}
+                  className={cn('inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors', chartType === 's-curve' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+                >
+                  <Activity className="h-3.5 w-3.5" />
+                  Curva S
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1043,7 +1061,7 @@ function IndicatorManagementCard({
             {!chartInView ? null : hasAnyData ? (
               <ResponsiveContainer width="100%" height="100%">
                 {chartType === 'bar' ? (
-                  <BarChart data={chartData} barGap={2} margin={{ top: 40, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
+                  <BarChart data={chartData} barGap={2} margin={{ top: chartLabelTopMargin(barLabelPlan), right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
                     <XAxis
                       dataKey="month"
@@ -1056,14 +1074,14 @@ function IndicatorManagementCard({
                       tickLine={false}
                       interval={0}
                     />
-                    <YAxis tick={{ fontSize: 11 }} width={48} />
+                    <YAxis tick={{ fontSize: 11 }} width={48} tickFormatter={chartAxisTickFormatter} />
                     <Tooltip content={<ChartTooltip viewMode={viewMode} />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
                     <Bar dataKey="displayMeta" name="Meta" fill={CHART_COLORS.meta} radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                      <LabelList dataKey="displayMeta" content={(props) => renderCustomBarLabel(props, CHART_COLORS.meta)} />
+                      <LabelList dataKey="displayMeta" content={(props) => renderChartValueLabel(props, { fill: CHART_COLORS.meta, plan: barLabelPlan })} />
                     </Bar>
                     {hasSecondaryBar && (
                       <Bar dataKey="displaySecondary" name="Meta Secundária" fill={CHART_COLORS.secondary} radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                        <LabelList dataKey="displaySecondary" content={(props) => renderCustomBarLabel(props, CHART_COLORS.secondary)} />
+                        <LabelList dataKey="displaySecondary" content={(props) => renderChartValueLabel(props, { fill: CHART_COLORS.secondary, plan: barLabelPlan })} />
                       </Bar>
                     )}
                     <Bar dataKey="displayRealizado" name="Realizado" radius={[3, 3, 0, 0]} isAnimationActive={false}>
@@ -1073,14 +1091,14 @@ function IndicatorManagementCard({
                           fill={realizadoBarColor(entry.displayRealizado, entry.displayMeta, entry.gainLower, entry.gainUpper, indicator.direction)}
                         />
                       ))}
-                      <LabelList dataKey="displayRealizado" content={(props) => renderCustomBarLabel(props, 'hsl(var(--foreground))')} />
+                      <LabelList dataKey="displayRealizado" content={(props) => renderChartValueLabel(props, { fill: 'hsl(var(--foreground))', plan: barLabelPlan })} />
                     </Bar>
                     {hasNoValueBar && (
                       <Bar dataKey="noValueStub" name="Realizado sem valor" fill={CHART_COLORS.noValue} radius={[3, 3, 0, 0]} isAnimationActive={false} />
                     )}
                   </BarChart>
                 ) : (
-                  <LineChart data={chartData} margin={{ top: 24, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
+                  <LineChart data={chartData} margin={{ top: chartLabelTopMargin(lineLabelPlan, 24), right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
                     <XAxis
                       dataKey="month"
@@ -1093,18 +1111,18 @@ function IndicatorManagementCard({
                       tickLine={false}
                       interval={0}
                     />
-                    <YAxis tick={{ fontSize: 11 }} width={48} />
+                    <YAxis tick={{ fontSize: 11 }} width={48} tickFormatter={chartAxisTickFormatter} />
                     <Tooltip content={<ChartTooltip viewMode={viewMode} />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }} />
                     <Line type="monotone" dataKey="displayMeta" name="Meta" stroke={CHART_COLORS.meta} strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: CHART_COLORS.meta }} activeDot={{ r: 5 }} isAnimationActive={false}>
-                      <LabelList dataKey="displayMeta" position="top" fontSize={10} fill={CHART_COLORS.meta} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                      <LabelList dataKey="displayMeta" content={(props) => renderChartValueLabel(props, { fill: CHART_COLORS.meta, plan: lineLabelPlan })} />
                     </Line>
                     {hasSecondaryBar && (
                       <Line type="monotone" dataKey="displaySecondary" name="Meta Secundária" stroke={CHART_COLORS.secondary} strokeWidth={2} strokeDasharray="2 3" dot={{ r: 2.5, fill: CHART_COLORS.secondary }} activeDot={{ r: 4 }} isAnimationActive={false} connectNulls>
-                        <LabelList dataKey="displaySecondary" position="bottom" fontSize={9} fill={CHART_COLORS.secondary} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                        <LabelList dataKey="displaySecondary" content={(props) => renderChartValueLabel(props, { fill: CHART_COLORS.secondary, plan: secondaryLineLabelPlan, placement: 'bottom' })} />
                       </Line>
                     )}
                     <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke={realizadoSeriesColor(chartData, indicator.direction)} strokeWidth={2.5} dot={{ r: 3, fill: realizadoSeriesColor(chartData, indicator.direction) }} activeDot={{ r: 5 }} isAnimationActive={false}>
-                      <LabelList dataKey="displayRealizado" position="top" fontSize={10} fill={realizadoSeriesColor(chartData, indicator.direction)} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                      <LabelList dataKey="displayRealizado" content={(props) => renderChartValueLabel(props, { fill: realizadoSeriesColor(chartData, indicator.direction), plan: lineLabelPlan })} />
                     </Line>
                   </LineChart>
                 )}

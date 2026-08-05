@@ -48,7 +48,23 @@ import { StatusBadge } from '@/components/platform/status-badge';
 import { api } from '@/lib/api';
 import { cn, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import { ACTION_STATUS_LABEL, getIndicatorUnitLabel, MEETING_STATUS_LABEL, TRAFFIC_LIGHT_LABEL } from '@/lib/labels';
-import { CHART_COLORS, ChartLegend, computeStubValue, isWithinGain, realizadoBarColor } from '@/lib/indicator-chart';
+import {
+  barLabelSlotWidth,
+  chartAxisTickFormatter,
+  chartLabelTopMargin,
+  CHART_COLORS,
+  ChartLabelModeButton,
+  ChartLegend,
+  computeStubValue,
+  isWithinGain,
+  planChartLabels,
+  plotWidthFrom,
+  pointLabelSlotWidth,
+  realizadoBarColor,
+  renderChartValueLabel,
+  useChartLabelMode,
+  useChartWidth,
+} from '@/lib/indicator-chart';
 import { attainmentFor } from '@/lib/farol';
 import { exportNodeToPng } from '@/lib/export-image';
 import { useVision360 } from '@/components/ui/vision360-context';
@@ -196,30 +212,6 @@ interface CurrentTreatment {
 }
 
 const STATUS_LABEL = ACTION_STATUS_LABEL;
-
-const renderCustomBarLabel = (props: any, fill: string, fontSize = 9) => {
-  const { x, y, width, value } = props;
-  if (value === null || value === undefined || value === '') return null;
-
-  const formatted = formatNumber(value);
-  const cx = x + width / 2;
-  // Afasta o rótulo da barra proporcionalmente ao corpo: com fonte grande,
-  // 6px fixos deixavam o número encostado no topo da barra.
-  const cy = y - Math.max(6, Math.round(fontSize * 0.7));
-
-  return (
-    <text
-      x={cx}
-      y={cy}
-      fill={fill}
-      textAnchor="middle"
-      fontSize={fontSize}
-      fontWeight={600}
-    >
-      {formatted}
-    </text>
-  );
-};
 
 export function IndicatorDetailView({
   id,
@@ -393,6 +385,12 @@ export function IndicatorDetailView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoAnalyze, detail.data, deviations.data]);
 
+  // Rótulos de dados: preferência do usuário + largura real do gráfico, usadas
+  // adiante para escolher entre número completo, abreviado ou girado 90°.
+  const [labelMode, setLabelMode] = useChartLabelMode();
+  const chartBoxRef = useRef<HTMLDivElement | null>(null);
+  const chartWidth = useChartWidth(chartBoxRef);
+
   if (detail.isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
   if (!detail.data) return null;
   const ind = detail.data;
@@ -467,9 +465,26 @@ export function IndicatorDetailView({
   // Sem tamanho configurado (fora da apresentação) valem os corpos de sempre.
   const barLabelSize = chartLabelSize ?? 9;
   const lineLabelSize = chartLabelSize ?? 10;
-  const secondaryLabelSize = Math.max(8, lineLabelSize - 1);
+  // Plano anticolisão dos rótulos: compara o texto com o espaço real de cada
+  // barra/ponto e degrada em completo → abreviado → girado 90° → corpo menor.
+  const plotWidth = plotWidthFrom(chartWidth);
+  const labelValues = chartData.flatMap((p) => [p.displayMeta, p.displaySecondary, p.displayRealizado]);
+  const barSeriesCount = 2 + (hasSecondaryBar ? 1 : 0) + (hasNoValueBar ? 1 : 0);
+  const barLabelPlan = planChartLabels({
+    values: labelValues,
+    mode: labelMode,
+    fontSize: barLabelSize,
+    slotWidth: barLabelSlotWidth({ plotWidth, pointCount: chartData.length, seriesCount: barSeriesCount }),
+  });
+  const lineLabelPlan = planChartLabels({
+    values: labelValues,
+    mode: labelMode,
+    fontSize: lineLabelSize,
+    slotWidth: pointLabelSlotWidth({ plotWidth, pointCount: chartData.length }),
+  });
+  const secondaryLabelPlan = { ...lineLabelPlan, fontSize: Math.max(8, lineLabelPlan.fontSize - 1) };
   // Espaco no topo para o rotulo da barra/ponto mais alto nao ser cortado.
-  const chartTopMargin = Math.max(40, Math.round(Math.max(barLabelSize, lineLabelSize) * 2));
+  const chartTopMargin = chartLabelTopMargin(chartType === 'bar' ? barLabelPlan : lineLabelPlan);
   const onChartClick = (state: any) => {
     const idx = state?.activeTooltipIndex;
     if (typeof idx === 'number' && idx >= 0 && idx < chartData.length) setSelectedIdx(idx);
@@ -712,6 +727,7 @@ export function IndicatorDetailView({
                     ))}
                   </NativeSelect>
                 )}
+                <ChartLabelModeButton mode={labelMode} onChange={setLabelMode} />
                 <div className="inline-flex rounded-md border bg-card/60 p-0.5">
                   <button
                     type="button"
@@ -736,7 +752,7 @@ export function IndicatorDetailView({
           <CardContent>
             {hasChartData ? (
               <>
-                <div className="h-[17rem] border border-border/60 bg-card/60 p-2 sm:h-[23rem]">
+                <div ref={chartBoxRef} className="h-[17rem] border border-border/60 bg-card/60 p-2 sm:h-[23rem]">
                   <ResponsiveContainer width="100%" height="100%">
                     {chartType === 'bar' ? (
                       <BarChart data={chartData} barGap={2} margin={{ top: chartTopMargin, right: 12, left: 0, bottom: 8 }} onClick={onChartClick} style={{ cursor: 'pointer' }}>
@@ -752,14 +768,14 @@ export function IndicatorDetailView({
                           tickLine={false}
                           interval={0}
                         />
-                        <YAxis tick={{ fontSize: 11 }} width={48} />
+                        <YAxis tick={{ fontSize: 11 }} width={48} tickFormatter={chartAxisTickFormatter} />
                         <Tooltip content={<DetailChartTooltip viewMode={viewMode} />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.35 }} />
                         <Bar dataKey="displayMeta" name="Meta" fill={CHART_COLORS.meta} radius={[3, 3, 0, 0]}>
-                          <LabelList dataKey="displayMeta" content={(props) => renderCustomBarLabel(props, CHART_COLORS.meta, barLabelSize)} />
+                          <LabelList dataKey="displayMeta" content={(props) => renderChartValueLabel(props, { fill: CHART_COLORS.meta, plan: barLabelPlan })} />
                         </Bar>
                         {hasSecondaryBar && (
                           <Bar dataKey="displaySecondary" name="Meta Secundária" fill={CHART_COLORS.secondary} radius={[3, 3, 0, 0]}>
-                            <LabelList dataKey="displaySecondary" content={(props) => renderCustomBarLabel(props, CHART_COLORS.secondary, barLabelSize)} />
+                            <LabelList dataKey="displaySecondary" content={(props) => renderChartValueLabel(props, { fill: CHART_COLORS.secondary, plan: barLabelPlan })} />
                           </Bar>
                         )}
                         <Bar dataKey="displayRealizado" name="Realizado" radius={[3, 3, 0, 0]}>
@@ -769,7 +785,7 @@ export function IndicatorDetailView({
                               fill={realizadoBarColor(entry.displayRealizado, entry.displayMeta, entry.gainLower, entry.gainUpper, ind.direction)}
                             />
                           ))}
-                          <LabelList dataKey="displayRealizado" content={(props) => renderCustomBarLabel(props, 'hsl(var(--foreground))', barLabelSize)} />
+                          <LabelList dataKey="displayRealizado" content={(props) => renderChartValueLabel(props, { fill: 'hsl(var(--foreground))', plan: barLabelPlan })} />
                         </Bar>
                         {hasNoValueBar && (
                           <Bar dataKey="noValueStub" name="Realizado sem valor" fill={CHART_COLORS.noValue} radius={[3, 3, 0, 0]} />
@@ -789,18 +805,18 @@ export function IndicatorDetailView({
                           tickLine={false}
                           interval={0}
                         />
-                        <YAxis tick={{ fontSize: 11 }} width={48} />
+                        <YAxis tick={{ fontSize: 11 }} width={48} tickFormatter={chartAxisTickFormatter} />
                         <Tooltip content={<DetailChartTooltip viewMode={viewMode} />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }} />
                         <Line type="monotone" dataKey="displayMeta" name="Meta" stroke={CHART_COLORS.meta} strokeWidth={2.5} strokeDasharray="6 4" dot={{ r: 3, fill: CHART_COLORS.meta }} activeDot={{ r: 5 }}>
-                          <LabelList dataKey="displayMeta" position="top" fontSize={lineLabelSize} fill={CHART_COLORS.meta} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                          <LabelList dataKey="displayMeta" content={(props) => renderChartValueLabel(props, { fill: CHART_COLORS.meta, plan: lineLabelPlan })} />
                         </Line>
                         {hasSecondaryBar && (
                           <Line type="monotone" dataKey="displaySecondary" name="Meta Secundária" stroke={CHART_COLORS.secondary} strokeWidth={2} strokeDasharray="2 3" dot={{ r: 2.5, fill: CHART_COLORS.secondary }} activeDot={{ r: 4 }} connectNulls>
-                            <LabelList dataKey="displaySecondary" position="bottom" fontSize={secondaryLabelSize} fill={CHART_COLORS.secondary} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                            <LabelList dataKey="displaySecondary" content={(props) => renderChartValueLabel(props, { fill: CHART_COLORS.secondary, plan: secondaryLabelPlan, placement: 'bottom' })} />
                           </Line>
                         )}
                         <Line type="monotone" dataKey="displayRealizado" name="Realizado" stroke={chartLineColor} strokeWidth={2.5} dot={{ r: 3, fill: chartLineColor }} activeDot={{ r: 5 }}>
-                          <LabelList dataKey="displayRealizado" position="top" fontSize={lineLabelSize} fill={chartLineColor} formatter={(v: any) => (v === null || v === undefined ? '' : formatNumber(v))} />
+                          <LabelList dataKey="displayRealizado" content={(props) => renderChartValueLabel(props, { fill: chartLineColor, plan: lineLabelPlan })} />
                         </Line>
                       </LineChart>
                     )}
