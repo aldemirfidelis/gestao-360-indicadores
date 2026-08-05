@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { calcStatus } from '@g360/shared';
 import { swallow } from '../../common/logging/swallow';
 import {
@@ -938,34 +938,26 @@ export class MonthlyResultsService {
       dueDate?: string;
       impactIfNotDecided?: string;
       boardInvolved?: string;
-      createAction?: boolean;
     },
   ) {
     await this.assertMeeting(me, id);
     const description = String(body.description ?? '').trim();
     if (!description) throw new BadRequestException('Informe a decisão, risco ou escalonamento.');
+    const orgNodeId = this.clean(body.orgNodeId);
+    const ownerUserId = this.clean(body.ownerUserId);
+    // Saída de reunião é sempre ação de alguém: sem área e responsável ela não
+    // teria como aparecer na Ata da Reunião (que é organizada por área/dono).
+    if (!orgNodeId) throw new BadRequestException('Selecione a área da saída da reunião.');
+    if (!ownerUserId) throw new BadRequestException('Selecione o responsável pela saída da reunião.');
 
-    let actionPlanId: string | null = null;
-    if (body.createAction) {
-      const action = await this.actions.create(
-        {
-          companyId: me.companyId,
-          ownerNodeId: this.clean(body.orgNodeId),
-          title: this.truncate(description, 120),
-          description,
-          origin: ActionOrigin.MEETING,
-          // Marca de qual reunião a ação saiu: é o que separa, na ata, o que o
-          // fórum decidiu do que a área já trouxe pronto.
-          originRefId: id,
-          priority: ActionPriority.HIGH,
-          status: ActionStatus.NOT_STARTED,
-          responsibleUserId: this.clean(body.ownerUserId),
-          dueDate: this.parseOptionalDate(body.dueDate),
-        },
-        me.sub,
-      );
-      actionPlanId = action.id;
-    }
+    const dueDate = this.parseOptionalDate(body.dueDate);
+    const actionPlanId = await this.createOutcomeAction(me, {
+      meetingId: id,
+      description,
+      orgNodeId,
+      ownerUserId,
+      dueDate,
+    });
 
     await this.prisma.monthlyMeetingDecision.create({
       data: {
@@ -973,10 +965,10 @@ export class MonthlyResultsService {
         kind: body.kind ?? MonthlyEntryKind.DECISION,
         topic: this.clean(body.topic),
         description,
-        orgNodeId: this.clean(body.orgNodeId),
-        ownerUserId: this.clean(body.ownerUserId),
+        orgNodeId,
+        ownerUserId,
         ownerName: this.clean(body.ownerName),
-        dueDate: this.parseOptionalDate(body.dueDate),
+        dueDate,
         impactIfNotDecided: this.clean(body.impactIfNotDecided),
         boardInvolved: this.clean(body.boardInvolved),
         actionPlanId,
@@ -984,6 +976,77 @@ export class MonthlyResultsService {
       },
     });
     return this.meetingDetail(me, id);
+  }
+
+  /**
+   * Gera a ação da ata para um registro que ainda não tem plano vinculado —
+   * seja porque foi criado antes desta regra, seja porque quem registrou não
+   * tinha permissão de escrita na área no momento da reunião.
+   */
+  async createDecisionAction(me: AuthPayload, decisionId: string) {
+    const decision = await this.prisma.monthlyMeetingDecision.findFirst({
+      where: { id: decisionId, meeting: { companyId: me.companyId, deletedAt: null } },
+      include: { meeting: { select: { id: true } } },
+    });
+    if (!decision) throw new NotFoundException('Registro não encontrado.');
+    if (decision.actionPlanId) throw new BadRequestException('Este registro já tem ação vinculada na ata.');
+    if (!decision.orgNodeId) throw new BadRequestException('Informe a área do registro antes de gerar a ação da ata.');
+    if (!decision.ownerUserId) throw new BadRequestException('Informe o responsável do registro antes de gerar a ação da ata.');
+
+    const actionPlanId = await this.createOutcomeAction(
+      me,
+      {
+        meetingId: decision.meetingId,
+        description: decision.description,
+        orgNodeId: decision.orgNodeId,
+        ownerUserId: decision.ownerUserId,
+        dueDate: decision.dueDate,
+      },
+      // Aqui o usuário pediu a ação explicitamente: falta de acesso à área é
+      // erro para ele ver, não algo para engolir em silêncio.
+      { silentOnDenied: false },
+    );
+    await this.prisma.monthlyMeetingDecision.update({ where: { id: decisionId }, data: { actionPlanId } });
+    return this.meetingDetail(me, decision.meeting.id);
+  }
+
+  /**
+   * Ação de SAÍDA da reunião: nasce no fórum, fica com a área e o responsável
+   * definidos no registro e é o que a Ata da Reunião lista e cobra.
+   *
+   * Quem registra nem sempre tem escrita na área da saída (o secretário anota
+   * decisões de várias áreas). Nesse caso o registro é salvo assim mesmo, sem
+   * ação — a linha aparece marcada na reunião e alguém com acesso à área gera
+   * a ação depois, em vez de a reunião inteira travar num 403.
+   */
+  private async createOutcomeAction(
+    me: AuthPayload,
+    input: { meetingId: string; description: string; orgNodeId: string; ownerUserId: string; dueDate: Date | null },
+    { silentOnDenied = true }: { silentOnDenied?: boolean } = {},
+  ): Promise<string | null> {
+    try {
+      const action = await this.actions.create(
+        {
+          companyId: me.companyId,
+          ownerNodeId: input.orgNodeId,
+          title: this.truncate(input.description, 120),
+          description: input.description,
+          origin: ActionOrigin.MEETING,
+          // Marca de qual reunião a ação saiu: é o que separa, na ata, o que o
+          // fórum decidiu do que a área já trouxe pronto.
+          originRefId: input.meetingId,
+          priority: ActionPriority.HIGH,
+          status: ActionStatus.NOT_STARTED,
+          responsibleUserId: input.ownerUserId,
+          dueDate: input.dueDate,
+        },
+        me.sub,
+      );
+      return action.id;
+    } catch (error) {
+      if (silentOnDenied && error instanceof ForbiddenException) return null;
+      throw error;
+    }
   }
 
   async updateDecision(me: AuthPayload, decisionId: string, body: any) {
@@ -1000,6 +1063,26 @@ export class MonthlyResultsService {
     if (body.status !== undefined) data.status = body.status;
     if (body.dueDate !== undefined) data.dueDate = this.parseOptionalDate(body.dueDate);
     await this.prisma.monthlyMeetingDecision.update({ where: { id: decisionId }, data });
+
+    // O registro e a ação da ata são a mesma saída vista de dois lugares: mudar
+    // dono, prazo, área ou texto aqui tem de valer lá (o status da ação segue o
+    // ciclo do plano — progresso e evidência — e não é sobrescrito).
+    if (decision.actionPlanId) {
+      const actionData: any = {};
+      if (data.ownerUserId !== undefined) actionData.responsibleUserId = data.ownerUserId;
+      if (data.orgNodeId !== undefined) actionData.ownerNodeId = data.orgNodeId;
+      if (data.dueDate !== undefined) actionData.dueDate = data.dueDate;
+      if (data.description) {
+        actionData.title = this.truncate(data.description, 120);
+        actionData.description = data.description;
+      }
+      if (Object.keys(actionData).length) {
+        await this.prisma.actionPlan.updateMany({
+          where: { id: decision.actionPlanId, companyId: me.companyId, deletedAt: null },
+          data: actionData,
+        });
+      }
+    }
     return this.meetingDetail(me, decision.meeting.id);
   }
 

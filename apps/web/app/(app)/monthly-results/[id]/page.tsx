@@ -1009,7 +1009,26 @@ function DecisionRow({ d, can, run }: { d: DecisionEntry; can: Can; run: Run }) 
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {d.owner && <span>{d.owner}</span>}
             {d.dueDate && <span>· prazo {formatDate(d.dueDate)}</span>}
-            {d.action && <Link href={`/actions/${d.action.id}`} className="text-primary hover:underline">· ação vinculada</Link>}
+            {d.action ? (
+              <Link href={`/actions/${d.action.id}`} className="text-primary hover:underline">· ação vinculada</Link>
+            ) : (
+              // Registro antigo (ou salvo sem acesso de escrita à área): sem ação
+              // ele não aparece na Ata da Reunião — daí o alerta e o botão.
+              <span className="inline-flex items-center gap-2">
+                <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">
+                  Fora da ata: sem ação
+                </Badge>
+                {can.decide && (
+                  <button
+                    type="button"
+                    className="text-primary underline-offset-2 hover:underline"
+                    onClick={() => run(`/monthly-results/decisions/${d.id}/action`, 'POST', undefined, 'Ação gerada na ata da reunião')}
+                  >
+                    Gerar ação da ata
+                  </button>
+                )}
+              </span>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -1507,7 +1526,6 @@ function DecisionDialog({
     dueDate: '',
     impactIfNotDecided: '',
     boardInvolved: defaultHeader,
-    createAction: false,
   });
   const chooseArea = (orgNodeId: string) => {
     const selected = meeting.areas.find((item) => item.orgNodeId === orgNodeId);
@@ -1582,17 +1600,22 @@ function DecisionDialog({
             <Label>Impacto se não decidir</Label>
             <Textarea rows={2} className="mt-1" value={form.impactIfNotDecided} onChange={(e) => setForm({ ...form, impactIfNotDecided: e.target.value })} />
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" className="h-4 w-4" checked={form.createAction} onChange={(e) => setForm({ ...form, createAction: e.target.checked })} />
-            Criar plano de ação vinculado a esta decisão
-          </label>
+          <p className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+            Esta saída vira automaticamente uma <strong className="text-foreground">ação da área</strong>, com o responsável e o
+            prazo informados acima, e passa a ser cobrada na <strong className="text-foreground">Ata da Reunião</strong>.
+          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
           <Button
-            disabled={!form.description.trim()}
+            disabled={!form.description.trim() || !form.orgNodeId || !form.ownerUserId}
+            title={
+              !form.orgNodeId || !form.ownerUserId
+                ? 'Informe a área e o responsável: a saída vira ação deles na Ata da Reunião.'
+                : undefined
+            }
             onClick={() => {
               const header = form.boardInvolved.trim() || defaultHeader;
               run(`/monthly-results/meetings/${meeting.id}/decisions`, 'POST', { ...form, boardInvolved: header }, 'Registrado na ata');

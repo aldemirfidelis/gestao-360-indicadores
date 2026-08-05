@@ -146,6 +146,12 @@ export class MonthlyResultsController {
     return this.service.addDecision(me, id, body);
   }
 
+  @Post('decisions/:id/action')
+  @RequirePermissions('monthly:decide', 'monthly:update')
+  createDecisionAction(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.createDecisionAction(me, id);
+  }
+
   @Patch('decisions/:id')
   @RequirePermissions('monthly:decide', 'monthly:update')
   updateDecision(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
