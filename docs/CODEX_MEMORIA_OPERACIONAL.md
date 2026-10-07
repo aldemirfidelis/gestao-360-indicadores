@@ -55,6 +55,16 @@ Na retomada foi verificado, de fora do droplet:
   migration `20260526115900_restore_dbpush_drift` resolveu isso. Testado em
   2026-10-07 num Postgres 17 descartavel no droplet: as 152 migrations aplicam
   e o banco resultante tem todas as tabelas e colunas do `schema.prisma`.
+- **Producao reconstruida em 2026-10-07.** Deploy de `c7e1041` + correcoes de
+  Caddy/Collabora (`edab72d`, `98a441c`), zona DNS recriada (A para `@`,
+  `www`, `collabora` e `*`), certificado do apex emitido e backup diario
+  (`backup-db.sh`, cron 03:00, so local por enquanto). Registros de e-mail (MX,
+  SPF, DKIM, DMARC) ainda nao recriados, por decisao do usuario.
+- **Acessos iniciais.** PLATFORM_OWNER `aldemir.fidelis@gmail.com` criado pelo
+  bootstrap. Pela API do Portal Admin foram criados a empresa "Gestao 360"
+  (plano CORPORATIVO) e o usuario `SUPER_ADMIN` `aldemir.fidelis@gmail.com`
+  nela. As senhas iniciais ficam so em `/root/g360-acesso-inicial.txt` no
+  droplet (modo 600); nunca copia-las para o repositorio ou para logs.
 - **CI bloqueado.** Todos os runs do GitHub Actions desde julho falham em
   segundos com "account is locked due to a billing issue". Nenhum commit
   recente foi validado pelo CI.
@@ -250,9 +260,16 @@ O projeto usa pnpm 9.7.0. A maquina atual e Linux (Ubuntu 26.04, Node 24,
   indice truncados e `DROP DEFAULT` em `updatedAt`. O banco antigo de producao
   tinha o mesmo. Por isso `prisma migrate dev` propoe uma migration que apaga
   essas FKs: revisar o SQL gerado antes de aceitar.
-- Docker ainda nao estava instalado em 2026-10-07; instalar com
-  `sudo apt install docker.io docker-compose-v2` e
-  `sudo usermod -aG docker $USER`.
+- Docker instalado em 2026-10-07 (`docker.io` + `docker-compose-v2`) e
+  usuario no grupo `docker`. Enquanto a sessao grafica for anterior a entrada
+  no grupo, liberar o socket com `sudo setfacl -m u:$USER:rw /var/run/docker.sock`
+  (este Ubuntu nao tem `sg`/`newgrp`).
+- Subir o sistema local: `NODE_OPTIONS=--max-old-space-size=4096 pnpm dev`
+  (site em http://localhost:3000, API em http://localhost:3333/api). Logins do
+  seed: `admin@demo.com`/`123456` (SUPER_ADMIN), `demo@demo.com`/`123456`,
+  Portal Admin `platform@demo.com`/`admin123`.
+- Fluxo combinado com o usuario: alterar e testar localmente primeiro, depois
+  commit, push e deploy (sempre com OK explicito).
 
 ### Gate de qualidade (o mesmo do `.github/workflows/ci.yml`)
 
@@ -430,6 +447,25 @@ Se aparecer Prisma `P1001` (banco inacessivel):
 5. Recriar a API e aguardar o healthcheck.
 6. Subir o Web caso ele tenha ficado em `Created`.
 7. Confirmar migrations e endpoints publicos.
+
+Se `www.gestao360.org` ou `collabora.gestao360.org` derem erro de TLS
+(`tlsv1 alert internal error`) enquanto o apex funciona:
+
+- Com o bloco curinga `*.gestao360.org` em TLS on-demand, o Caddy 2.10+ trata
+  esses hosts como cobertos pelo curinga e nao emite certificado proprio para
+  eles: emite sob demanda, so se `GET /api/public/tenant/allow?domain=...`
+  responder 2xx.
+- Em `main` o endpoint so libera tenants, por isso em 2026-10-07 `www` e
+  `collabora` estavam sem certificado. A correcao (`isPlatformSiteHost` em
+  `apps/api/src/common/tenant-host.ts`, liberando apex, `www` e `collabora`)
+  foi preparada e testada localmente, mas o usuario adiou a publicacao.
+  Depois de publicada, se um site novo da plataforma for criado no Caddyfile,
+  inclua o subdominio la.
+- Teste de dentro do Caddy:
+  `docker exec g360-caddy wget -qS -O- "http://api:3333/api/public/tenant/allow?domain=www.gestao360.org"`
+- Nao fixar arquivos de certificado no Caddyfile (`tls /data/caddy/...crt`):
+  foi o contorno de 2026-06 e derrubou o Caddy no droplet novo, onde os
+  arquivos nao existiam.
 
 ## Incidente de 2026-07-01 (historico, arquitetura com banco gerenciado)
 
