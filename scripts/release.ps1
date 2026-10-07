@@ -41,7 +41,7 @@ $ErrorActionPreference = 'Stop'
 
 # ============== CONFIG (ajuste se necessario) ==============
 $Branch      = 'main'
-$DropletHost = 'root@159.89.91.222'
+$DropletHost = 'root@165.22.176.248'
 $SshKey      = "$env:USERPROFILE\.ssh\beeeyes_digitalocean"
 $RemoteDir   = '/opt/gestao-360-indicadores'
 $ComposeFile = 'docker-compose.droplet.yml'
