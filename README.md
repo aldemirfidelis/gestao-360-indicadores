@@ -2,9 +2,9 @@
 
 Plataforma SaaS corporativa para gestao estrategica de indicadores, OKR, KPI, planos de acao, FCA/CAPA, cronogramas, reunioes, importacao de dados, relatorios, insights e dashboards executivos.
 
-> **Status:** sistema funcional ponta a ponta com backend NestJS + frontend Next.js, banco PostgreSQL com ~370 models Prisma, rastreabilidade pela Arvore Organizacional e Mapa Estrategico, dashboards, regras de negocio implementadas e dados demo realistas.
+> **Status:** sistema funcional ponta a ponta com backend NestJS + frontend Next.js, banco PostgreSQL com ~535 models Prisma, rastreabilidade pela Arvore Organizacional e Mapa Estrategico, dashboards, modulos de RH/folha/recrutamento/treinamento, regras de negocio implementadas e dados demo realistas.
 
-> **Nota operacional:** o nome local `gestao-indicadores-sqlite` e historico. O produto atual usa PostgreSQL; producao roda em Droplet DigitalOcean com Postgres local.
+> **Nota operacional (2026-10-07):** producao roda em Droplet DigitalOcean (`165.22.176.248`) com **Postgres local no proprio droplet** (container `postgres` do compose). Em 2026-10 a DigitalOcean eliminou, por falta de pagamento, o droplet antigo e o banco gerenciado, e **todos os dados de producao se perderam**; a producao foi reconstruida com banco novo. O CI do GitHub tambem estava bloqueado por cobranca. O estado operacional vigente fica em **[docs/CODEX_MEMORIA_OPERACIONAL.md](./docs/CODEX_MEMORIA_OPERACIONAL.md)**; leia-o antes de qualquer deploy. O nome antigo `gestao-indicadores-sqlite` e historico.
 
 ---
 
@@ -23,7 +23,7 @@ Plataforma SaaS corporativa para gestao estrategica de indicadores, OKR, KPI, pl
 ## Arquitetura
 
 ```
-gestao-indicadores-sqlite/
+gestao-360-indicadores/
 ├── apps/
 │   ├── api/          # NestJS + Prisma + PostgreSQL + Redis (BullMQ pronto)
 │   └── web/          # Next.js 15 App Router + Tailwind + shadcn-style + Recharts + React Flow
@@ -39,7 +39,7 @@ gestao-indicadores-sqlite/
 | ---------- | ---------- |
 | Frontend   | Next.js 15, React 18, TypeScript, Tailwind, shadcn-style, Recharts, React Flow, TanStack Query, React Hook Form + Zod, next-themes, jsPDF, Papaparse, date-fns |
 | Backend    | NestJS 10, Prisma 5, Passport JWT, bcryptjs, Helmet, Throttler, BullMQ (stack pronta) |
-| Banco      | PostgreSQL 17 em producao no droplet; compose local pode usar versao propria de desenvolvimento |
+| Banco      | Postgres 17 local no droplet em producao; Postgres 16 via `docker-compose.yml` em desenvolvimento |
 | Cache/Fila | Redis 7 |
 | Devops     | Docker Compose, pnpm workspaces |
 
@@ -47,19 +47,25 @@ gestao-indicadores-sqlite/
 
 ## Setup rapido
 
-**Pre-requisitos:** Node.js 20+, pnpm 9+, Docker Desktop.
+**Pre-requisitos:** Node.js 20+, pnpm 9.7.0 e Docker com Compose v2. No Ubuntu:
+`sudo apt install docker.io docker-compose-v2` e `sudo usermod -aG docker $USER`
+(depois saia e entre de novo na sessao).
 
 ```bash
 pnpm install
-Copy-Item .env.example .env   # PowerShell (Windows). No Bash: cp .env.example .env
-pnpm shared:build             # Build do package compartilhado (necessario antes do dev)
-pnpm db:up                    # Sobe Postgres + Redis
-pnpm db:migrate               # Cria schema
-pnpm db:seed                  # Popula dados demo
-pnpm dev                      # API e Web em paralelo (ja inclui shared:build)
+cp .env.example .env                        # troque JWT_ACCESS_SECRET/JWT_REFRESH_SECRET por valores aleatorios
+ln -s ../../.env apps/api/.env              # API e Prisma leem o .env de apps/api
+ln -s ../../.env apps/web/.env.local        # Next le o .env de apps/web
+pnpm shared:build                           # Build do package compartilhado (necessario antes do dev)
+pnpm db:up                                  # Sobe Postgres 16 + Redis 7
+pnpm --filter @g360/api prisma:deploy       # Aplica as migrations (ver nota abaixo)
+pnpm db:seed                                # Popula dados demo
+pnpm dev                                    # API e Web em paralelo (ja inclui shared:build)
 ```
 
-Atalho: `pnpm setup` faz tudo de uma vez.
+> **Migrations:** desde 2026-10-07 o historico constroi o banco do zero (a migration `20260526115900_restore_dbpush_drift` recriou tabelas que tinham entrado so por `db push`). Prefira `prisma migrate deploy` (`prisma:deploy`) para montar o banco: ele cria tambem o trigger, os indices parciais e os `CHECK`s escritos em SQL, que `db push` nao cria. Existe uma diferenca antiga e conhecida entre as migrations e o `schema.prisma` (FKs extras na Seguranca Patrimonial, alguns indices e nomes truncados); por isso `prisma migrate dev` (usado por `pnpm db:migrate` e `pnpm setup`) propoe uma migration que apaga essas FKs — revise antes de aceitar.
+
+No Windows (PowerShell), use `Copy-Item .env.example .env` e copie o arquivo para `apps/api/.env` e `apps/web/.env.local` em vez de criar links.
 
 ## Documentacao
 
@@ -87,22 +93,22 @@ O modulo avancado de Plano de Acao, com origem ponta a ponta, ferramentas de ana
 
 ## Deploy em producao
 
-Setup vigente de producao: **Droplet DigitalOcean com Postgres local no proprio droplet**.
-O Neon foi usado como origem legada/migracao e nao deve voltar a ser banco de producao
-sem decisao explicita.
+Setup vigente de producao: **Droplet DigitalOcean (`165.22.176.248`, criado em 2026-10 apos a DigitalOcean eliminar o antigo `159.89.91.222` e o banco gerenciado por falta de pagamento) rodando Postgres, API, Web, Caddy e Collabora**.
+O banco e o servico `postgres` do `docker-compose.droplet.yml`, acessivel so pela rede interna; `DATABASE_URL` e `DIRECT_URL` apontam para `postgres:5432`.
+Se a base crescer, a ideia e voltar para um Postgres externo/gerenciado (como foi de 2026-06-30 a 2026-10).
+Backup diario com `scripts/backup-db.sh` e copia off-site sao obrigatorios: foi a falta disso que fez os dados se perderem em 2026-10.
 
-### Opcao A (recomendada) — Droplet DigitalOcean (~$6/mes)
-VM Linux gerenciada por voce, Caddy fazendo proxy reverso com SSL automatico. Veja **[DEPLOY-DROPLET.md](./DEPLOY-DROPLET.md)**.
+O procedimento completo de pre-flight, deploy, validacao e diagnostico esta em
+**[docs/CODEX_MEMORIA_OPERACIONAL.md](./docs/CODEX_MEMORIA_OPERACIONAL.md)**. Em resumo, no droplet:
 
 ```bash
-# Resumo:
-# 1. Criar Droplet $6 Ubuntu 24.04 + SSH key
-# 2. ssh root@IP
-# 3. curl -fsSL https://raw.githubusercontent.com/aldemirfidelis/gestao-360-indicadores/main/scripts/setup-droplet.sh | bash
-# 4. nano /opt/gestao-360-indicadores/.env  (configure Postgres local + JWT secrets)
-# 5. cd /opt/gestao-360-indicadores && bash scripts/deploy.sh
-# 6. http://IP
+cd /opt/gestao-360-indicadores
+make deploy        # git pull --ff-only + build das imagens + up + prisma migrate deploy
+make ps            # postgres, api, web e collabora devem ficar healthy
 ```
+
+### Opcao A (vigente) — Droplet DigitalOcean
+VM Linux gerenciada por voce, Caddy fazendo proxy reverso com SSL automatico. Para um droplet novo: swap de 4 GB, `apt install docker.io docker-compose-v2 docker-buildx make git ufw`, UFW liberando 22/80/443, `git clone` em `/opt/gestao-360-indicadores` e `.env` a partir do `.env.droplet.example`. O `scripts/setup-droplet.sh` faz quase tudo isso, mas instala o Docker por `get.docker.com` e nao cria swap. O **[DEPLOY-DROPLET.md](./DEPLOY-DROPLET.md)** traz o passo a passo antigo.
 
 ### Opcao B — DigitalOcean App Platform (~$10/mes)
 Guia mantido apenas como referencia historica. Veja **[DEPLOY.md](./DEPLOY.md)**.
@@ -115,7 +121,7 @@ Guia mantido apenas como referencia historica. Veja **[DEPLOY.md](./DEPLOY.md)**
 
 ### Stack de deploy ja pronta:
 - `Dockerfile` multi-stage para API e Web (Alpine, ~80MB Web standalone)
-- `docker-compose.droplet.yml` (Postgres local + API + Web + Caddy) e `.do/app.yaml` (legado App Platform)
+- `docker-compose.droplet.yml` (Postgres + API + Web + Caddy + Collabora) e `.do/app.yaml` (legado App Platform)
 - `Caddyfile` (proxy reverso, SSL Let's Encrypt automatico quando voce tiver dominio)
 - `scripts/setup-droplet.sh` (provisiona Droplet zerada em 3 min)
 - `scripts/deploy.sh` + `Makefile` (deploy / logs / restart / migrate / seed)
@@ -201,9 +207,9 @@ Guia mantido apenas como referencia historica. Veja **[DEPLOY.md](./DEPLOY.md)**
 
 ---
 
-## Modelagem (Prisma) - ~370 models
+## Modelagem (Prisma) - ~535 models
 
-O schema Prisma tem ~370 models e ~167 enums (371 models / 167 enums em 2026-06-20, num `schema.prisma` de ~11k linhas) e cobre multiempresa, estrutura organizacional, usuarios/permissoes, estrategia, OKRs, indicadores, resultados, desvios, planos de acao, reunioes, documentos, auditorias, processos, formularios, Portal Admin, Platform Admin, mensageria, workflows, integracoes e modulos corporativos adicionais.
+O schema Prisma tem ~535 models e ~188 enums (535 models / 188 enums e 151 migrations em 2026-10-07, num `schema.prisma` de ~15,8k linhas) e cobre multiempresa, estrutura organizacional, usuarios/permissoes, estrategia, OKRs, indicadores, resultados, desvios, planos de acao, reunioes, documentos, auditorias, processos, formularios, Portal Admin, Platform Admin, mensageria, workflows, integracoes e modulos corporativos adicionais.
 
 **Padroes:** `createdAt`, `updatedAt`, `deletedAt` em todas entidades de negocio (soft delete). `companyId` em todas (multi-tenant). Indices em campos quentes. Enums em Prisma + espelhados em `packages/shared/src/enums.ts`.
 
@@ -267,7 +273,8 @@ pnpm dev:web              # Apenas Web
 
 pnpm db:up                # docker compose up postgres redis
 pnpm db:down              # docker compose down
-pnpm db:migrate           # Cria/aplica migrations
+pnpm db:migrate           # prisma migrate dev: cria migration nova (revise o SQL gerado)
+pnpm --filter @g360/api prisma:deploy   # Aplica as migrations existentes
 pnpm db:seed              # Popula demo
 pnpm db:reset             # CUIDADO: dropa e recria
 
@@ -280,11 +287,11 @@ pnpm build                               # Build de tudo
 
 ## Notas de honestidade
 
-- **Nao executei `pnpm install` localmente** — pode haver pequenos ajustes de tipos quando voce subir pela primeira vez (versoes evoluem).
-- **BullMQ esta na stack** mas as filas em si nao foram implementadas — `POST /notifications/generate` permite rodar as regras sob demanda. Em producao isso viraria um cron.
+- **CI parado:** desde julho de 2026 o GitHub Actions nao executa os jobs ("account is locked due to a billing issue"). Ate resolver a cobranca, rode localmente o gate do `.github/workflows/ci.yml` antes de publicar.
+- **BullMQ:** os workers existem em `apps/api/src/jobs` (notificacoes, automacoes, premio), mas ficam desligados por padrao (`WORKERS_ENABLED=false`). `POST /notifications/generate` roda as regras sob demanda.
 - **Multi-tenancy** filtra por `companyId` nos controllers, mas falta RLS no Postgres para isolamento forte.
 - **Permissoes granulares**: catalogo de permissoes ja semeado no banco e o decorator `@Roles` funciona, mas o enforcement detalhado de `permissions:key` por endpoint ainda nao esta espalhado em todos os controllers.
-- **Insights** usam heuristicas locais (sem chamada de IA real). A arquitetura esta pronta para plugar Claude API substituindo o `InsightsService`.
+- **IA:** os recursos de IA (insights, planos de acao, reunioes, formularios, recrutamento, entre outros) usam Google Gemini (`GEMINI_API_KEY`). Sem a chave, insights e sugestoes voltam para regras deterministicas.
 
 Tudo o que esta documentado acima como "Implementado" **funciona de verdade** — login, lancar valores, ver farol mudar, abrir desvio, gerar acao automatica, fechar desvio bloqueado por acoes abertas, check-in de OKR mudando status, importar CSV com erros linha a linha, exportar PDF, navegar arvore de indicadores e simular impacto.
 

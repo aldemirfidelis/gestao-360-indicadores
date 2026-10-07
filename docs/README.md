@@ -62,7 +62,7 @@ Nota do ambiente: no Windows, o build standalone do Next pode falhar na etapa fi
 ## Deploy e verificacao
 
 ```bash
-ssh root@159.89.91.222
+ssh root@165.22.176.248
 cd /opt/gestao-360-indicadores
 grep DATABASE_URL .env
 docker compose -f docker-compose.droplet.yml exec api pnpm exec prisma migrate status

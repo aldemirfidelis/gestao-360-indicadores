@@ -2,12 +2,12 @@
 
 Guia rápido para fazer deploy e operar a produção direto no console da droplet.
 
-- **Servidor:** DigitalOcean Droplet `159.89.91.222`
+- **Servidor:** DigitalOcean Droplet `165.22.176.248`
 - **Pasta do projeto:** `/opt/gestao-360-indicadores`
 - **Compose de produção:** `docker-compose.droplet.yml`
-- **Banco de dados:** **DigitalOcean Managed PostgreSQL** (EXTERNO). O `DATABASE_URL`/`DIRECT_URL` vêm do `.env` da droplet. **Não há mais Postgres local** (o container `g360-postgres` é apenas fallback histórico e pode ser removido).
+- **Banco de dados:** **Postgres local** no próprio droplet (serviço `postgres` do compose, container `g360-postgres`, volume `g360_pgdata`). Desde 2026-10, depois que a DigitalOcean eliminou o droplet antigo e o banco gerenciado por falta de pagamento. O `DATABASE_URL`/`DIRECT_URL` vêm do `.env` da droplet e apontam para `postgres:5432`.
 
-> Acesso SSH (da sua máquina): `ssh -i ~/.ssh/beeeyes_digitalocean root@159.89.91.222`
+> Acesso SSH (da sua máquina): `ssh -i ~/.ssh/beeeyes_digitalocean root@165.22.176.248`
 
 ---
 
@@ -90,31 +90,31 @@ curl -s -o /dev/null -w "%{http_code}\n" https://gestao360.org/api/health   # de
 
 ---
 
-## 4. Banco de dados (Managed PostgreSQL)
+## 4. Banco de dados (Postgres local)
 
-As URLs de conexão ficam no `.env` da droplet (`DATABASE_URL` e `DIRECT_URL`).
-**Regra:** as duas devem apontar para o **mesmo** banco gerenciado (a tela Configurações > Banco de Dados usa o `DIRECT_URL`).
+As URLs de conexão ficam no `.env` da droplet (`DATABASE_URL` e `DIRECT_URL`) e apontam para `postgres:5432/g360`.
+**Regra:** as duas apontam para o **mesmo** banco (a tela Configurações > Banco de Dados usa o `DIRECT_URL`) e a senha delas é a de `POSTGRES_PASSWORD`.
 
 Ver as URLs (com senha mascarada):
 ```bash
-grep -E '^(DATABASE_URL|DIRECT_URL)=' /opt/gestao-360-indicadores/.env | sed -E 's#doadmin:[^@]*@#doadmin:***@#'
+grep -E '^(DATABASE_URL|DIRECT_URL)=' /opt/gestao-360-indicadores/.env | sed -E 's#(postgres(ql)?://)[^@]+@#\1***@#'
 ```
 
-Conectar via `psql` para inspeção (usa a imagem postgres já presente; troque `SENHA`):
+Conectar via `psql` para inspeção (dentro do próprio container, sem senha):
 ```bash
-docker run --rm -e PGPASSWORD='SENHA' -e PGSSLMODE=require postgres:17-alpine \
-  psql -h g360-do-user-35000047-0.k.db.ondigitalocean.com -p 25060 -U doadmin -d defaultdb \
+docker compose -f docker-compose.droplet.yml exec postgres \
+  psql -U g360 -d g360 \
   -c 'SELECT (SELECT count(*) FROM "User") users, (SELECT count(*) FROM "Company") empresas, (SELECT count(*) FROM "Indicator") indicadores;'
 ```
 
-> Backups: o Managed PostgreSQL do DigitalOcean já faz **backup automático diário** (+ PITR). Backups adicionais podem ser feitos com `pg_dump` para um arquivo local.
+> Backups: **não há backup automático**. Use `scripts/backup-db.sh` no cron (diário) com cópia off-site (Spaces/S3). Em 2026-10 os dados de produção se perderam justamente por não haver cópia fora do provedor.
 
-Dump manual do banco gerenciado (para um arquivo na droplet):
+Dump manual (para um arquivo na droplet):
 ```bash
-docker run --rm -e PGPASSWORD='SENHA' -e PGSSLMODE=require postgres:17-alpine \
-  pg_dump -h g360-do-user-35000047-0.k.db.ondigitalocean.com -p 25060 -U doadmin -d defaultdb \
-  --no-owner --no-privileges -Fc > /root/g360_managed_$(date +%Y%m%d_%H%M%S).dump
+./scripts/backup-db.sh          # gera db-backups/g360-AAAAMMDD-HHMMSS.dump
 ```
+
+Restaurar um dump: ver o cabeçalho de `scripts/backup-db.sh`.
 
 ---
 
@@ -146,8 +146,8 @@ docker compose -f docker-compose.droplet.yml up -d --remove-orphans
 
 ## 7. Armadilhas conhecidas
 
-- **Memória apertada:** a droplet tem ~2 GB. O `deploy.sh` para o Collabora durante o build de propósito. Se um build falhar por OOM, rode os builds um de cada vez (`build api`, depois `build web`).
-- **`--remove-orphans`:** remove containers que não estão no compose. Hoje é seguro (o Postgres é externo). No passado, quando havia Postgres local, isso derrubava o banco — não é mais o caso.
+- **Memória apertada:** a droplet tem ~4 GB de RAM + 4 GB de swap (desde 2026-10; antes ~2 GB). O `deploy.sh` para o Collabora durante o build de propósito. Se um build falhar por OOM, rode os builds um de cada vez (`build api`, depois `build web`).
+- **`--remove-orphans`:** remove containers que não estão no compose. É seguro enquanto o serviço `postgres` estiver no `docker-compose.droplet.yml`. Se um dia o banco sair do compose, confira antes: o container seria removido (o volume `g360_pgdata` continua, mas nunca use `down -v`).
 - **Prisma no container (pnpm):** o binário fica em `./node_modules/.bin/prisma` (dentro de `/app/apps/api`). Não use caminhos antigos tipo `../../node_modules/prisma/...`.
 - **Socket.IO / WebSocket:** o Caddy já faz o upgrade automaticamente; não precisa configurar nada extra.
 - **`.env`:** é ignorado pelo git — o `git pull` nunca sobrescreve. Guarde uma cópia segura fora da droplet.

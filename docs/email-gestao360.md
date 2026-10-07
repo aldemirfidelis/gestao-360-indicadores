@@ -96,7 +96,7 @@ caixa receptora do Titan:
 Mais trabalhoso e sensível a bloqueios de entregabilidade. Só se houver necessidade real:
 
 1. Instalar **mailcow** (Docker) ou **Postfix + Dovecot** no droplet.
-2. Garantir **PTR (DNS reverso)** do IP `159.89.91.222` apontando para `mail.gestao360.org`
+2. Garantir **PTR (DNS reverso)** do IP `165.22.176.248` apontando para `mail.gestao360.org`
    (configurável no painel da DigitalOcean) — sem PTR, a entrega cai em spam.
 3. Publicar **MX**, **SPF**, **DKIM** e **DMARC** como acima, apontando para o próprio servidor.
 4. Abrir as portas 25/465/587/993 no firewall (UFW) e instalar TLS (Let's Encrypt).
