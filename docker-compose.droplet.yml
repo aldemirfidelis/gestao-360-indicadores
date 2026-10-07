@@ -152,9 +152,10 @@ services:
     expose:
       - "9980"
     healthcheck:
-      # A imagem do Collabora nao tem curl/wget; usa bash /dev/tcp p/ checar a porta.
+      # A imagem distroless do Collabora nao tem /bin/sh, bash, curl ou wget.
+      # Use o probe nativo fornecido pela propria imagem.
       # start_period alto: o 1o boot clona os jails (systemplate) e demora ~2-3min.
-      test: ["CMD-SHELL", "bash -c '(exec 3<>/dev/tcp/127.0.0.1/9980)' || exit 1"]
+      test: ["CMD", "/usr/bin/coolwsd", "--probe", "--use-env-vars"]
       interval: 30s
       timeout: 5s
       retries: 5
