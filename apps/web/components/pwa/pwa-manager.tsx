@@ -14,6 +14,19 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+// Fallback em memoria: se o localStorage estiver bloqueado, o X ainda vale ate
+// a aba ser recarregada.
+let dismissedInMemory = false;
+
+function isDismissed(): boolean {
+  if (dismissedInMemory) return true;
+  try {
+    return Boolean(window.localStorage.getItem(DISMISS_KEY));
+  } catch {
+    return false;
+  }
+}
+
 function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;
   return (
@@ -46,32 +59,39 @@ export function PwaManager() {
 
     if (isStandalone()) return; // ja instalado
 
-    // Usuário já dispensou o convite de instalação — respeitar a decisão e não exibir novamente.
-    if (window.localStorage.getItem(DISMISS_KEY)) return;
-
     const ua = window.navigator.userAgent.toLowerCase();
     const ios = /iphone|ipad|ipod/.test(ua);
     setIsIOS(ios);
 
+    // O navegador pode disparar beforeinstallprompt de novo durante o uso (ex.:
+    // ao navegar entre telas). Por isso a dispensa do X e conferida a CADA
+    // disparo, e nao so na montagem. O preventDefault fica sempre, para o
+    // Chrome nao trocar o nosso convite pela mini-barra nativa de instalacao.
     const handler = (event: Event) => {
       event.preventDefault();
+      if (isDismissed()) return;
       setDeferred(event as BeforeInstallPromptEvent);
       setShow(true);
     };
+    const onInstalled = () => setShow(false);
     window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', onInstalled);
 
     // iOS/iPadOS Safari nao dispara beforeinstallprompt: mostramos instrucoes.
-    if (ios) {
+    if (ios && !isDismissed()) {
       const isSafari = /safari/.test(ua) && !/crios|fxios|edgios|chrome/.test(ua);
       if (isSafari) setShow(true);
     }
 
-    window.addEventListener('appinstalled', () => setShow(false));
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
   }, []);
 
   const dismiss = () => {
     setShow(false);
+    dismissedInMemory = true;
     try {
       window.localStorage.setItem(DISMISS_KEY, String(Date.now()));
     } catch {
@@ -87,6 +107,10 @@ export function PwaManager() {
     if (choice.outcome === 'accepted') {
       toast.success('Aplicativo instalado! Abra pela tela inicial.');
       setShow(false);
+    } else {
+      // Cancelou a janela do navegador: vale como fechar no X. Sem isso o
+      // convite ficava na tela com o botao desabilitado (o evento ja foi usado).
+      dismiss();
     }
   };
 
