@@ -37,6 +37,11 @@ fi
 export APP_VERSION="${PACKAGE_VERSION}+$(git rev-parse --short=8 HEAD)"
 echo "Versao da aplicacao: ${APP_VERSION}"
 
+# Guarda os IDs efetivamente em uso: durante builds sequenciais uma tag latest
+# pode ja ter sido substituida quando a outra imagem ou sua inicializacao falha.
+PREVIOUS_API_IMAGE="$(docker inspect --format '{{.Image}}' g360-api 2>/dev/null || true)"
+PREVIOUS_WEB_IMAGE="$(docker inspect --format '{{.Image}}' g360-web 2>/dev/null || true)"
+
 echo ""
 echo "[1.5/5] Liberando memoria: parando app (web+api) e Collabora durante o build..."
 # Droplet de 1.9GB RAM: manter web+api rodando durante o 'next build' estoura a
@@ -50,10 +55,12 @@ docker compose -f "$COMPOSE_FILE" stop web api collabora 2>/dev/null || true
 # Rede de seguranca: a partir daqui o portal esta fora do ar (containers parados
 # acima). Se o build falhar, o 'set -e' abortaria o script e o portal ficaria
 # fora ate alguem intervir manualmente. O trap sobe de volta a versao anterior
-# (as imagens antigas seguem no disco com a tag :latest) antes de abortar.
+# pelos IDs capturados acima antes de abortar.
 restore_on_failure() {
   echo ""
   echo "!! FALHA no build/deploy - restaurando os containers da versao anterior..."
+  if [ -n "$PREVIOUS_API_IMAGE" ]; then docker tag "$PREVIOUS_API_IMAGE" g360-api:latest || true; fi
+  if [ -n "$PREVIOUS_WEB_IMAGE" ]; then docker tag "$PREVIOUS_WEB_IMAGE" g360-web:latest || true; fi
   docker compose -f "$COMPOSE_FILE" up -d || true
   echo "!! Containers restaurados na versao anterior. Deploy abortado."
 }
@@ -65,7 +72,7 @@ docker compose -f "$COMPOSE_FILE" build --pull web
 
 echo ""
 echo "[3/5] Subindo containers (zero downtime quando possivel)..."
-docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+docker compose -f "$COMPOSE_FILE" up -d --remove-orphans --wait --wait-timeout 180
 
 # Containers no ar: a partir daqui uma falha nao exige restaurar nada.
 trap - ERR

@@ -54,6 +54,9 @@ específica, backup e confirmação do banco-alvo.
 - Imagens de runtime usam `dist-active` e `public-active`, mantendo Prisma/schema
   e migrations para preservar o histórico do banco. Collabora fica no profile
   Docker `documents`, fora da subida padrão.
+- Cópia do standalone preserva symlinks relativos e rejeita links externos ou
+  quebrados; a imagem Docker verifica imports do Next antes de ser publicada.
+  O deploy aguarda saúde dos containers e recupera imagens anteriores pelos IDs.
 
 ## Validação concluída localmente
 

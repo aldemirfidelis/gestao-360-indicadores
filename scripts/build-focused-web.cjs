@@ -2,13 +2,14 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { copyPortableTree, assertPortableLinks } = require('./focused-web-runtime.cjs');
 const root = path.resolve(__dirname, '..');
 const web = path.join(root, 'apps/web');
 const scope = require('../packages/shared/src/product-scope.json');
 const staging = fs.mkdtempSync(path.join(root, 'apps/.focused-web-'));
 const parked = scope.parkedWebRoutes.flatMap(route => ['app/(app)', 'app'].map(group => path.join(web, group, route.slice(1))));
 try {
-  fs.cpSync(web, staging, { recursive: true, filter: file => {
+  fs.cpSync(web, staging, { recursive: true, verbatimSymlinks: true, filter: file => {
     const relative = path.relative(web, file);
     return !['.next', 'public-active', 'tsconfig.tsbuildinfo'].some(name => relative === name || relative.startsWith(name + path.sep))
       && !parked.some(dir => file === dir || file.startsWith(dir + path.sep));
@@ -24,7 +25,8 @@ try {
     fs.renameSync(traced, runtime);
     const output = path.join(web, '.next');
     if (fs.existsSync(output)) fs.rmSync(output, { recursive: true });
-    fs.cpSync(path.join(staging, '.next'), output, { recursive: true });
+    copyPortableTree(path.join(staging, '.next'), output);
+    console.log(`Standalone: ${assertPortableLinks(path.join(output, 'standalone'))} links portaveis verificados.`);
     const publicOutput = path.join(web, 'public-active');
     if (fs.existsSync(publicOutput)) fs.rmSync(publicOutput, { recursive: true });
     fs.cpSync(path.join(web, 'public'), publicOutput, { recursive: true, filter: file => !file.startsWith(path.join(web, 'public/models/face')) });
