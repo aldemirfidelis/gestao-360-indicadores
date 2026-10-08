@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, NotFoundException, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { isPlatformSiteHost } from '../../common/tenant-host';
 import { Public } from '../auth/public.decorator';
 import { PublicContactDto } from './public-contact.dto';
 import { PublicContactService } from './public-contact.service';
@@ -43,6 +44,9 @@ export class PublicController {
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Get('tenant/allow')
   async allow(@Query('domain') domain?: string, @Query('host') host?: string) {
+    // Sites da própria plataforma (apex, www, collabora) também dependem deste
+    // endpoint para obter certificado — ver isPlatformSiteHost.
+    if (isPlatformSiteHost(domain ?? host)) return { ok: true };
     const tenant = await this.tenants.resolveByHost(domain ?? host);
     if (!tenant) throw new NotFoundException('host não corresponde a um tenant');
     return { ok: true };

@@ -31,6 +31,24 @@ export function platformRootDomain(): string {
   return (process.env.PLATFORM_ROOT_DOMAIN ?? 'gestao360.org').toLowerCase();
 }
 
+// Subdomínios com site próprio no Caddyfile (além do apex). Com o bloco curinga
+// `*.gestao360.org` em TLS on-demand, o Caddy 2.10+ trata esses hosts como
+// cobertos pelo curinga e só emite o certificado se o endpoint "ask" autorizar.
+const PLATFORM_SITE_SUBDOMAINS = new Set(['www', 'collabora']);
+
+/**
+ * Indica se o host é um site da própria plataforma servido pelo Caddy (apex,
+ * `www`, `collabora`), e não um tenant. Usado pelo endpoint "ask" do TLS
+ * on-demand para liberar o certificado desses hosts.
+ */
+export function isPlatformSiteHost(host?: string | null, root = platformRootDomain()): boolean {
+  const h = normalizeHost(host);
+  if (!h) return false;
+  if (h === root) return true;
+  const suffix = `.${root}`;
+  return h.endsWith(suffix) && PLATFORM_SITE_SUBDOMAINS.has(h.slice(0, -suffix.length));
+}
+
 /** Remove porta, espaços e normaliza para minúsculas. */
 export function normalizeHost(host?: string | null): string {
   return (host ?? '').toLowerCase().trim().split(':')[0];
