@@ -20,6 +20,11 @@
 }
 
 www.gestao360.org {
+    # Host explicito precisa da mesma politica sob demanda do wildcard;
+    # a API autoriza apenas hosts da plataforma e tenants reconhecidos.
+    tls {
+        on_demand
+    }
     redir https://gestao360.org{uri} permanent
 }
 
