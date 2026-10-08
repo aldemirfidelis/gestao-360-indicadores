@@ -15,7 +15,8 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  webServer: [
+  // Permite validar os pacotes focados já construídos sem subir watchers concorrentes.
+  webServer: process.env.E2E_EXTERNAL_SERVERS === '1' ? undefined : [
     {
       command: 'pnpm --filter @g360/api dev',
       url: `${apiBaseURL}/health`,

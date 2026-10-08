@@ -1,3 +1,4 @@
+import { isProductRouteActive } from '@g360/shared';
 import { NextResponse, type NextRequest } from 'next/server';
 import { privateRoutePrefixes } from '@/lib/public-site';
 
@@ -13,6 +14,10 @@ export function middleware(request: NextRequest) {
   if (url.pathname.length > 1 && url.pathname.endsWith('/')) {
     url.pathname = url.pathname.replace(/\/+$/, '');
     return NextResponse.redirect(url, 301);
+  }
+
+  if (!isProductRouteActive(url.pathname)) {
+    return new NextResponse('Módulo aguardando reativação.', { status: 404, headers: { 'x-robots-tag': 'noindex' } });
   }
 
   if (url.pathname === '/organograma') {

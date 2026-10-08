@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { useAuth } from '@/components/auth/auth-provider';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { DEMO_PATH } from '@/lib/public-site';
 
@@ -13,7 +16,9 @@ type DemoLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'onC
 
 export function DemoLink({ children, href = DEMO_PATH, source = 'site_cta', ...props }: DemoLinkProps) {
   const pathname = usePathname();
-  // Já estamos na página de destino (o formulário está logo abaixo): o botão
+  const { loginDemo } = useAuth();
+  const [busy, setBusy] = useState(false);
+  // Já estamos na página de destino (o acesso está logo abaixo): o botão
   // não leva a lugar nenhum, então some — vale para o cabeçalho e para o hero.
   if (pathname === href.split('?')[0]) return null;
 
@@ -39,7 +44,15 @@ export function DemoLink({ children, href = DEMO_PATH, source = 'site_cta', ...p
   }
 
   return (
-    <Link href={href} onClick={trackDemoAccess} {...props}>
+    <Link href={href} aria-disabled={busy} onClick={async (event) => {
+      trackDemoAccess();
+      if (href.split('?')[0] !== DEMO_PATH) return;
+      event.preventDefault();
+      if (busy) return;
+      setBusy(true);
+      try { await loginDemo(); }
+      catch { toast.error('Demonstração indisponível no momento. Tente novamente em instantes.'); setBusy(false); }
+    }} {...props}>
       {children}
     </Link>
   );

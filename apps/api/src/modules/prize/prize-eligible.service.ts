@@ -1,3 +1,4 @@
+import { isProductModuleActive } from '@g360/shared';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, PrizeConnectorType } from '@prisma/client';
 import { Workbook, Worksheet } from 'exceljs';
@@ -166,6 +167,7 @@ export class PrizeEligibleService {
    * Inclui ativos e desligados dentro da competencia (proporcionalidade).
    */
   async importFromInternal(me: AuthPayload, competenceId: string) {
+    if (!isProductModuleActive('personnel')) throw new NotFoundException('Integração com Serviço Pessoal aguardando reativação.');
     const competence = await this.getCompetence(me.companyId, competenceId);
     const monthStart = new Date(Date.UTC(competence.year, competence.month - 1, 1));
     const employees = await this.prisma.orgEmployee.findMany({

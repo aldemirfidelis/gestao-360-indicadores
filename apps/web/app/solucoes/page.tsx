@@ -8,7 +8,7 @@ import { breadcrumbJsonLd, moduleHighlights, publicMetadata, solutionPages, webP
 
 export const metadata: Metadata = publicMetadata({
   title: 'Soluções de gestão corporativa integrada',
-  description: 'Conheça as soluções e os 14 módulos do Gestão 360 para estratégia, execução, qualidade, segurança, suprimentos e toda a jornada de pessoas.',
+  description: 'Conheça as soluções do Gestão 360 para BSC, indicadores, dados, execução e gestão de prêmio.',
   path: '/solucoes',
 });
 
@@ -16,11 +16,11 @@ export default function SolucoesPage() {
   return (
     <PublicShell>
       <JsonLd data={[webPageJsonLd({ title: 'Soluções', description: metadata.description as string, path: '/solucoes' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Soluções', path: '/solucoes' }])]} />
-      <PageHero eyebrow="Soluções" title="Uma plataforma para conectar a rotina inteira da empresa." description="Do trabalho diário à estratégia, da qualidade à segurança e da comunicação à remuneração: cada frente ganha profundidade sem perder integração." />
+      <PageHero eyebrow="Soluções" title="Conecte estratégia, dados e resultados." description="Do trabalho diário ao BSC, dos indicadores às ações e ao reconhecimento: acompanhe os resultados com dados conectados." />
       <section className="bg-white py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-700">Plataforma atual</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">14 módulos sobre uma base comum</h2>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Quatro frentes sobre uma base comum</h2>
           <div className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {moduleHighlights.map((module) => (
               <Link key={module.slug} href={`/modulos#${module.slug}`} className="group flex min-h-[192px] flex-col border border-slate-200 bg-slate-50 p-5 hover:border-slate-950">

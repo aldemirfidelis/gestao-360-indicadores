@@ -1,4 +1,5 @@
-export const PERMISSION_CATALOG = [
+import { isProductPermissionActive } from '@g360/shared';
+const ALL_PERMISSION_CATALOG = [
   // Dashboard / Visão geral
   ['dashboard:view', 'Visualizar dashboards e visão geral', 'Dashboard', 'view'],
   ['dashboard:export', 'Exportar dashboards', 'Dashboard', 'export'],
@@ -420,6 +421,8 @@ export const PERMISSION_CATALOG = [
   ['prize:admin', 'Administrar configurações e integrações do módulo de prêmio', 'Gestão de Prêmio', 'manage'],
 ] as const;
 
+export const PERMISSION_CATALOG = ALL_PERMISSION_CATALOG.filter(([key]) => isProductPermissionActive(key));
+
 const ALL_KEYS = PERMISSION_CATALOG.map(([key]) => key);
 const SENSITIVE_COMPENSATION_KEYS = new Set(['compensation:salary:individual', 'prize:salary:view']);
 const DIRECTOR_KEYS = PERMISSION_CATALOG
@@ -445,7 +448,7 @@ const ANALYST_KEYS = PERMISSION_CATALOG
   })
   .map(([key]) => key);
 
-export const DEFAULT_PROFILES = [
+const ALL_DEFAULT_PROFILES = [
   {
     code: 'SUPER_ADMIN',
     name: 'Super Admin',
@@ -857,3 +860,5 @@ export const DEFAULT_PROFILES = [
     permissions: ['ponto:kiosk'],
   },
 ] as const;
+
+export const DEFAULT_PROFILES = ALL_DEFAULT_PROFILES.map(profile => ({ ...profile, permissions: profile.permissions.filter(isProductPermissionActive) }));

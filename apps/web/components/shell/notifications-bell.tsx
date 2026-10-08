@@ -149,19 +149,19 @@ export function NotificationsBell() {
               size="sm"
               className="h-8 px-2 text-xs"
               onClick={() => generate.mutate()}
-              disabled={generate.isPending}
+              disabled={user?.isDemo || generate.isPending}
             >
               <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', generate.isPending && 'animate-spin')} />
               Verificar regras
             </Button>
-            {unread > 0 && (
+            {!user?.isDemo && unread > 0 && (
               <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => markAll.mutate()}>
                 <Check className="h-3.5 w-3.5 mr-1.5" /> Marcar todas
               </Button>
             )}
           </div>
 
-          {pushState === 'off' && (
+          {!user?.isDemo && pushState === 'off' && (
             <button
               onClick={enablePush}
               disabled={pushBusy}
@@ -202,7 +202,7 @@ export function NotificationsBell() {
                     {n.body && <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{n.body}</div>}
                     <div className="text-[10px] text-muted-foreground mt-1.5">{formatDate(n.createdAt)}</div>
                   </div>
-                  {!n.readAt && (
+                  {!user?.isDemo && !n.readAt && (
                     <button
                       onClick={(e) => {
                         e.preventDefault();

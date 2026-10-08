@@ -1,4 +1,5 @@
 'use client';
+import { isProductModuleActive } from '@g360/shared';
 
 /**
  * Diálogos de gestão do indicador (cadastro, resumo, metas, realizado e
@@ -386,6 +387,7 @@ export function IndicatorFormDialog({
   // deixava a lista vazia justamente para os formulários publicados.
   const formTemplatesQuery = useQuery<Array<{ id: string; title: string; version: string | null; status: string }>>({
     queryKey: ['indicator-form-templates'],
+    enabled: isProductModuleActive('forms'),
     queryFn: () => api('/forms'),
     staleTime: 5 * 60 * 1000,
     select: (rows) => rows.filter((row) => ['PUBLISHED', 'APPROVED', 'ACTIVE'].includes(row.status)),
@@ -538,7 +540,7 @@ export function IndicatorFormDialog({
           </Field>
           {/* Vínculo direto formulário → indicador. (área, setor) não basta:
               um setor pode ter vários indicadores diferentes. */}
-          <Field label="Alimentado pelo formulário" className="md:col-span-2">
+          {isProductModuleActive('forms') && (<Field label="Alimentado pelo formulário" className="md:col-span-2">
             <NativeSelect value={form.formTemplateId} onChange={(e) => patchForm(setForm, { formTemplateId: e.target.value })}>
               <option value="">Lançamento manual (sem formulário)</option>
               {(formTemplatesQuery.data ?? []).map((template) => (
@@ -552,7 +554,7 @@ export function IndicatorFormDialog({
                 ? 'Nenhum formulário publicado ainda. Publique o modelo em Formulários e Checklists para poder vinculá-lo aqui.'
                 : 'Ao concluir uma inspeção deste formulário nesta área/setor, o sistema lança a média de conformidade do mês neste indicador.'}
             </p>
-          </Field>
+          </Field>)}
           <Field label="Formula de cálculo" className="md:col-span-2">
             <Input value={form.formula} onChange={(e) => patchForm(setForm, { formula: e.target.value })} placeholder="Ex.: (faltas / horas previstas) * 100" />
           </Field>

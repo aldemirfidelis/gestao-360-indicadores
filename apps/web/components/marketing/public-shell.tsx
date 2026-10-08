@@ -1,13 +1,12 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { ArrowRight, BarChart3, BriefcaseBusiness, FileText, Layers3, LogIn, ShieldCheck, UserRound } from 'lucide-react';
+import { ArrowRight, BarChart3, FileText, Layers3, ShieldCheck } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { DemoLink } from './demo-link';
 
 const nav = [
   { href: '/solucoes', label: 'Soluções' },
   { href: '/modulos', label: 'Módulos' },
-  { href: '/carreiras', label: 'Vagas' },
   { href: '/segmentos', label: 'Segmentos' },
   { href: '/recursos', label: 'Recursos' },
   { href: '/conteudos', label: 'Conteúdos' },
@@ -18,13 +17,7 @@ const footerGroups = [
     title: 'Módulos',
     links: [
       ['Gestão à Vista', '/modulos#gestao-a-vista'],
-      ['Qualidade e Compliance', '/modulos#qualidade-e-compliance'],
-      ['Segurança dos Alimentos', '/modulos#seguranca-dos-alimentos'],
-      ['Segurança Patrimonial', '/modulos#seguranca-patrimonial'],
-      ['Cargos e Salários', '/modulos#cargos-e-salarios'],
-      ['Recrutamento e Seleção', '/modulos#recrutamento'],
-      ['Serviço Pessoal e Ponto', '/modulos#servico-pessoal'],
-      ['Suprimentos', '/modulos#suprimentos'],
+      ['Gestão de Prêmio', '/modulos#gestao-de-premio'],
       ['Todos os módulos', '/modulos'],
     ],
   },
@@ -37,9 +30,7 @@ const footerGroups = [
       ['Suporte', '/suporte'],
       ['SAC', '/suporte#formulario'],
       ['Contato Comercial', '/contato'],
-      ['Vagas abertas', '/carreiras'],
-      ['Área do candidato', '/candidato'],
-      ['Agendar demonstração', '/demonstracao'],
+      ['Acesse a Demonstração', '/demonstracao'],
       ['Trial de 30 dias', '/teste-gratis'],
     ],
   },
@@ -59,27 +50,6 @@ const footerGroups = [
 export function PublicShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-white text-slate-950">
-      {/* Faixa de acessos (candidato à esquerda, plataforma à direita): separa quem
-          já é cliente/candidato de quem está conhecendo o produto. O #081023 é o
-          azul mais escuro da identidade (mesmo tom do gradiente da marca). */}
-      <div className="bg-[#081023] text-white">
-        <div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link
-            href="/candidato"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-white/90 transition-colors hover:text-white sm:text-sm"
-          >
-            <UserRound className="h-4 w-4" />
-            Acesso aos Candidatos
-          </Link>
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-white/90 transition-colors hover:text-white sm:text-sm"
-          >
-            <LogIn className="h-4 w-4" />
-            Acessar Plataforma
-          </Link>
-        </div>
-      </div>
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <Link href="/" aria-label="Página inicial do Gestão 360" className="shrink-0">
@@ -93,21 +63,12 @@ export function PublicShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="flex items-center gap-2">
-            <Link
-              href="/carreiras"
-              className="inline-flex items-center gap-2 border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-sky-500 hover:text-sky-700"
-              aria-label="Encontre sua próxima vaga no portal global de carreiras"
-            >
-              <BriefcaseBusiness className="h-4 w-4" />
-              <span className="hidden xl:inline">Encontre sua próxima vaga</span>
-              <span className="xl:hidden">Vagas</span>
-            </Link>
             {/* Ciano da marca com texto escuro: alto contraste no cabeçalho branco. */}
             <DemoLink
               source="public_header"
               className="inline-flex items-center gap-2 rounded-full bg-[#00b4d8] px-5 py-2.5 text-sm font-semibold text-slate-950 transition-colors hover:bg-[#00F0FF]"
             >
-              <span className="hidden sm:inline">Agendar Demonstração</span>
+              <span className="hidden sm:inline">Acesse a Demonstração</span>
               <span className="sm:hidden">Demonstração</span>
               <ArrowRight className="h-4 w-4" />
             </DemoLink>
@@ -120,12 +81,11 @@ export function PublicShell({ children }: { children: ReactNode }) {
           <div>
             <BrandLogo variant="horizontal" size="sm" theme="dark" animated={true} />
             <p className="mt-4 max-w-md text-sm leading-6 text-slate-300">
-              Plataforma corporativa com 14 módulos conectados para estratégia, execução, qualidade,
-              segurança, suprimentos e toda a jornada de pessoas, do cargo à vida funcional.
+              BSC, indicadores e dados conectados à execução: Meu Dia, Tarefas, Gestão à Vista e Gestão de Prêmio.
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3 text-xs text-slate-300 sm:grid-cols-4">
               <FooterMetric icon={<BarChart3 className="h-4 w-4" />} label="Gestão à vista" />
-              <FooterMetric icon={<Layers3 className="h-4 w-4" />} label="14 módulos" />
+              <FooterMetric icon={<Layers3 className="h-4 w-4" />} label="BSC e dados" />
               <FooterMetric icon={<ShieldCheck className="h-4 w-4" />} label="Permissões" />
               <FooterMetric icon={<FileText className="h-4 w-4" />} label="Auditoria" />
             </div>

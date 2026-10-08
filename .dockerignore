@@ -56,3 +56,9 @@ docker-compose.yml
 # Prisma local sqlite (caso uso futuro)
 *.db
 *.sqlite
+
+# Pacotes focados gerados localmente
+**/dist-active
+**/public-active
+
+apps/.focused-web-*

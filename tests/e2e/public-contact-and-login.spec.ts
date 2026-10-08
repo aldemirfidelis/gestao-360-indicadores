@@ -8,7 +8,8 @@ test.describe('login, documentos legais e contatos públicos', () => {
 
     const footer = page.locator('footer');
     await expect(footer).toBeVisible();
-    await expect(footer.getByLabel('Versão da aplicação')).toContainText(/^Versão 0\.1\.0\+/);
+    await expect(footer.getByLabel('Versão da aplicação')).toContainText(/^Versão v0\.1\.0/);
+    await expect(footer.getByLabel('Versão da aplicação')).toHaveAttribute('title', /^Versão completa: 0\.1\.0\+/);
     await expect(footer.getByRole('link', { name: 'Termos' })).toHaveAttribute('href', '/termos-de-uso');
     await expect(footer.getByRole('link', { name: 'Privacidade' })).toHaveAttribute('href', '/politica-de-privacidade');
     await expect(footer.getByRole('link', { name: 'LGPD' })).toHaveAttribute('href', '/lgpd');

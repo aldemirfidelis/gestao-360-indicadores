@@ -5,6 +5,7 @@ import { AuthPayload } from './auth.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { requireSecret } from '../../common/env';
 import { effectiveCompanyId } from '../../common/effective-company';
+import { PUBLIC_DEMO_COMPANY_SLUG, PUBLIC_DEMO_PROFILE } from '@g360/shared';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -30,7 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         companyId: true,
         activeCompanyId: true,
         accessProfile: { select: { code: true } },
-        company: { select: { status: true, deletedAt: true } },
+        company: { select: { status: true, deletedAt: true, slug: true } },
       },
     });
     if (!user || !user.active || user.status !== 'ACTIVE' || user.deletedAt) {
@@ -45,6 +46,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // Empresa efetiva recalculada do banco a cada requisição (fonte da verdade) — a troca
     // de empresa do Super Admin passa a valer imediatamente, mesmo com token antigo.
     const companyId = effectiveCompanyId(user);
+    if (user.accessProfile?.code === PUBLIC_DEMO_PROFILE &&
+      (user.company.slug !== PUBLIC_DEMO_COMPANY_SLUG || user.activeCompanyId || user.role !== 'COMPANY_ADMIN')) {
+      throw new UnauthorizedException('Escopo da demonstração inválido.');
+    }
     return {
       ...payload,
       role: user.role,

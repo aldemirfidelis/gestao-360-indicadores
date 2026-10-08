@@ -1,4 +1,5 @@
 'use client';
+import { isProductModuleActive } from '@g360/shared';
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -70,7 +71,7 @@ export default function MeuDiaEquipePage() {
     { label: 'Riscos', value: s?.risksCritical ?? 0, tab: 'priorities', cls: 'text-orange-600' },
     { label: 'Documentos', value: s?.documentsToReview ?? 0, tab: 'priorities', cls: 'text-sky-600' },
     { label: 'Indicadores', value: s?.indicatorsOffTarget ?? 0, tab: 'priorities', cls: 'text-fuchsia-600' },
-  ];
+  ].filter(card => !['Aprovações', 'Riscos', 'Documentos'].includes(card.label));
   const rows = items.data?.rows ?? [];
 
   if (team.isPending) {

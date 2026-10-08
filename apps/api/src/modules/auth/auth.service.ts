@@ -1,3 +1,4 @@
+import { PERMISSION_CATALOG } from '../users/permission-catalog';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -8,6 +9,7 @@ import { requireSecret } from '../../common/env';
 import { effectiveCompanyId } from '../../common/effective-company';
 import { swallow } from '../../common/logging/swallow';
 import { TenantService } from '../public/tenant.service';
+import { PUBLIC_DEMO_COMPANY_SLUG, PUBLIC_DEMO_EMAIL, PUBLIC_DEMO_PROFILE, isProductPermissionActive } from '@g360/shared';
 
 @Injectable()
 export class AuthService {
@@ -132,6 +134,27 @@ export class AuthService {
 
   async me(payload: AuthPayload) {
     return this.userProfile(payload.sub);
+  }
+
+  async demo(ctx?: { ip?: string; userAgent?: string }) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: PUBLIC_DEMO_EMAIL },
+      include: { accessProfile: true, company: true },
+    });
+    if (!user || !user.active || user.status !== 'ACTIVE' || user.deletedAt ||
+      user.role !== 'COMPANY_ADMIN' || user.activeCompanyId ||
+      user.accessProfile?.code !== PUBLIC_DEMO_PROFILE ||
+      user.company.slug !== PUBLIC_DEMO_COMPANY_SLUG || user.company.deletedAt || user.company.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Demonstração temporariamente indisponível.');
+    }
+    const payload: AuthPayload = {
+      sub: user.id, email: user.email, name: user.name, role: user.role,
+      companyId: user.companyId, homeCompanyId: user.companyId,
+      accessProfileCode: PUBLIC_DEMO_PROFILE,
+    };
+    const accessToken = await this.jwt.signAsync(payload, { secret: requireSecret('JWT_ACCESS_SECRET'), expiresIn: '1h' });
+    // Sem refresh persistente compartilhado entre visitantes.
+    return { accessToken, refreshToken: '', user: await this.userProfile(user.id) };
   }
 
   async refresh(refreshToken: string) {
@@ -281,7 +304,8 @@ export class AuthService {
       avatarUrl: user.avatarUrl,
       jobTitle: user.jobTitle,
       accessProfile: user.accessProfile ? { id: user.accessProfile.id, code: user.accessProfile.code, name: user.accessProfile.name } : null,
-      permissions: Array.from(permissionKeys).sort(),
+      isDemo: user.accessProfile?.code === PUBLIC_DEMO_PROFILE,
+      permissions: Array.from(permissionKeys).filter(key => isProductPermissionActive(key) && (user.accessProfile?.code !== PUBLIC_DEMO_PROFILE || PERMISSION_CATALOG.some(([catalogKey, , , action]) => catalogKey === key && ['view', 'export'].includes(action)))).sort(),
     };
   }
 }

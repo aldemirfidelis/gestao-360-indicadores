@@ -21,8 +21,6 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { AccordionNavigation } from '@/components/shell/accordion-navigation';
 import { isActivePath, visibleAllNavSections } from '@/components/shell/navigation';
 import { NotificationsBell } from './notifications-bell';
-import { OnlineUsersButton } from '@/components/communication/online-users-button';
-import { MessagesButton } from '@/components/communication/messages-button';
 import { UserAvatar } from '@/components/communication/user-avatar';
 import { api } from '@/lib/api';
 import { BrandLogo } from '@/components/brand/brand-logo';
@@ -78,7 +76,7 @@ export function Topbar() {
   });
 
   const avatarMutation = useMutation({
-    mutationFn: (avatarUrl: string | null) => api('/communication/me/profile', { method: 'PATCH', json: { avatarUrl } }),
+    mutationFn: (avatarUrl: string | null) => api('/profile/me', { method: 'PATCH', json: { avatarUrl } }),
     onSuccess: async () => {
       await refreshUser();
       toast.success('Foto atualizada');
@@ -211,8 +209,6 @@ export function Topbar() {
             <LifeBuoy className="h-4 w-4" />
           </Link>
         </Button>
-        <MessagesButton />
-        <OnlineUsersButton />
         <NotificationsBell />
         <Button
           variant="ghost"
@@ -258,7 +254,7 @@ export function Topbar() {
                   <InfoPill label="Perfil" value={user.accessProfile?.name ?? user.role} />
                 </div>
 
-                <div className="mt-4 space-y-2">
+                {!user.isDemo && <><div className="mt-4 space-y-2">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Foto</div>
                   <div className="flex flex-wrap gap-2">
                     <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors hover:bg-accent/35">
@@ -331,7 +327,7 @@ export function Topbar() {
                     {passwordMutation.isPending ? 'Aplicando...' : 'Aplicar'}
                   </Button>
                 </form>
-              </div>
+</>}              </div>
             )}
           </div>
         )}

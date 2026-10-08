@@ -1,10 +1,11 @@
+import { isProductRouteActive, isProductModuleActive } from '@g360/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { WorkItemPriorityService } from './work-item-priority.service';
 import type { WorkItemAction } from '@g360/shared';
-import { EMPLOYEE_FEED_PATH } from '../communication/publications/publications.service';
+const EMPLOYEE_FEED_PATH = '/servico-pessoal/comunicacao-interna';
 
 /** Item "rascunho" coletado de um modulo de origem, antes da priorização. */
 interface WorkItemDraft {
@@ -166,33 +167,31 @@ export class WorkItemAggregationService {
   }
 
   private async collectSources(me: AuthPayload): Promise<WorkItemDraft[]> {
-    return (
-      await Promise.all([
-        this.collectActions(me).catch((e) => this.warn('actions', e)),
-        this.collectActionTasks(me).catch((e) => this.warn('action-tasks', e)),
-        this.collectProjectTasks(me).catch((e) => this.warn('project-tasks', e)),
-        this.collectWorkflowTasks(me).catch((e) => this.warn('workflow-tasks', e)),
-        this.collectApprovals(me).catch((e) => this.warn('approvals', e)),
-        this.collectMeetingsToday(me).catch((e) => this.warn('meetings', e)),
-        this.collectDocuments(me).catch((e) => this.warn('documents', e)),
-        this.collectAudits(me).catch((e) => this.warn('audits', e)),
-        this.collectAuditFindings(me).catch((e) => this.warn('audit-findings', e)),
-        this.collectFormSubmissions(me).catch((e) => this.warn('form-submissions', e)),
-        this.collectRisks(me).catch((e) => this.warn('risks', e)),
-        this.collectNonConformities(me).catch((e) => this.warn('nonconformities', e)),
-        this.collectIndicatorsOffTarget(me).catch((e) => this.warn('indicators', e)),
-        this.collectNotifications(me).catch((e) => this.warn('notifications', e)),
-        this.collectUnreadCommunications(me).catch((e) => this.warn('communications', e)),
-        this.collectTrainings(me).catch((e) => this.warn('trainings', e)),
-        this.collectSecurityIncidents(me).catch((e) => this.warn('security-incidents', e)),
-        this.collectTimeClock(me).catch((e) => this.warn('time-clock', e)),
-        this.collectVacations(me).catch((e) => this.warn('vacations', e)),
-        this.collectPersonnelLifecycle(me).catch((e) => this.warn('personnel-lifecycle', e)),
-        this.collectSupplies(me).catch((e) => this.warn('supplies', e)),
-        this.collectRecruitment(me).catch((e) => this.warn('recruitment', e)),
-        this.collectCompensation(me).catch((e) => this.warn('compensation', e)),
-      ])
-    ).flat();
+    return (await Promise.all([
+      this.collectActions(me).catch((e) => this.warn('collectActions', e)),
+      this.collectActionTasks(me).catch((e) => this.warn('collectActionTasks', e)),
+      this.collectProjectTasks(me).catch((e) => this.warn('collectProjectTasks', e)),
+      this.collectMeetingsToday(me).catch((e) => this.warn('collectMeetingsToday', e)),
+      this.collectIndicatorsOffTarget(me).catch((e) => this.warn('collectIndicatorsOffTarget', e)),
+      this.collectNotifications(me).catch((e) => this.warn('collectNotifications', e)),
+      ...(isProductModuleActive('automations') ? [this.collectWorkflowTasks(me).catch((e) => this.warn('collectWorkflowTasks', e))] : []),
+      ...(isProductModuleActive('automations') ? [this.collectApprovals(me).catch((e) => this.warn('collectApprovals', e))] : []),
+      ...(isProductModuleActive('documents') ? [this.collectDocuments(me).catch((e) => this.warn('collectDocuments', e))] : []),
+      ...(isProductModuleActive('audits') ? [this.collectAudits(me).catch((e) => this.warn('collectAudits', e))] : []),
+      ...(isProductModuleActive('audits') ? [this.collectAuditFindings(me).catch((e) => this.warn('collectAuditFindings', e))] : []),
+      ...(isProductModuleActive('forms') ? [this.collectFormSubmissions(me).catch((e) => this.warn('collectFormSubmissions', e))] : []),
+      ...(isProductModuleActive('risks') ? [this.collectRisks(me).catch((e) => this.warn('collectRisks', e))] : []),
+      ...(isProductModuleActive('nonconformities') ? [this.collectNonConformities(me).catch((e) => this.warn('collectNonConformities', e))] : []),
+      ...(isProductModuleActive('communication') ? [this.collectUnreadCommunications(me).catch((e) => this.warn('collectUnreadCommunications', e))] : []),
+      ...(isProductModuleActive('training') ? [this.collectTrainings(me).catch((e) => this.warn('collectTrainings', e))] : []),
+      ...(isProductModuleActive('asset-security') ? [this.collectSecurityIncidents(me).catch((e) => this.warn('collectSecurityIncidents', e))] : []),
+      ...(isProductModuleActive('personnel') ? [this.collectTimeClock(me).catch((e) => this.warn('collectTimeClock', e))] : []),
+      ...(isProductModuleActive('personnel') ? [this.collectVacations(me).catch((e) => this.warn('collectVacations', e))] : []),
+      ...(isProductModuleActive('personnel') ? [this.collectPersonnelLifecycle(me).catch((e) => this.warn('collectPersonnelLifecycle', e))] : []),
+      ...(isProductModuleActive('procurement') ? [this.collectSupplies(me).catch((e) => this.warn('collectSupplies', e))] : []),
+      ...(isProductModuleActive('recruitment') ? [this.collectRecruitment(me).catch((e) => this.warn('collectRecruitment', e))] : []),
+      ...(isProductModuleActive('compensation') ? [this.collectCompensation(me).catch((e) => this.warn('collectCompensation', e))] : []),
+    ])).flat();
   }
 
   private async activeDelegations(me: AuthPayload, now: Date) {
@@ -1249,7 +1248,7 @@ export class WorkItemAggregationService {
       TARGET_MISSED: { type: 'ALERT', crit: 'MEDIUM' },
       PROJECT_LATE: { type: 'ALERT', crit: 'MEDIUM' },
     };
-    return notes.map((n) => {
+    return notes.filter((n) => (!n.link || isProductRouteActive(n.link)) && !['MESSAGE', 'MENTION'].includes(n.kind)).map((n) => {
       const m = map[n.kind as string] ?? { type: 'ALERT', crit: 'LOW' };
       return {
         sourceModule: 'notifications',

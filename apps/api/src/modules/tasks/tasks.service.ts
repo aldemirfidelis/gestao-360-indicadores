@@ -1,3 +1,4 @@
+import { isProductModuleActive, isProductRouteActive } from '@g360/shared';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationKind, Prisma, UserRoleEnum, WorkspaceTask } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -88,7 +89,7 @@ export class TasksService {
       orderBy: [{ column: { position: 'asc' } }, { position: 'asc' }, { createdAt: 'desc' }],
       take: 1000,
     });
-    const enriched = await this.enrichTasks(tasks);
+    const enriched = await this.enrichTasks(tasks.filter(task => (!task.sourceModule || isProductModuleActive(task.sourceModule)) && (!task.sourceUrl || isProductRouteActive(task.sourceUrl))));
     const total = enriched.length;
     const done = enriched.filter((task) => task.status === 'DONE').length;
     const now = Date.now();

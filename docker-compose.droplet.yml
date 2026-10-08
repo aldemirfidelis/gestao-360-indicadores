@@ -127,11 +127,11 @@ services:
   # O host WOPI e a propria API (rotas /api/wopi). O Caddy publica este
   # servico no subdominio collabora.gestao360.org (ver Caddyfile).
   collabora:
+    profiles: ["documents"]
     image: collabora/code:latest
     container_name: g360-collabora
-    # Collabora habilitado como servico PADRAO do deploy (DNS collabora.gestao360.org
-    # ativo + cert emitido). Sem 'profiles' para que o deploy.sh (up -d --remove-orphans)
-    # NAO o trate como orfao e o preserve/gerencie a cada deploy.
+    # Editor suspenso junto com Documentos; para reativar, revisar o escopo do
+    # produto e subir explicitamente com --profile documents. Volumes preservados.
     restart: unless-stopped
     environment:
       # Dominios (regex) autorizados a embutir/usar o editor = host WOPI.

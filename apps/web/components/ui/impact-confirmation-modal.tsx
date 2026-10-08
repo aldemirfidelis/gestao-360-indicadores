@@ -70,7 +70,7 @@ export const ImpactConfirmationModal: React.FC<ImpactConfirmationModalProps> = (
   // Busca lista de usuarios para atribuicao de tarefas
   const { data: users } = useQuery<UserOption[]>({
     queryKey: ['users-options-impact'],
-    queryFn: () => api<UserOption[]>('/processes/options').then((res: any) => res.users || []),
+    queryFn: () => api<UserOption[]>('/indicators/options').then((res: any) => res.users || []),
     enabled: isOpen,
   });
 

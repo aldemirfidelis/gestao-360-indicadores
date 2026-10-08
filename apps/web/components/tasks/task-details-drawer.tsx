@@ -1,5 +1,6 @@
 'use client';
 
+import { useAuth } from '@/components/auth/auth-provider';
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -53,6 +54,7 @@ interface Props {
 
 export function TaskDetailsDrawer({ taskId, context, onClose }: Props) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const detail = useQuery<TaskDetail>({
     queryKey: ['task-detail', taskId],
     queryFn: () => api(`/tasks/${taskId}`),
@@ -103,7 +105,7 @@ export function TaskDetailsDrawer({ taskId, context, onClose }: Props) {
             </div>
             <h2 className="mt-2 pr-3 text-lg font-semibold leading-snug">{task?.title ?? 'Carregando tarefa...'}</h2>
           </div>
-          <Button size="sm" variant="ghost" className="h-9 w-9 p-0" onClick={() => task && window.confirm('Arquivar esta tarefa?') && archive.mutate()} disabled={!task || archive.isPending}>
+          <Button size="sm" variant="ghost" className="h-9 w-9 p-0" onClick={() => task && window.confirm('Arquivar esta tarefa?') && archive.mutate()} disabled={user?.isDemo || !task || archive.isPending}>
             <Archive className="h-4 w-4" />
           </Button>
           <Button size="sm" variant="ghost" className="h-9 w-9 p-0" onClick={onClose}><X className="h-5 w-5" /></Button>
@@ -123,14 +125,14 @@ export function TaskDetailsDrawer({ taskId, context, onClose }: Props) {
                 <Tab value="links" label="Vínculos" count={task.links.length} />
               </TabsList>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <fieldset disabled={user?.isDemo} className="min-h-0 flex-1 overflow-y-auto">
               <TabsContent value="details" className="m-0"><DetailsTab task={task} context={context} onChanged={refresh} /></TabsContent>
               <TabsContent value="checklist" className="m-0"><ChecklistTab task={task} onChanged={refresh} /></TabsContent>
               <TabsContent value="comments" className="m-0"><CommentsTab task={task} onChanged={refresh} /></TabsContent>
               <TabsContent value="attachments" className="m-0"><AttachmentsTab task={task} onChanged={refresh} /></TabsContent>
               <TabsContent value="activity" className="m-0"><ActivityTab task={task} /></TabsContent>
               <TabsContent value="links" className="m-0"><LinksTab task={task} onChanged={refresh} /></TabsContent>
-            </div>
+            </fieldset>
           </Tabs>
         )}
       </aside>

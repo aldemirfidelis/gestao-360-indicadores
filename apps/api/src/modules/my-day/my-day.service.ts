@@ -1,14 +1,14 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, OnModuleInit, Optional, Inject } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { swallow } from '../../common/logging/swallow';
 import { WorkItemAggregationService } from './work-item-aggregation.service';
-import { WorkflowApprovalService } from '../automations/services/workflow-approval.service';
+import type { WorkflowApprovalService } from '../automations/services/workflow-approval.service';
 import { ActionsService } from '../actions/actions.service';
 import { WorkItemEventBus } from './work-item-event-bus';
 import { MyDayTeamService } from './my-day-team.service';
-import { DocumentsService } from '../documents/documents.service';
+import type { DocumentsService } from '../documents/documents.service';
 
 const REFRESH_TTL_MS = 30_000;
 
@@ -46,11 +46,11 @@ export class MyDayService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly aggregation: WorkItemAggregationService,
-    private readonly approvals: WorkflowApprovalService,
+    @Optional() @Inject('parked.approvals') private readonly approvals: WorkflowApprovalService,
     private readonly actions: ActionsService,
     private readonly bus: WorkItemEventBus,
     private readonly team: MyDayTeamService,
-    private readonly documents: DocumentsService,
+    @Optional() @Inject('parked.documents') private readonly documents: DocumentsService,
   ) {}
 
   /** Assina o bus: quando um registro muda, agenda rebuild incremental do(s) usuario(s). */
@@ -228,6 +228,7 @@ export class MyDayService implements OnModuleInit {
     const item = await this.getItem(me, id);
     const action = (dto.action ?? '').toLowerCase();
 
+    if (item.itemType === 'APPROVAL' && !this.approvals) throw new NotFoundException('Automações aguardando reativação.');
     if (item.itemType === 'APPROVAL' && ['approve', 'reject', 'changes'].includes(action)) {
       if ((action === 'reject' || action === 'changes') && !dto.justification?.trim()) {
         throw new BadRequestException('Justificativa obrigatória para reprovar ou solicitar ajustes.');
@@ -253,6 +254,7 @@ export class MyDayService implements OnModuleInit {
       return { ok: true, message: 'Marcada como lida.' };
     }
 
+    if (item.sourceEntityType === 'DOCUMENT_EDIT_REQUEST' && !this.documents) throw new NotFoundException('Documentos aguardando reativação.');
     if (item.sourceEntityType === 'DOCUMENT_EDIT_REQUEST') {
       if (action === 'approve') {
         await this.documents.approveEditRequest(me, item.sourceEntityId, { note: dto.justification });

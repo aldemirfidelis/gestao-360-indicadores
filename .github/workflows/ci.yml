@@ -124,21 +124,24 @@ jobs:
       - name: Prisma generate
         run: pnpm --filter @g360/api exec prisma generate
 
-      # NOTA: o historico de migrations ainda nao constroi o schema do zero
-      # (falta CREATE TABLE de OrgEmployee/OrgJob — so existem ALTERs). Para o
-      # banco EFEMERO de e2e usamos db push (schema atual). Corrigir as migrations
-      # para um build limpo e item separado.
-      - name: Construir schema do banco de teste (db push)
-        run: pnpm --filter @g360/api exec prisma db push --skip-generate
+      # Desde 2026-10-07 (migration 20260526115900_restore_dbpush_drift) o
+      # historico constroi o schema do zero. Usar `migrate deploy` aqui garante
+      # que isso continue verdade — e e o mesmo caminho do boot em producao.
+      - name: Construir schema do banco de teste (migrate deploy)
+        run: pnpm --filter @g360/api exec prisma migrate deploy
 
       - name: Seed do banco de teste
         run: pnpm --filter @g360/api prisma:seed
 
+      - name: Seed aditivo da demonstração no banco de teste
+        run: pnpm --filter @g360/api exec tsx prisma/seed-focused-demo.ts
+
       - name: Instalar Chromium do Playwright
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Rodar E2E
-        run: pnpm test:e2e
+      # Os cenários de módulos suspensos ficam preservados para reativação.
+      - name: Rodar E2E do produto focado e site público
+        run: pnpm exec playwright test tests/e2e/focused-demo.spec.ts tests/e2e/api-health.spec.ts tests/e2e/public-contact-and-login.spec.ts --workers=1
 
       - name: Upload do relatorio Playwright (em falha)
         if: failure()

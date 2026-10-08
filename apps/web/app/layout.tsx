@@ -15,10 +15,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} | Plataforma de gestão corporativa integrada`,
+    default: `${SITE_NAME} | BSC, indicadores e resultados`,
     template: `%s | ${SITE_NAME}`,
   },
-  description: 'Plataforma corporativa integrada para estratégia, qualidade, segurança, suprimentos e toda a jornada de pessoas, do cargo ao ponto e à folha.',
+  description: 'Conecte BSC, indicadores, metas, resultados, tarefas, planos de ação e gestão de prêmio.',
   alternates: { canonical: absoluteUrl('/') },
   icons: {
     icon: [
@@ -40,15 +40,15 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'pt_BR',
     siteName: SITE_NAME,
-    title: `${SITE_NAME} | Plataforma de gestão corporativa integrada`,
-    description: 'Conecte estratégia, indicadores, qualidade, segurança, suprimentos, cargos, recrutamento, ponto, folha e vida funcional em um único ambiente.',
+    title: `${SITE_NAME} | BSC, indicadores e resultados`,
+    description: 'Conecte estratégia, indicadores, execução e gestão de prêmio em um único ambiente.',
     url: absoluteUrl('/'),
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630, alt: `${SITE_NAME} - plataforma de gestão corporativa` }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${SITE_NAME} | Plataforma de gestão corporativa integrada`,
-    description: 'Conecte estratégia, indicadores, qualidade, segurança, suprimentos, cargos, recrutamento, ponto, folha e vida funcional em um único ambiente.',
+    title: `${SITE_NAME} | BSC, indicadores e resultados`,
+    description: 'Conecte estratégia, indicadores, execução e gestão de prêmio em um único ambiente.',
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };

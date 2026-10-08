@@ -1,3 +1,4 @@
+import { PRODUCT_SCOPE, isProductModuleActive } from '@g360/shared';
 import { BadRequestException, ForbiddenException, Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuthPayload } from '../../auth/auth.types';
@@ -77,11 +78,12 @@ export class RegistryService implements OnModuleInit {
     return { created };
   }
 
-  listModules() { return this.prisma.portalModule.findMany({ orderBy: { menuOrder: 'asc' } }); }
-  listPages() { return this.prisma.portalPage.findMany({ orderBy: [{ moduleCode: 'asc' }, { menuOrder: 'asc' }] }); }
-  listFeatures() { return this.prisma.portalFeature.findMany({ orderBy: [{ moduleCode: 'asc' }, { name: 'asc' }] }); }
+  listModules() { return this.prisma.portalModule.findMany({ where: { code: { notIn: PRODUCT_SCOPE.parkedModuleCodes } }, orderBy: { menuOrder: 'asc' } }); }
+  listPages() { return this.prisma.portalPage.findMany({ where: { moduleCode: { notIn: PRODUCT_SCOPE.parkedModuleCodes } }, orderBy: [{ moduleCode: 'asc' }, { menuOrder: 'asc' }] }); }
+  listFeatures() { return this.prisma.portalFeature.findMany({ where: { moduleCode: { notIn: PRODUCT_SCOPE.parkedModuleCodes } }, orderBy: [{ moduleCode: 'asc' }, { name: 'asc' }] }); }
 
   async setModuleStatus(code: string, status: string, opts: { confirmationPhrase?: string; reason?: string }, user: AuthPayload) {
+    if (!isProductModuleActive(code)) throw new BadRequestException('Módulo aguardando reativação no produto.');
     const mod = await this.prisma.portalModule.findUnique({ where: { code } });
     if (!mod) throw new BadRequestException(`Módulo não encontrado: ${code}`);
     const makesUnavailable = UNAVAILABLE_STATUSES.includes(status) || status === 'HIDDEN';

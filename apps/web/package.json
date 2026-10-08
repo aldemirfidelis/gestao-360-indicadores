@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build",
+    "build": "node ../../scripts/build-focused-web.cjs",
     "start": "next start -p ${PORT:-3000}",
     "start:standalone": "node server.js",
     "lint": "next lint",

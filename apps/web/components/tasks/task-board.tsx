@@ -1,5 +1,6 @@
 'use client';
 
+import { useAuth } from '@/components/auth/auth-provider';
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import {
@@ -116,6 +117,7 @@ function TaskBoardColumn({
   onDragOver: () => void;
   onDrop: (position?: number) => void;
 }) {
+  const { user } = useAuth();
   const Icon = columnIcon(column.statusKey);
   const doneTarget = column.isDoneColumn && Boolean(activeTask) && over;
 
@@ -160,7 +162,7 @@ function TaskBoardColumn({
         {tasks.map((task) => (
           <div
             key={task.id}
-            draggable={!moving}
+            draggable={!moving && !user?.isDemo}
             onDragOver={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -191,7 +193,7 @@ function TaskBoardColumn({
           </div>
         )}
       </div>
-      <Button variant="ghost" size="sm" className="mt-2 w-full border border-dashed bg-background/50 text-xs" onClick={() => onAdd(column.id)}>
+      <Button variant="ghost" size="sm" className="mt-2 w-full border border-dashed bg-background/50 text-xs" disabled={user?.isDemo} onClick={() => onAdd(column.id)}>
         <Plus className="mr-1.5 h-3.5 w-3.5" />Adicionar tarefa
       </Button>
     </section>

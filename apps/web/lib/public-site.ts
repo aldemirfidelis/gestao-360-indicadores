@@ -5,7 +5,7 @@ export const PRODUCT_NAME = 'Gestão 360';
 export const DEFAULT_SITE_URL = 'https://gestão360.org';
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_SITE_URL).replace(/\/$/, '');
 export const DEFAULT_OG_IMAGE = '/brand/social-preview-14-modulos.png';
-/** A demonstração deixou de ter acesso aberto: agora é solicitada por formulário. */
+/** Entrada pública na Empresa Demonstração, com sessão de consulta. */
 export const DEMO_PATH = '/demonstracao';
 export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '5564981009108';
 export const WHATSAPP_MESSAGE =
@@ -53,7 +53,7 @@ export interface ArticlePage {
   related: string[];
 }
 
-export const solutionPages: PublicPage[] = [
+export const solutionPages: PublicPage[] = ([
   {
     slug: 'gestao-de-indicadores',
     path: '/solucoes/gestao-de-indicadores',
@@ -148,9 +148,9 @@ export const solutionPages: PublicPage[] = [
     useCases: ['Plano corretivo de auditoria.', 'Tratativa de desvio de indicador.', 'Acompanhamento de melhoria contínua.'],
     faq: [
       {
-        question: 'O plano de ação pode nascer de uma não conformidade?',
+        question: 'O plano de ação pode nascer de um desvio?',
         answer:
-          'Sim. Planos podem ser relacionados a desvios, auditorias, não conformidades, reuniões e outros registros autorizados.',
+          'Planos são relacionados a indicadores, desvios, objetivos e reuniões, mantendo o contexto de cada ação.',
       },
       {
         question: 'Há controle de eficácia?',
@@ -471,7 +471,7 @@ export const solutionPages: PublicPage[] = [
     ],
     kind: 'solution',
   },
-];
+] satisfies PublicPage[]).filter((item) => ['gestao-de-indicadores', 'planejamento-estrategico', 'planos-de-acao', 'dashboards-executivos', 'gestao-multiempresa'].includes(item.slug));
 
 export const segmentPages: PublicPage[] = [
   {
@@ -595,7 +595,7 @@ export const moduleHighlights: ModuleHighlight[] = [
     title: 'Meu Dia',
     eyebrow: 'Prioridades pessoais',
     description:
-      'Reúne em uma única central tudo o que exige atenção: aprovações, ações atrasadas, riscos, documentos, reuniões e indicadores fora da meta.',
+      'Reúne prioridades, ações atrasadas, prazos, reuniões e indicadores fora da meta em uma única central.',
     capabilities: ['Prioridades e prazos', 'Delegações e acompanhamento', 'Recomendações assistidas'],
   },
   {
@@ -603,8 +603,8 @@ export const moduleHighlights: ModuleHighlight[] = [
     title: 'Tarefas',
     eyebrow: 'Execução diária',
     description:
-      'Organiza a caixa de trabalho do usuário, incluindo pendências operacionais e documentos liberados para edição, com status e ações disponíveis.',
-    capabilities: ['Fila de trabalho', 'Tarefas de documentos', 'Ações no contexto'],
+      'Organiza tarefas da equipe em quadros, listas, calendário e cronogramas, com responsáveis, checklists e comentários.',
+    capabilities: ['Fila de trabalho', 'Checklists e comentários', 'Ações no contexto'],
   },
   {
     slug: 'central-de-atendimento',
@@ -702,7 +702,7 @@ export const moduleHighlights: ModuleHighlight[] = [
       'Conduz programas, competências, regras, indicadores, elegibilidade, apuração, ajustes, espelhos, auditoria e integração do prêmio com a folha.',
     capabilities: ['Regras e competências', 'Apuração e memória de cálculo', 'Espelhos e folha'],
   },
-];
+].filter((item) => ['meu-dia', 'tarefas', 'gestao-a-vista', 'gestao-de-premio'].includes(item.slug));
 
 export const faqPage: FaqItem[] = [
   {
@@ -723,7 +723,7 @@ export const faqPage: FaqItem[] = [
   {
     question: 'Como acessar a demonstração?',
     answer:
-      'Use o botão "Agendar Demonstração" e preencha o formulário. Nossa equipe entra em contato pelo e-mail informado para enviar a demonstração e agendar uma apresentação. Se preferir, o WhatsApp fica disponível para proposta ou solução sob medida.',
+      'Use o botão "Acesse a Demonstração" e preencha o formulário. Nossa equipe entra em contato pelo e-mail informado para enviar a demonstração e agendar uma apresentação. Se preferir, o WhatsApp fica disponível para proposta ou solução sob medida.',
   },
 ];
 
@@ -909,7 +909,6 @@ export const publicRoutes = [
   '/solucoes',
   ...solutionPages.map((page) => page.path),
   '/modulos',
-  '/carreiras',
   '/segmentos',
   ...segmentPages.map((page) => page.path),
   '/recursos',

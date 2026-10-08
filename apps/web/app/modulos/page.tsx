@@ -8,7 +8,7 @@ import { breadcrumbJsonLd, moduleHighlights, publicMetadata, solutionPages, webP
 
 export const metadata: Metadata = publicMetadata({
   title: 'Módulos do Gestão 360',
-  description: 'Conheça os 14 módulos do Gestão 360 para rotina, estratégia, qualidade, segurança, pessoas, recrutamento, serviço pessoal, suprimentos, comunicação, atendimento e remuneração.',
+  description: 'Conheça Meu Dia, Tarefas, Gestão à Vista e Gestão de Prêmio.',
   path: '/modulos',
 });
 
@@ -16,7 +16,7 @@ export default function ModulosPage() {
   return (
     <PublicShell>
       <JsonLd data={[webPageJsonLd({ title: 'Módulos', description: metadata.description as string, path: '/modulos' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Módulos', path: '/modulos' }])]} />
-      <PageHero eyebrow="14 módulos conectados" title="Cada área ganha profundidade sem virar um novo silo." description="O Gestão 360 organiza rotina, estratégia, qualidade, segurança, suprimentos e a jornada completa de pessoas sobre uma base comum de empresas, estrutura, usuários, permissões, histórico e auditoria." />
+      <PageHero eyebrow="Quatro frentes conectadas" title="Cada área ganha profundidade sem virar um novo silo." description="O Gestão 360 organiza o trabalho diário, o BSC, os indicadores e o prêmio sobre uma base comum de dados, estrutura, permissões e histórico." />
       <section className="bg-white py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
@@ -54,7 +54,7 @@ export default function ModulosPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-semibold tracking-tight text-slate-950">Capacidades que atravessam os módulos</h2>
           <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
-            Indicadores, estratégia, planos de ação, documentos, auditorias e riscos se conectam a cargos, vagas, colaboradores, ponto, folha, compras e demais frentes sem duplicar cadastros e históricos.
+            Indicadores, estratégia, planos de ação, tarefas e reuniões se conectam ao reconhecimento dos resultados sem duplicar cadastros e históricos.
           </p>
           <div className="mt-8 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             {solutionPages.slice(0, 8).map((page) => (

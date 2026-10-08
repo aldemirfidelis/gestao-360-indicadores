@@ -275,6 +275,7 @@ export default function OrgPage() {
   const users = useQuery<UserRow[]>({
     queryKey: ['users'],
     queryFn: () => api<UserRow[]>('/users'),
+    enabled: !user?.isDemo && hasPermission('org:manage'),
   });
 
   const stats = useMemo(() => {

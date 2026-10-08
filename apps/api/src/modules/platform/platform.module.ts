@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { PlatformController } from './platform.controller';
 import { PlatformService } from './platform.service';
-import { CommunicationModule } from '../communication/communication.module';
+import { ProfileInfrastructureModule } from '../communication/profile-infrastructure.module';
 
 @Module({
-  imports: [CommunicationModule],
+  imports: [ProfileInfrastructureModule],
   controllers: [PlatformController],
   providers: [PlatformService],
 })

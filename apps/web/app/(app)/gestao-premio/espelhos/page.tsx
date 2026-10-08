@@ -81,7 +81,7 @@ async function buildPdf(d: any) {
 
 export default function PrizePayslipsPage() {
   const qc = useQueryClient();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const canPublish = hasPermission(['prize:payslip:publish']);
 
   const [competenceId, setCompetenceId] = useState('');
@@ -155,7 +155,7 @@ export default function PrizePayslipsPage() {
                     <td className="px-3 py-2 text-right">
                       <Button size="sm" variant="ghost" onClick={() => openPdf(p.id, p.registration)}><FileDown className="mr-1 h-3.5 w-3.5" />PDF</Button>
                       {canPublish && p.status === 'GENERATED' && <Button size="sm" variant="ghost" onClick={() => publishOne.mutate(p.id)}>Publicar</Button>}
-                      {p.status === 'PUBLISHED' && !p.acknowledgedAt && <Button size="sm" variant="ghost" onClick={() => acknowledge.mutate(p.id)}>Dar ciência</Button>}
+                      {!user?.isDemo && p.status === 'PUBLISHED' && !p.acknowledgedAt && <Button size="sm" variant="ghost" onClick={() => acknowledge.mutate(p.id)}>Dar ciência</Button>}
                     </td>
                   </tr>
                 ))}

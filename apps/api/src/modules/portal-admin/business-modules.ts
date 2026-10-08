@@ -1,3 +1,4 @@
+import { isProductModuleActive } from '@g360/shared';
 /**
  * Módulos de NEGÓCIO (alinhados às abas do menu) sobre o catálogo granular.
  *
@@ -128,7 +129,7 @@ export function businessModuleMembers(code: string): string[] {
 /** Códigos granulares sempre ativos: módulos de negócio core + sistema. */
 export function alwaysOnModuleCodes(): string[] {
   const core = BUSINESS_MODULES.filter((m) => m.core).flatMap((m) => m.members);
-  return Array.from(new Set([...core, ...SYSTEM_MODULE_CODES]));
+  return Array.from(new Set([...core, ...SYSTEM_MODULE_CODES])).filter(isProductModuleActive);
 }
 
 /**
@@ -151,5 +152,5 @@ export function nonBlockableModuleCodes(): string[] {
 export function expandPlanModules(planCode: string): string[] {
   const businessCodes = PLAN_BUSINESS_MODULES[planCode] ?? [];
   const granular = businessCodes.flatMap((code) => byCode.get(code)?.members ?? []);
-  return Array.from(new Set([...alwaysOnModuleCodes(), ...granular]));
+  return Array.from(new Set([...alwaysOnModuleCodes(), ...granular])).filter(isProductModuleActive);
 }

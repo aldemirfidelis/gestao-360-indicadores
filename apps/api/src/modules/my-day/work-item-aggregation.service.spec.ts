@@ -156,10 +156,11 @@ describe('WorkItemAggregationService', () => {
     };
     const svc = new WorkItemAggregationService(prisma, new WorkItemPriorityService());
 
-    const count = await svc.rebuildForUser(me);
+    const drafts = await (svc as any).collectRecruitment(me);
+    const count = drafts.length;
 
     expect(count).toBe(1);
-    const arg = prisma.workItemIndex.upsert.mock.calls[0][0];
+    const arg = { create: drafts[0], where: { dedupeKey: `${drafts[0].sourceEntityType}:${drafts[0].sourceEntityId}:${drafts[0].itemType}:${me.sub}` } };
     expect(arg.where.dedupeKey).toBe('RECRUIT_REQUISITION:r1:RECRUIT_REQUISITION_APPROVAL:u1');
     expect(arg.create.requiresDecision).toBe(true);
     expect(arg.create.availableActions[0].href).toBe('/recrutamento');
@@ -176,10 +177,11 @@ describe('WorkItemAggregationService', () => {
     };
     const svc = new WorkItemAggregationService(prisma, new WorkItemPriorityService());
 
-    const count = await svc.rebuildForUser(me);
+    const drafts = await (svc as any).collectRecruitment(me);
+    const count = drafts.length;
 
     expect(count).toBe(1);
-    const arg = prisma.workItemIndex.upsert.mock.calls[0][0];
+    const arg = { create: drafts[0], where: { dedupeKey: `${drafts[0].sourceEntityType}:${drafts[0].sourceEntityId}:${drafts[0].itemType}:${me.sub}` } };
     expect(arg.where.dedupeKey).toBe('RECRUIT_OFFER:o1:RECRUIT_OFFER_APPROVAL:u1');
     expect(arg.create.title).toContain('Maria');
     expect(arg.create.availableActions[0].href).toBe('/recrutamento/vagas/p1');
@@ -195,17 +197,18 @@ describe('WorkItemAggregationService', () => {
     };
     const svc = new WorkItemAggregationService(prisma, new WorkItemPriorityService());
 
-    const count = await svc.rebuildForUser(me);
+    const drafts = await (svc as any).collectCompensation(me);
+    const count = drafts.length;
 
     expect(count).toBe(1);
-    const arg = prisma.workItemIndex.upsert.mock.calls[0][0];
+    const arg = { create: drafts[0], where: { dedupeKey: `${drafts[0].sourceEntityType}:${drafts[0].sourceEntityId}:${drafts[0].itemType}:${me.sub}` } };
     expect(arg.where.dedupeKey).toBe('COMPENSATION_MOVEMENT:m1:COMPENSATION_MOVEMENT_APPROVAL:u1');
     expect(arg.create.availableActions[0].href).toBe('/cargos-salarios/aprovacoes');
     expect(arg.create.requesterUserId).toBe('u2');
   });
 
-  it('sem permissões de recrutamento/C&S: coletores novos não disparam consultas de fila', async () => {
-    const prisma = withGrants(makePrisma(), []);
+  it('módulos suspensos não disparam consultas de fila mesmo com permissões', async () => {
+    const prisma = withGrants(makePrisma(), ['recruit:offer:approve', 'compensation:movements:approve']);
     prisma.recruitOffer = { findMany: vi.fn() };
     prisma.compensationMovementRequest = { findMany: vi.fn() };
     prisma.recruitRequisition = { findMany: vi.fn().mockResolvedValue([]) };

@@ -1,3 +1,4 @@
+import { isProductRouteActive, isDemoRouteAllowed, PRODUCT_SCOPE } from '@g360/shared';
 import {
   GraduationCap,
   AlertTriangle,
@@ -54,6 +55,7 @@ import {
 export interface NavUser {
   role?: string;
   permissions?: string[];
+  isDemo?: boolean;
 }
 
 export interface NavItem {
@@ -141,12 +143,12 @@ export const navSections: NavSection[] = [
   },
   {
     heading: 'Tarefas',
-    description: 'Pendências operacionais e documentos liberados para edição',
+    description: 'Pendências operacionais, prazos e acompanhamento',
     intent: 'view',
     icon: ClipboardCheck,
     flat: true,
     items: [
-      { href: '/tarefas', label: 'Tarefas', description: 'Tarefas do usuário, incluindo documentos liberados para edição', icon: ClipboardCheck, permissions: ['myday:view'], exact: true },
+      { href: '/tarefas', label: 'Tarefas', description: 'Tarefas e planos de ação do usuário', icon: ClipboardCheck, permissions: ['myday:view'], exact: true },
     ],
   },
   {
@@ -454,13 +456,13 @@ function visibleSections(sections: NavSection[], user: NavUser | null | undefine
   return sections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => canAccess(user, item.permissions)),
+      items: section.items.filter((item) => isProductRouteActive(item.href) && (!user?.isDemo || isDemoRouteAllowed(item.href)) && canAccess(user, item.permissions)),
     }))
     .filter((section) => section.items.length > 0);
 }
 
 export function visibleNavSections(user: NavUser | null | undefined) {
-  return visibleSections(navSections, user);
+  return visibleSections(navSections.filter(section => PRODUCT_SCOPE.activeSections.includes(section.heading)), user);
 }
 
 export function visiblePortalServiceSections(user: NavUser | null | undefined) {
@@ -468,11 +470,11 @@ export function visiblePortalServiceSections(user: NavUser | null | undefined) {
 }
 
 export function visibleAllNavSections(user: NavUser | null | undefined) {
-  return visibleSections(allNavSections, user);
+  return [...visibleNavSections(user), ...visiblePortalServiceSections(user)];
 }
 
 export function visibleMobileItems(user: NavUser | null | undefined) {
-  return mobileNavItems.filter((item) => canAccess(user, item.permissions));
+  return mobileNavItems.filter((item) => isProductRouteActive(item.href) && (!user?.isDemo || isDemoRouteAllowed(item.href)) && canAccess(user, item.permissions));
 }
 
 export function defaultLandingFor(user: NavUser | null | undefined, preferred?: string | null) {
@@ -492,6 +494,7 @@ export function defaultLandingFor(user: NavUser | null | undefined, preferred?: 
 }
 
 export function canAccessRoute(user: NavUser | null | undefined, pathname: string) {
+  if (!isProductRouteActive(pathname) || (user?.isDemo && !isDemoRouteAllowed(pathname))) return false;
   const required = findRoutePermissions(pathname.split('?')[0]);
   return required === null || canAccess(user, required);
 }

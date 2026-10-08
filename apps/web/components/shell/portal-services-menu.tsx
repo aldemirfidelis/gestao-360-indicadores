@@ -49,19 +49,6 @@ export function PortalServicesMenu({
         collapsed ? 'flex-col justify-center' : 'justify-end',
       )}
     >
-      {/* Escanear QR — sempre visível, ao lado da engrenagem (campo: rondas/ocorrências/inspeções). */}
-      <Button
-        asChild
-        variant="ghost"
-        size="icon"
-        className="h-9 w-9 text-slate-400 hover:bg-white/[0.06] hover:text-white"
-        aria-label="Escanear QR"
-        title="Escanear QR Code"
-      >
-        <Link href="/scan" onClick={onNavigate}>
-          <QrCode className="h-5 w-5" />
-        </Link>
-      </Button>
       {sections.length > 0 && (
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>

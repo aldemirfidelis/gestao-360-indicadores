@@ -3,10 +3,24 @@ import {
   canAccessRoute,
   defaultLandingFor,
   visibleAllNavSections,
+  visibleNavSections,
   visiblePortalServiceSections,
 } from './navigation';
 
 describe('granular navigation', () => {
+  it('mostra apenas as quatro abas de negócio mesmo para super admin', () => {
+    const user = { role: 'SUPER_ADMIN', permissions: [] };
+    expect(visibleNavSections(user).map(section => section.heading)).toEqual(['Meu Dia', 'Tarefas', 'Gestão à Vista', 'Gestão de Prêmio']);
+    expect(canAccessRoute(user, '/documents')).toBe(false);
+    expect(canAccessRoute(user, '/servico-pessoal')).toBe(false);
+  });
+  it('visitante demo só encontra os módulos apresentados', () => {
+    const user = { role: 'COMPANY_ADMIN', isDemo: true, permissions: ['myday:view', 'indicators:view', 'prize:view', 'settings:manage'] };
+    expect(visiblePortalServiceSections(user)).toEqual([]);
+    expect(canAccessRoute(user, '/settings')).toBe(false);
+    expect(canAccessRoute(user, '/gestao-premio/integracoes')).toBe(false);
+    expect(canAccessRoute(user, '/indicators')).toBe(true);
+  });
   it('does not expose Meu Dia or Tarefas without myday:view', () => {
     const user = { role: 'VIEWER', permissions: ['indicators:view'] };
     const hrefs = visibleAllNavSections(user).flatMap((section) =>
@@ -19,13 +33,14 @@ describe('granular navigation', () => {
     expect(defaultLandingFor(user)).toBe('/indicators');
   });
 
-  it('keeps the Totem profile navigation exclusive', () => {
+  it('does not expose suspended Totem routes', () => {
     const user = { role: 'VIEWER', permissions: ['ponto:kiosk'] };
     const hrefs = visibleAllNavSections(user).flatMap((section) =>
       section.items.map((item) => item.href),
     );
 
-    expect(hrefs).toEqual(['/totem']);
+    expect(hrefs).toEqual([]);
+    expect(canAccessRoute(user, '/totem')).toBe(false);
     expect(canAccessRoute(user, '/meu-dia')).toBe(false);
     expect(canAccessRoute(user, '/tarefas')).toBe(false);
   });

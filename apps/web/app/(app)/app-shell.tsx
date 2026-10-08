@@ -1,4 +1,5 @@
 'use client';
+import { isDemoRouteAllowed } from '@g360/shared';
 
 import { ReactNode, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -9,12 +10,9 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { RoutePermissionGate } from '@/components/auth/route-permission-gate';
 import { PortalRouteGate } from '@/components/portal-admin/portal-route-gate';
 import { PortalAnnouncements } from '@/components/portal-admin/portal-announcements';
-import { RealtimeProvider } from '@/components/communication/realtime-provider';
-import { CommunicationProvider } from '@/components/communication/communication-provider';
 import { findRoutePermissions } from '@/components/shell/navigation';
 import { Vision360Provider } from '@/components/ui/vision360-context';
 import { Vision360Sidebar } from '@/components/ui/vision360-sidebar';
-import { FloatingChatManager } from '@/components/communication/chat/floating-chat-manager';
 import { HelpBotFloatingButton } from '@/components/help-bot/help-bot-floating-button';
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -24,8 +22,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const exclusiveTotem = user?.accessProfile?.code === 'TOTEM';
 
   useEffect(() => {
+    if (!loading && user?.isDemo && !isDemoRouteAllowed(pathname)) router.replace('/meu-dia');
     if (!loading && exclusiveTotem) router.replace('/totem');
-  }, [exclusiveTotem, loading, router]);
+  }, [exclusiveTotem, loading, router, user, pathname]);
 
   if (loading) {
     return (
@@ -34,7 +33,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (!user) return null;
+  if (!user || (user.isDemo && !isDemoRouteAllowed(pathname))) return null;
   if (exclusiveTotem) {
     return (
       <div className="enterprise-shell grid min-h-screen place-items-center text-sm text-muted-foreground">
@@ -44,14 +43,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
   const routePerms = findRoutePermissions(pathname ?? '');
   return (
-    <RealtimeProvider>
-      <CommunicationProvider>
         <Vision360Provider>
           <div className="enterprise-shell flex h-screen overflow-hidden">
             <Sidebar />
             <div className="flex min-w-0 flex-1 flex-col">
               <Topbar />
               <PortalAnnouncements />
+              {user.isDemo && <div className="border-b bg-sky-50 px-4 py-2 text-sm text-sky-900">Empresa Demonstração · Dados fictícios · Acesso somente para consulta</div>}
               <main className="flex-1 overflow-y-auto px-4 py-4 pb-24 sm:px-5 lg:px-6 lg:py-5">
                 <PortalRouteGate>
                   {routePerms ? (
@@ -64,11 +62,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <MobileNav />
             <Vision360Sidebar />
-            <FloatingChatManager />
-            <HelpBotFloatingButton />
+            {!user.isDemo && <HelpBotFloatingButton />}
           </div>
         </Vision360Provider>
-      </CommunicationProvider>
-    </RealtimeProvider>
   );
 }

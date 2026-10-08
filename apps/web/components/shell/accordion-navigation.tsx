@@ -1,4 +1,5 @@
 'use client';
+import { isProductModuleActive } from '@g360/shared';
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
@@ -53,7 +54,7 @@ export function AccordionNavigation({
   const conversations = useQuery<ConversationSummary[]>({
     queryKey: ['conversations', user?.companyId],
     queryFn: () => api('/communication/conversations'),
-    enabled: !!user,
+    enabled: !!user && isProductModuleActive('communication'),
     refetchInterval: 30_000,
   });
   const unreadMessages = (conversations.data ?? []).reduce((sum, c) => sum + c.unread, 0);

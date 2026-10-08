@@ -43,7 +43,8 @@ echo "[1.5/5] Liberando memoria: parando app (web+api) e Collabora durante o bui
 # memoria (OOM -> "connection reset by peer" e deploy morto no meio). Paramos os
 # containers da aplicacao durante o build e subimos tudo de novo no passo [3].
 # Isso troca "zero downtime" (que nao cabe na RAM) por uma janela de ~1-2min de
-# indisponibilidade, porem com build confiavel. Collabora volta no 'up'.
+# indisponibilidade, porem com build confiavel. Collabora permanece suspenso
+# no profile documents enquanto o produto focado nao inclui o GED.
 docker compose -f "$COMPOSE_FILE" stop web api collabora 2>/dev/null || true
 
 # Rede de seguranca: a partir daqui o portal esta fora do ar (containers parados

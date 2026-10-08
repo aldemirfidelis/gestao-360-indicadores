@@ -1,3 +1,4 @@
+import { isProductModuleActive } from '@g360/shared';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { StructuralHardeningPipe } from './common/pipes/structural-hardening.pipe';
@@ -44,7 +45,7 @@ async function bootstrap() {
   app.use(helmet({ crossOriginResourcePolicy: false }));
   // O middleware global de CORS responde OPTIONS com 204 antes dos controllers.
   // Para o Word local via WebDAV, OPTIONS precisa anunciar DAV/MS-Author-Via.
-  expressApp.use?.(`/${prefix}/dav`, (req: any, res: any, next: any) => {
+  if (isProductModuleActive('documents')) expressApp.use?.(`/${prefix}/dav`, (req: any, res: any, next: any) => {
     if (String(req.method).toUpperCase() !== 'OPTIONS') {
       next();
       return;

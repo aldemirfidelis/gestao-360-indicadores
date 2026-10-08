@@ -19,8 +19,9 @@ describe('Notifications tenant isolation', () => {
     expect(prisma.notification.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { companyId: 'company-b', userId: 'admin', readAt: null },
     }));
-    expect(prisma.notification.count).toHaveBeenCalledWith({
+    expect(prisma.notification.findMany).toHaveBeenCalledWith({
       where: { companyId: 'company-b', userId: 'admin', readAt: null },
+      select: { link: true },
     });
   });
 

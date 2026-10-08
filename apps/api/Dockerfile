@@ -49,6 +49,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 # Copia codigo
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
+COPY scripts/package-focused-api.cjs ./scripts/
 
 # Build em ordem: shared -> prisma -> api
 # set -ex: aborta no primeiro erro + loga cada comando
@@ -66,7 +67,8 @@ RUN set -ex \
     && cd /app \
     && echo "=== [3/3] Nest build ===" \
     && pnpm --filter @g360/api run build \
-    && ls -la apps/api/dist
+    && node scripts/package-focused-api.cjs
+
 
 # Nota: NAO rodamos `pnpm prune --prod` aqui porque o pnpm em workspaces
 # remove o node_modules de packages/shared/, quebrando a resolucao de
@@ -92,8 +94,9 @@ COPY --from=build --chown=node:node /app/packages/shared/node_modules ./packages
 COPY --from=build --chown=node:node /app/packages/shared/dist ./packages/shared/dist
 COPY --from=build --chown=node:node /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build --chown=node:node /app/apps/api/package.json ./apps/api/
-COPY --from=build --chown=node:node /app/apps/api/dist ./apps/api/dist
-COPY --from=build --chown=node:node /app/apps/api/prisma ./apps/api/prisma
+COPY --from=build --chown=node:node /app/apps/api/dist-active ./apps/api/dist
+COPY --from=build --chown=node:node /app/apps/api/prisma/schema.prisma ./apps/api/prisma/schema.prisma
+COPY --from=build --chown=node:node /app/apps/api/prisma/migrations ./apps/api/prisma/migrations
 
 WORKDIR /app/apps/api
 

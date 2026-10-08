@@ -1,4 +1,5 @@
 'use client';
+import { isProductRouteActive } from '@g360/shared';
 
 import { createContext, useContext, useMemo, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -77,11 +78,12 @@ export function PortalConfigProvider({ children }: { children: ReactNode }) {
       loading: query.isLoading,
       navHidden: (href) => {
         const baseHref = href.split('?')[0];
-        return hidden.has(href) || hidden.has(baseHref);
+        return !isProductRouteActive(baseHref) || hidden.has(href) || hidden.has(baseHref);
       },
       sectionHidden: (heading) => sectionHiddenSet.has(heading),
       navLabel: (href) => labels.get(href) ?? labels.get(href.split('?')[0]) ?? null,
       routeBlock: (href) => {
+        if (!isProductRouteActive(href)) return { reason: 'blocked', message: 'Módulo aguardando reativação.' };
         if (isSuper) return null; // Super Admin nunca é bloqueado
         if (globalMaint) return { reason: 'global', message: config?.maintenance.global.message };
         const baseHref = href.split('?')[0];

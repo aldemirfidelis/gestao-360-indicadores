@@ -1,3 +1,4 @@
+import { isProductModuleActive } from '@g360/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { logSwallowed } from '../../common/logging/swallow';
@@ -76,6 +77,7 @@ export class TraceabilityService {
       },
     });
 
+    if (!isProductModuleActive('automations')) return event;
     // Forward as domain event to the Workflow engine
     try {
       const { WorkflowEventDispatcher } = await import('../automations/services/workflow-dispatcher.service');

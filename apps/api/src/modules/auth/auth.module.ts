@@ -11,6 +11,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { ExclusiveAccessProfileGuard } from '../../common/guards/exclusive-access-profile.guard';
 import { requireSecret } from '../../common/env';
 import { PublicModule } from '../public/public.module';
+import { ProductScopeGuard } from '../../common/guards/product-scope.guard';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { PublicModule } from '../public/public.module';
     AuthService,
     JwtStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ProductScopeGuard },
     { provide: APP_GUARD, useClass: ExclusiveAccessProfileGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

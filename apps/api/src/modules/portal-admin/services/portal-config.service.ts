@@ -1,3 +1,4 @@
+import { isProductModuleActive, isProductRouteActive } from '@g360/shared';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuthPayload } from '../../auth/auth.types';
@@ -58,7 +59,7 @@ export class PortalConfigService {
         modules: activeMaint.filter((w) => w.scope === 'module').map((w) => w.targetCode),
         pages: activeMaint.filter((w) => w.scope === 'page').map((w) => w.targetCode),
       },
-      modules: modules.map((m) => {
+      modules: modules.filter((m) => isProductModuleActive(m.code) && (!m.route || isProductRouteActive(m.route))).map((m) => {
         const companyModule = companyModules.find((item) => item.moduleCode === m.code);
         const planStatus = user.companyId ? statusFromPlan(planCode, m.code, planEntries) : null;
         // "Herdado do plano" (ou sem registro) resolve pelo plano ATUAL da
@@ -80,7 +81,7 @@ export class PortalConfigService {
           allowedRoles: parseArray(m.allowedRoles),
         };
       }),
-      pages: pages.map((p) => {
+      pages: pages.filter((p) => !p.route || isProductRouteActive(p.route)).map((p) => {
         // Exceção por empresa vence o catálogo global: dá para tirar uma tela de
         // um cliente sem afetar os demais. Sem registro, segue o status global.
         const companyPage = companyPages.find((item) => item.pageCode === p.code);

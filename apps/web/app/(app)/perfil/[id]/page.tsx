@@ -1,20 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { CalendarPlus, Mail, MessageSquare, Phone, Save, Coins, Eye } from 'lucide-react';
+import { Mail, Phone, Save } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import PayslipCard from '@/components/payroll/payslip-card';
 import { useAuth } from '@/components/auth/auth-provider';
-import { useRealtime } from '@/components/communication/realtime-provider';
 import { UserAvatar } from '@/components/communication/user-avatar';
-import { MANUAL_STATUSES, PRESENCE_LABEL, type PresenceStatus } from '@/lib/communication/events';
+import { type PresenceStatus } from '@/lib/communication/events';
 import { SectionCard } from '@/components/platform/section-card';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,25 +37,22 @@ interface ProfileData {
   presence: { status: PresenceStatus; lastSeenAt: string | null };
 }
 
-interface Preferences {
-  browserPush: boolean;
-  emailDigest: boolean;
-  muteMessages: boolean;
-}
-
 export default function ProfilePage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const { user } = useAuth();
-  const { presenceOf, setStatus: setRealtimeStatus } = useRealtime();
   const qc = useQueryClient();
   const isMe = user?.id === id;
 
   const profile = useQuery<ProfileData>({
     queryKey: ['profile', user?.companyId, id],
-    queryFn: () => api(`/communication/users/${id}/profile`),
-    enabled: !!id,
+    queryFn: () => api('/profile/me'),
+    enabled: !!id && isMe,
   });
+
+  if (!isMe) {
+    return <div className="py-12 text-center text-sm text-muted-foreground">Somente o próprio perfil está disponível nesta versão.</div>;
+  }
 
   if (profile.isLoading) {
     return <div className="py-12 text-center text-sm text-muted-foreground">Carregando perfil...</div>;
@@ -69,7 +62,6 @@ export default function ProfilePage() {
   }
 
   const p = profile.data;
-  const liveStatus = presenceOf(p.id, p.presence.status);
   const areaPath = [p.defaultNode?.parent?.name, p.defaultNode?.name].filter(Boolean).join(' › ');
 
   return (
@@ -78,31 +70,16 @@ export default function ProfilePage() {
       <Card>
         <CardContent className="p-5">
         <div className="flex flex-wrap items-start gap-4">
-          <UserAvatar name={p.name} avatarUrl={p.avatarUrl} status={liveStatus} size="xl" />
+          <UserAvatar name={p.name} avatarUrl={p.avatarUrl} size="xl" />
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-semibold">{p.name}</h1>
             <p className="text-sm text-muted-foreground">{p.jobTitle ?? '—'}</p>
             {p.customStatus && <p className="mt-1 text-sm italic text-muted-foreground/90">“{p.customStatus}”</p>}
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">{PRESENCE_LABEL[liveStatus]}</Badge>
               <Badge variant="outline" className="font-mono text-xs">{p.role}</Badge>
               {p.accessProfile && <Badge variant="outline">{p.accessProfile.name}</Badge>}
             </div>
           </div>
-          {!isMe && (
-            <div className="flex flex-col gap-2">
-              <Button asChild size="sm">
-                <Link href={`/comunicacao/chat?to=${p.id}`}>
-                  <MessageSquare className="mr-1.5 h-4 w-4" /> Enviar mensagem
-                </Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/meetings">
-                  <CalendarPlus className="mr-1.5 h-4 w-4" /> Agendar reunião
-                </Link>
-              </Button>
-            </div>
-          )}
         </div>
         </CardContent>
       </Card>
@@ -129,7 +106,6 @@ export default function ProfilePage() {
             </dl>
           </SectionCard>
 
-          {isMe && <MyFunctionalLifeCard />}
         </div>
 
         {/* Bio + (se for eu) edição */}
@@ -145,19 +121,6 @@ export default function ProfilePage() {
           {isMe && (
             <>
               <SelfEditor profile={p} onSaved={() => qc.invalidateQueries({ queryKey: ['profile', user?.companyId, id] })} />
-              <StatusEditor
-                current={liveStatus}
-                onChange={async (status) => {
-                  setRealtimeStatus(status);
-                  try {
-                    await api('/communication/me/status', { method: 'PATCH', json: { status } });
-                    qc.invalidateQueries({ queryKey: ['profile', user?.companyId, id] });
-                  } catch {
-                    toast.error('Não foi possível atualizar o status.');
-                  }
-                }}
-              />
-              <PreferencesEditor />
             </>
           )}
         </div>
@@ -181,7 +144,7 @@ function SelfEditor({ profile, onSaved }: { profile: ProfileData; onSaved: () =>
   const [phone, setPhone] = useState(profile.phone ?? '');
 
   const save = useMutation({
-    mutationFn: () => api('/communication/me/profile', { method: 'PATCH', json: { bio, customStatus, phone } }),
+    mutationFn: () => api('/profile/me', { method: 'PATCH', json: { bio, customStatus, phone } }),
     onSuccess: () => {
       toast.success('Perfil atualizado.');
       onSaved();
@@ -215,141 +178,6 @@ function SelfEditor({ profile, onSaved }: { profile: ProfileData; onSaved: () =>
           <Save className="mr-1.5 h-4 w-4" /> {save.isPending ? 'Salvando...' : 'Salvar'}
         </Button>
       </div>
-    </SectionCard>
-  );
-}
-
-function StatusEditor({ current, onChange }: { current: PresenceStatus; onChange: (s: PresenceStatus) => void }) {
-  return (
-    <SectionCard title="Minha disponibilidade">
-      <div className="flex flex-wrap gap-2">
-        {MANUAL_STATUSES.map((s) => (
-          <Button
-            key={s}
-            size="sm"
-            variant={current === s ? 'default' : 'outline'}
-            onClick={() => onChange(s)}
-          >
-            {PRESENCE_LABEL[s]}
-          </Button>
-        ))}
-      </div>
-    </SectionCard>
-  );
-}
-
-function PreferencesEditor() {
-  const qc = useQueryClient();
-  const prefs = useQuery<Preferences>({
-    queryKey: ['my-preferences'],
-    queryFn: () => api('/communication/me/preferences'),
-  });
-  const [local, setLocal] = useState<Preferences | null>(null);
-  useEffect(() => {
-    if (prefs.data) setLocal(prefs.data);
-  }, [prefs.data]);
-
-  const save = useMutation({
-    mutationFn: (next: Preferences) => api('/communication/me/preferences', { method: 'PATCH', json: next }),
-    onSuccess: () => {
-      toast.success('Preferências salvas.');
-      qc.invalidateQueries({ queryKey: ['my-preferences'] });
-    },
-    onError: () => toast.error('Erro ao salvar preferências.'),
-  });
-
-  if (!local) return null;
-  const toggle = (key: keyof Preferences) => {
-    const next = { ...local, [key]: !local[key] };
-    setLocal(next);
-    save.mutate(next);
-  };
-
-  return (
-    <SectionCard title="Notificações">
-      <div className="space-y-2 text-sm">
-        <Toggle label="Notificações no navegador" checked={local.browserPush} onChange={() => toggle('browserPush')} />
-        <Toggle label="Resumo por e-mail" checked={local.emailDigest} onChange={() => toggle('emailDigest')} />
-        <Toggle label="Silenciar novas mensagens" checked={local.muteMessages} onChange={() => toggle('muteMessages')} />
-      </div>
-    </SectionCard>
-  );
-}
-
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
-  return (
-    <label className="flex cursor-pointer items-center justify-between gap-3">
-      <span className="text-muted-foreground">{label}</span>
-      <input type="checkbox" checked={checked} onChange={onChange} className="h-4 w-4 accent-foreground" />
-    </label>
-  );
-}
-
-function MyFunctionalLifeCard() {
-  const [selectedPayslipId, setSelectedPayslipId] = useState<string | null>(null);
-
-  const payslipsQuery = useQuery<any[]>({
-    queryKey: ['my-payslips'],
-    queryFn: () => api<any[]>('/payroll/my-payslips'),
-  });
-
-  const detailQuery = useQuery<any>({
-    queryKey: ['my-payslip-detail', selectedPayslipId],
-    queryFn: () => api<any>(`/payroll/my-payslips/${selectedPayslipId}`),
-    enabled: !!selectedPayslipId,
-  });
-
-  const formatMonthYear = (year: number, month: number) => {
-    return `${String(month).padStart(2, '0')}/${year}`;
-  };
-
-  return (
-    <SectionCard title="Minha Vida Funcional (Holerites)">
-      <div className="space-y-3 text-xs">
-        {payslipsQuery.isLoading && (
-          <div className="text-center py-4 text-muted-foreground">Carregando contracheques...</div>
-        )}
-        {!payslipsQuery.isLoading && (!payslipsQuery.data || payslipsQuery.data.length === 0) && (
-          <div className="text-center py-4 text-muted-foreground">Nenhum contracheque publicado.</div>
-        )}
-        <div className="space-y-2">
-          {payslipsQuery.data?.map((ps) => (
-            <div key={ps.id} className="flex items-center justify-between p-2.5 border border-border/60 rounded bg-muted/20">
-              <div className="flex items-center gap-2">
-                <Coins className="h-4 w-4 text-sky-500" />
-                <div>
-                  <span className="font-bold text-xs uppercase block">
-                    {ps.run.kind === 'ADIANTAMENTO' ? 'Adiantamento Salarial' : 'Folha Mensal'}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    Competência: {formatMonthYear(ps.run.competence.year, ps.run.competence.month)}
-                  </span>
-                </div>
-              </div>
-              <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setSelectedPayslipId(ps.id)}>
-                <Eye className="mr-1 h-3.5 w-3.5" /> Visualizar
-              </Button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* DIALOG: Visualizar Holerite */}
-      <Dialog open={!!selectedPayslipId} onOpenChange={(open) => !open && setSelectedPayslipId(null)}>
-        <DialogContent className="max-w-[750px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Meu Demonstrativo de Pagamento</DialogTitle>
-          </DialogHeader>
-          {detailQuery.isLoading && (
-            <div className="py-8 text-center text-xs text-muted-foreground">Carregando detalhes do holerite...</div>
-          )}
-          {detailQuery.data && (
-            <div className="py-2">
-              <PayslipCard data={detailQuery.data} />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </SectionCard>
   );
 }

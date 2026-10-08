@@ -1,4 +1,5 @@
 'use client';
+import { isProductRouteActive } from '@g360/shared';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -25,6 +26,7 @@ export interface AuthUser {
   jobTitle?: string | null;
   accessProfile?: { id: string; code: string; name: string } | null;
   permissions?: string[];
+  isDemo?: boolean;
 }
 
 interface AuthCtx {
@@ -33,6 +35,7 @@ interface AuthCtx {
   hasPermission: (permissions?: string | string[]) => boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  loginDemo: () => Promise<void>;
   refreshUser: () => Promise<AuthUser | null>;
   /** Super Admin: troca a empresa ativa (null = volta à empresa de origem) e recarrega. */
   switchCompany: (companyId: string | null) => Promise<void>;
@@ -127,6 +130,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.replace(defaultLandingFor(profile, preferredLanding));
   };
 
+  const loginDemo = async () => {
+    const out = await api<{ accessToken: string; refreshToken: string; user: AuthUser }>('/auth/demo', { method: 'POST' });
+    queryClient.clear();
+    clearTokens(); // Não herdar o refresh token de uma sessão administrativa.
+    setTokens(out.accessToken, out.refreshToken);
+    setUser(out.user);
+    router.replace('/meu-dia');
+  };
+
   const switchCompany = async (companyId: string | null) => {
     await api('/platform/switch', { method: 'POST', json: { companyId } });
     queryClient.clear();
@@ -164,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return required.some((permission) => granted.has(permission) || granted.has(`${permission.split(':')[0]}:manage`));
   };
 
-  return <Ctx.Provider value={{ user, loading, hasPermission, login, logout, refreshUser, switchCompany }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, loading, hasPermission, login, loginDemo, logout, refreshUser, switchCompany }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth(): AuthCtx {

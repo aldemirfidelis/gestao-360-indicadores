@@ -162,9 +162,6 @@ export default function LoginPage() {
             <div className="space-y-2 text-center text-xs text-slate-500">
               <p>
                 É candidato?{' '}
-                <Link href="/candidato" className="font-semibold text-cyan-400 hover:underline">
-                  Acesse a Área do candidato
-                </Link>
                 .
               </p>
               <p>

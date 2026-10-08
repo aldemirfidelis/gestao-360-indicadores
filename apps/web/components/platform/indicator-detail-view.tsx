@@ -905,7 +905,7 @@ export function IndicatorDetailView({
                 ))}
               </ul>
             )}
-            <RailLinkTo href="/risks">Ver todos os riscos</RailLinkTo>
+            <RailLinkTo href="/deviations">Ver todos os desvios</RailLinkTo>
           </RailCard>
 
           <RailCard icon={FileText} iconClass="text-status-blue" title="Planos vinculados">

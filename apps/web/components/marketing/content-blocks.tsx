@@ -25,7 +25,7 @@ export function PageHero({
         {showDemoCta && (
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <DemoLink source="public_page_hero" className="inline-flex h-11 items-center justify-center gap-2 bg-emerald-400 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
-              Agendar Demonstração <ArrowRight className="h-4 w-4" />
+              Acesse a Demonstração <ArrowRight className="h-4 w-4" />
             </DemoLink>
           </div>
         )}

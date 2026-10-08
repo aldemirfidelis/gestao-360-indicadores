@@ -1,3 +1,4 @@
+import { isProductModuleActive } from '@g360/shared';
 /**
  * Catalogo-semente do registro do portal. Fonte para popular Portal{Module,Page,Feature}.
  * O sync e aditivo por code e atualiza apenas metadados controlados pelo produto.
@@ -33,7 +34,7 @@ export interface CatalogFeature {
   criticality?: 'low' | 'medium' | 'high' | 'critical';
 }
 
-export const CATALOG_MODULES: CatalogModule[] = [
+export const CATALOG_MODULES: CatalogModule[] = ([
   { code: 'my-day', name: 'Meu Dia', category: 'Meu Dia', route: '/meu-dia', menuOrder: 10, criticality: 'medium' },
   { code: 'tasks', name: 'Tarefas', category: 'Tarefas', route: '/tarefas', menuOrder: 20, criticality: 'medium' },
 
@@ -90,9 +91,9 @@ export const CATALOG_MODULES: CatalogModule[] = [
   { code: 'insights', name: 'Insights', category: 'Legado', route: '/insights', menuOrder: 904, criticality: 'low' },
   { code: 'directory', name: 'Pessoas', category: 'Legado', route: '/pessoas', menuOrder: 905, criticality: 'low' },
   { code: 'help-center', name: 'Central de Ajuda', category: 'Legado', route: '/ajuda', menuOrder: 906, criticality: 'low' },
-];
+ ] satisfies CatalogModule[]).filter((item) => isProductModuleActive(item.code));
 
-export const CATALOG_PAGES: CatalogPage[] = [
+export const CATALOG_PAGES: CatalogPage[] = ([
   { code: 'my-day.main', moduleCode: 'my-day', name: 'Meu Dia', title: 'Meu Dia', route: '/meu-dia', menuOrder: 10 },
   { code: 'my-day.team', moduleCode: 'my-day', name: 'Meu Dia da Equipe', title: 'Meu Dia da Equipe', route: '/meu-dia/equipe', menuOrder: 11 },
   { code: 'tasks.main', moduleCode: 'tasks', name: 'Tarefas', title: 'Tarefas', route: '/tarefas', menuOrder: 20 },
@@ -289,9 +290,9 @@ export const CATALOG_PAGES: CatalogPage[] = [
   { code: 'forms.scan', moduleCode: 'forms', name: 'Leitor de Formularios', title: 'Leitor', route: '/scan', menuOrder: 906.1 },
   { code: 'treatments.detail', moduleCode: 'treatments', name: 'Detalhe da Tratativa', title: 'Tratativa', route: '/treatments/[id]', menuOrder: 906.2 },
   { code: 'dashboard.legacy', moduleCode: 'dashboard', name: 'Dashboard legado', title: 'Dashboard legado', route: '/dashboard', menuOrder: 900 },
-];
+ ] satisfies CatalogPage[]).filter((item) => isProductModuleActive(item.moduleCode));
 
-export const CATALOG_FEATURES: CatalogFeature[] = [
+export const CATALOG_FEATURES: CatalogFeature[] = ([
   { code: 'communication.attachments', moduleCode: 'communication', name: 'Enviar anexos em mensagens' },
   { code: 'communication.mute', moduleCode: 'communication', name: 'Silenciar conversas' },
   { code: 'communication.pin', moduleCode: 'communication', name: 'Fixar conversas' },
@@ -369,4 +370,4 @@ export const CATALOG_FEATURES: CatalogFeature[] = [
   { code: 'prize.admin', moduleCode: 'prize', name: 'Administrar configuracoes do premio', criticality: 'high' },
   { code: 'prize.connectors', moduleCode: 'prize', name: 'Gerenciar conectores do premio', criticality: 'high' },
   { code: 'prize.reports', moduleCode: 'prize', name: 'Visualizar relatorios do premio' },
-];
+ ] satisfies CatalogFeature[]).filter((item) => isProductModuleActive(item.moduleCode));

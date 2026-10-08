@@ -55,3 +55,9 @@ Gestao_premio/
 docs/modulos/
 docs/case-institucional/
 scripts/gerar-case-institucional.py
+
+# Pacotes gerados do escopo ativo
+apps/web/public-active/
+apps/api/dist-active/
+
+apps/.focused-web-*/

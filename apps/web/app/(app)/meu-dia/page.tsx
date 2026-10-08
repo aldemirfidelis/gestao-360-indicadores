@@ -1,4 +1,5 @@
 'use client';
+import { isProductModuleActive } from '@g360/shared';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -90,7 +91,7 @@ const TABS = [
   { key: 'priorities', label: 'Prioridades' },
   { key: 'today', label: 'Hoje' },
   { key: 'pending', label: 'Pendentes' },
-  { key: 'approvals', label: 'Aprovações' },
+  ...(isProductModuleActive('automations') ? [{ key: 'approvals', label: 'Aprovações' }] : []),
   { key: 'overdue', label: 'Atrasados' },
   { key: 'upcoming', label: 'Próximos prazos' },
 ];
@@ -225,10 +226,10 @@ export default function MeuDiaPage() {
 
   // Paineis da Visao geral: reusam o endpoint real /my-day/items (sem dados ficticios).
   const onOverview = tab === 'overview';
-  const panelApprovals = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'approvals'], queryFn: () => api('/my-day/items?tab=approvals&pageSize=4'), enabled: onOverview });
+  const panelApprovals = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'approvals'], queryFn: () => api('/my-day/items?tab=approvals&pageSize=4'), enabled: onOverview && isProductModuleActive('automations') });
   const panelMeetings = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'meetings'], queryFn: () => api('/my-day/items?itemType=MEETING&pageSize=4'), enabled: onOverview });
-  const panelRisks = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'risks'], queryFn: () => api('/my-day/items?itemType=RISK_CRITICAL&pageSize=4'), enabled: onOverview });
-  const panelDocs = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'docs'], queryFn: () => api('/my-day/items?itemType=DOCUMENTS&pageSize=4'), enabled: onOverview });
+  const panelRisks = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'risks'], queryFn: () => api('/my-day/items?itemType=RISK_CRITICAL&pageSize=4'), enabled: onOverview && isProductModuleActive('risks') });
+  const panelDocs = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'docs'], queryFn: () => api('/my-day/items?itemType=DOCUMENTS&pageSize=4'), enabled: onOverview && isProductModuleActive('documents') });
   const panelIndicators = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'indicators'], queryFn: () => api('/my-day/items?itemType=INDICATOR_OFF_TARGET&pageSize=4'), enabled: onOverview });
   const panelFollowing = useQuery<{ rows: WorkItem[] }>({ queryKey: ['my-day', 'panel', 'following'], queryFn: () => api('/my-day/items?tab=following&pageSize=4'), enabled: onOverview });
 
@@ -291,15 +292,21 @@ export default function MeuDiaPage() {
 
   function invalidate() { void qc.invalidateQueries({ queryKey: ['my-day'] }); }
   function toggleFollow(it: WorkItem) {
+    if (user?.isDemo) { toast.info('A demonstração permite somente consulta.'); return; }
     if (it.isFollowed && !it.isPinned) unfollowMut.mutate(it.id);
     else followMut.mutate({ id: it.id, pinned: false });
   }
   function togglePin(it: WorkItem) {
+    if (user?.isDemo) { toast.info('A demonstração permite somente consulta.'); return; }
     followMut.mutate({ id: it.id, pinned: !it.isPinned });
   }
   function openItem(it: WorkItem) {
     const href = it.availableActions?.find((a) => a.key === 'open')?.href;
     if (href) router.push(href);
+  }
+  function inspectItem(it: WorkItem) {
+    if (user?.isDemo) openItem(it);
+    else setActOn(it);
   }
   function openVision(it: WorkItem) {
     const t = VISION360_TYPE[it.sourceEntityType];
@@ -342,7 +349,7 @@ export default function MeuDiaPage() {
     { key: 'risksCritical', label: 'Riscos críticos', value: s?.risksCritical ?? 0, cls: 'text-orange-600' },
     { key: 'documentsToReview', label: 'Documentos', value: s?.documentsToReview ?? 0, cls: 'text-sky-600' },
     { key: 'meetingsToday', label: 'Reuniões hoje', value: s?.meetingsToday ?? 0, cls: 'text-emerald-600' },
-  ] as const), [s]);
+  ] as const).filter((card) => !['approvals', 'risksCritical', 'documentsToReview'].includes(card.key)), [s]);
 
   const rows = itemsQuery.data?.rows ?? [];
 
@@ -390,10 +397,10 @@ export default function MeuDiaPage() {
                 <Users className="mr-2 h-4 w-4" />Equipe
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setDelegationsOpen(true)}>
+            <Button variant="outline" size="sm" disabled={user?.isDemo} onClick={() => setDelegationsOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />Delegacoes
             </Button>
-            <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
+            <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={user?.isDemo || refresh.isPending}>
               <RefreshCw className={cn('mr-2 h-4 w-4', refresh.isPending && 'animate-spin')} />Atualizar
             </Button>
           </div>
@@ -490,7 +497,7 @@ export default function MeuDiaPage() {
             </>
           )}
         </div>
-        <Button variant="outline" size="sm" className="h-9 text-xs font-semibold bg-white border border-border text-slate-600 hover:text-slate-900 shadow-sm rounded-lg" onClick={() => setPrefsOpen(true)}>
+        <Button variant="outline" size="sm" className="h-9 text-xs font-semibold bg-white border border-border text-slate-600 hover:text-slate-900 shadow-sm rounded-lg" disabled={user?.isDemo} onClick={() => setPrefsOpen(true)}>
           <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5 text-slate-400" />Personalizar dashboard
         </Button>
       </div>
@@ -614,13 +621,13 @@ export default function MeuDiaPage() {
               ) : priorities.length === 0 ? (
                 <PanelEmpty>Nenhuma prioridade no momento.</PanelEmpty>
               ) : (
-                priorities.slice(0, 4).map((it) => <ItemRow key={it.id} it={it} onClick={() => setActOn(it)} />)
+                priorities.slice(0, 4).map((it) => <ItemRow key={it.id} it={it} onClick={() => inspectItem(it)} />)
               )}
             </div>
           </div>
 
           {/* Aprovações pendentes — itens reais (itemType APPROVAL) */}
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+          {isProductModuleActive('automations') && (<div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <Stamp className="h-4.5 w-4.5 text-purple-600" />
@@ -634,10 +641,10 @@ export default function MeuDiaPage() {
               ) : (panelApprovals.data?.rows ?? []).length === 0 ? (
                 <PanelEmpty>Nenhuma aprovação pendente.</PanelEmpty>
               ) : (
-                (panelApprovals.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => setActOn(it)} />)
+                (panelApprovals.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => inspectItem(it)} />)
               )}
             </div>
-          </div>
+          </div>)}
 
           {/* Próximas reuniões — reuniões reais atribuídas (itemType MEETING) */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
@@ -676,7 +683,7 @@ export default function MeuDiaPage() {
           </div>
 
           {/* Riscos críticos — itens reais (itemType RISK_CRITICAL) */}
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+          {isProductModuleActive('risks') && (<div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4.5 w-4.5 text-red-500" />
@@ -693,10 +700,10 @@ export default function MeuDiaPage() {
                 (panelRisks.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => openVision(it)} />)
               )}
             </div>
-          </div>
+          </div>)}
 
           {/* Documentos a revisar — itens reais (DOCUMENT_REVIEW/EDIT) */}
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+          {isProductModuleActive('documents') && (<div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <FileText className="h-4.5 w-4.5 text-blue-500" />
@@ -710,10 +717,10 @@ export default function MeuDiaPage() {
               ) : (panelDocs.data?.rows ?? []).length === 0 ? (
                 <PanelEmpty>Nenhum documento pendente de revisão.</PanelEmpty>
               ) : (
-                (panelDocs.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => setActOn(it)} />)
+                (panelDocs.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => inspectItem(it)} />)
               )}
             </div>
-          </div>
+          </div>)}
 
           {/* Indicadores fora da meta — itens reais (INDICATOR_OFF_TARGET) */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
@@ -750,7 +757,7 @@ export default function MeuDiaPage() {
               ) : (panelFollowing.data?.rows ?? []).length === 0 ? (
                 <div className="sm:col-span-2 lg:col-span-3"><PanelEmpty>Você ainda não acompanha nenhum item. Use o marcador nos itens para acompanhá-los aqui.</PanelEmpty></div>
               ) : (
-                (panelFollowing.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => setActOn(it)} />)
+                (panelFollowing.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => inspectItem(it)} />)
               )}
             </div>
           </div>
@@ -766,13 +773,13 @@ export default function MeuDiaPage() {
               <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Nenhum item para esta visão. Aproveite para adiantar outras frentes.</p>
             </CardContent></Card>
           ) : view === 'table' ? (
-            <ItemsTable rows={rows} onAct={setActOn} onFollow={toggleFollow} onPin={togglePin} />
+            <ItemsTable rows={rows} onAct={inspectItem} onFollow={toggleFollow} onPin={togglePin} />
           ) : view === 'kanban' ? (
-            <ItemsKanban rows={rows} onAct={setActOn} onFollow={toggleFollow} onPin={togglePin} />
+            <ItemsKanban rows={rows} onAct={inspectItem} onFollow={toggleFollow} onPin={togglePin} />
           ) : view === 'calendar' ? (
-            <ItemsCalendar rows={rows} onAct={setActOn} onFollow={toggleFollow} onPin={togglePin} />
+            <ItemsCalendar rows={rows} onAct={inspectItem} onFollow={toggleFollow} onPin={togglePin} />
           ) : view === 'timeline' ? (
-            <ItemsTimeline rows={rows} onAct={setActOn} onFollow={toggleFollow} onPin={togglePin} />
+            <ItemsTimeline rows={rows} onAct={inspectItem} onFollow={toggleFollow} onPin={togglePin} />
           ) : (
             rows.map((it) => {
               const meta = TYPE_META[it.itemType] ?? { label: it.itemType, icon: Inbox };
@@ -807,7 +814,7 @@ export default function MeuDiaPage() {
                           <Pin className="h-4 w-4" />
                         </Button>
                       </div>
-                      <Button size="sm" onClick={() => setActOn(it)}>Agir agora</Button>
+                      <Button size="sm" onClick={() => inspectItem(it)}>{user?.isDemo ? 'Consultar' : 'Agir agora'}</Button>
                       {VISION360_TYPE[it.sourceEntityType] && (
                         <Button size="sm" variant="outline" onClick={() => openVision(it)}>Visão 360°</Button>
                       )}
@@ -919,6 +926,7 @@ function ActNowDialog({ item, onClose, onDone, onOpen, onVision }: {
   item: WorkItem; onClose: () => void; onDone: () => void; onOpen: () => void; onVision: () => void;
 }) {
   const [justification, setJustification] = useState('');
+  const { user } = useAuth();
   const isApproval = item.itemType === 'APPROVAL';
   const isTask = ['TASK', 'OVERDUE_ACTION'].includes(item.itemType) && item.sourceEntityType === 'ACTION_PLAN';
   const isNotification = item.sourceEntityType === 'NOTIFICATION';
@@ -952,9 +960,9 @@ function ActNowDialog({ item, onClose, onDone, onOpen, onVision }: {
               <Textarea rows={3} value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="Descreva o motivo da sua decisão..." />
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button disabled={act.isPending} onClick={() => act.mutate('approve')}>Aprovar</Button>
-              <Button variant="outline" className="border-rose-300 text-rose-600" disabled={act.isPending} onClick={() => act.mutate('reject')}>Reprovar</Button>
-              <Button variant="outline" disabled={act.isPending} onClick={() => act.mutate('changes')}>Solicitar ajustes</Button>
+              <Button disabled={user?.isDemo || act.isPending} onClick={() => act.mutate('approve')}>Aprovar</Button>
+              <Button variant="outline" className="border-rose-300 text-rose-600" disabled={user?.isDemo || act.isPending} onClick={() => act.mutate('reject')}>Reprovar</Button>
+              <Button variant="outline" disabled={user?.isDemo || act.isPending} onClick={() => act.mutate('changes')}>Solicitar ajustes</Button>
             </div>
           </div>
         ) : isDocumentEditApproval ? (
@@ -964,24 +972,24 @@ function ActNowDialog({ item, onClose, onDone, onOpen, onVision }: {
               <Textarea rows={3} value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="Oriente o solicitante, quando necessário." />
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button disabled={act.isPending} onClick={() => act.mutate('approve')}>Liberar edição</Button>
-              <Button variant="outline" className="border-rose-300 text-rose-600" disabled={act.isPending} onClick={() => act.mutate('reject')}>Rejeitar</Button>
+              <Button disabled={user?.isDemo || act.isPending} onClick={() => act.mutate('approve')}>Liberar edição</Button>
+              <Button variant="outline" className="border-rose-300 text-rose-600" disabled={user?.isDemo || act.isPending} onClick={() => act.mutate('reject')}>Rejeitar</Button>
             </div>
           </div>
         ) : isDocumentEdit ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Abra o documento para editar pela web. Ao finalizar, marque a tarefa como concluída.</p>
-            <Button disabled={act.isPending} onClick={() => act.mutate('complete')}>Concluir edição</Button>
+            <Button disabled={user?.isDemo || act.isPending} onClick={() => act.mutate('complete')}>Concluir edição</Button>
           </div>
         ) : isTask ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Conclua a tarefa aqui, ou abra o registro para atualizar progresso, anexar evidências e comentar.</p>
-            <Button disabled={act.isPending} onClick={() => act.mutate('complete')}>Concluir tarefa</Button>
+            <Button disabled={user?.isDemo || act.isPending} onClick={() => act.mutate('complete')}>Concluir tarefa</Button>
           </div>
         ) : isNotification ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">{item.summary || 'Notificação'}</p>
-            <Button disabled={act.isPending} onClick={() => act.mutate('markRead')}>Marcar como lida</Button>
+            <Button disabled={user?.isDemo || act.isPending} onClick={() => act.mutate('markRead')}>Marcar como lida</Button>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">

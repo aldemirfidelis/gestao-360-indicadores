@@ -1,3 +1,4 @@
+import { isProductRouteActive } from '@g360/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActionStatus, NotificationKind } from '@prisma/client';
@@ -17,11 +18,12 @@ export class NotificationsService {
       where: { companyId, userId, ...(unreadOnly ? { readAt: null } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 100,
-    });
+    }).then((rows) => rows.filter((row) => !row.link || isProductRouteActive(row.link)));
   }
 
   async unreadCount(companyId: string, userId: string) {
-    return this.prisma.notification.count({ where: { companyId, userId, readAt: null } });
+    const rows = await this.prisma.notification.findMany({ where: { companyId, userId, readAt: null }, select: { link: true } });
+    return rows.filter(row => !row.link || isProductRouteActive(row.link)).length;
   }
 
   async create(
@@ -128,6 +130,8 @@ export class NotificationsService {
       );
       created.push(r.indicator.id);
     }
+
+    if (!isProductRouteActive('/nonconformities')) return { generated: created.length };
 
     // 3. Não conformidades com prazo vencido (Qualidade) — antes ninguém era
     // avisado; a NC só era percebida quando alguém abria a tela do módulo.

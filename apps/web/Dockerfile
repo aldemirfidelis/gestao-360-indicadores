@@ -36,6 +36,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 
 COPY packages/shared ./packages/shared
 COPY apps/web ./apps/web
+COPY scripts/build-focused-web.cjs ./scripts/
 
 # NEXT_PUBLIC_* precisa estar disponivel em build time
 ARG NEXT_PUBLIC_API_URL=/api
@@ -67,7 +68,7 @@ RUN addgroup --system --gid 1001 nodejs \
 # Estrutura do standalone em monorepo: apps/web/server.js + apps/web/.next/static
 COPY --from=build --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=build --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+COPY --from=build --chown=nextjs:nodejs /app/apps/web/public-active ./apps/web/public
 COPY --chown=nextjs:nodejs scripts ./scripts
 
 USER nextjs

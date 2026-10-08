@@ -61,6 +61,13 @@ export class AuthController {
     return this.auth.refresh(body.refreshToken);
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Public()
+  @Post('demo')
+  demo(@Req() req: Request) {
+    return this.auth.demo({ ip: req.ip, userAgent: req.headers['user-agent'] });
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   logout(@CurrentUser() me: AuthPayload, @Body() body: { refreshToken?: string }, @Req() req: Request) {

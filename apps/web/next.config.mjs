@@ -27,6 +27,8 @@ function resolveAppVersion() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Build sequencial: evita vários workers disputarem a RAM com o editor.
+  experimental: { cpus: 1 },
   // Uma versão rastreável é injetada no bundle. Em deploy ela vem do commit;
   // em desenvolvimento o fallback também consulta o Git local.
   env: {
@@ -39,9 +41,7 @@ const nextConfig = {
   // Next 15: outputFileTracingRoot saiu de `experimental` para top-level.
   // Em monorepo, indica para o Next rastrear arquivos a partir da raiz
   // para que .next/standalone inclua o packages/shared.
-  outputFileTracingRoot: process.cwd().endsWith('apps/web')
-    ? new URL('../../', import.meta.url).pathname
-    : undefined,
+  outputFileTracingRoot: new URL('../../', import.meta.url).pathname,
   // Esconde o header "X-Powered-By: Next.js" (reduz fingerprinting).
   poweredByHeader: false,
   // Cabecalhos de seguranca aplicados a todas as respostas servidas pelo Next.

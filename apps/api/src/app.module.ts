@@ -22,14 +22,6 @@ import { HealthModule } from './modules/health/health.module';
 import { StrategyModule } from './modules/strategy/strategy.module';
 import { OkrsModule } from './modules/okrs/okrs.module';
 import { ProjectsModule } from './modules/projects/projects.module';
-import { RisksModule } from './modules/risks/risks.module';
-import { NonConformitiesModule } from './modules/nonconformities/nonconformities.module';
-import { DocumentsModule } from './modules/documents/documents.module';
-import { AuditsModule } from './modules/audits/audits.module';
-import { ProcessesModule } from './modules/processes/processes.module';
-import { FoodSafetyModule } from './modules/food-safety/food-safety.module';
-import { AssetSecurityModule } from './modules/asset-security/asset-security.module';
-import { FormsModule } from './modules/forms/forms.module';
 import { MeetingsModule } from './modules/meetings/meetings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PushModule } from './modules/push/push.module';
@@ -48,7 +40,6 @@ import { PortalAdminModule } from './modules/portal-admin/portal-admin.module';
 import { PeriodsModule } from './modules/periods/periods.module';
 import { ClosedMonthsModule } from './modules/closed-months/closed-months.module';
 import { AiModule } from './modules/ai/ai.module';
-import { CommunicationModule } from './modules/communication/communication.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { AccessModule } from './modules/access/access.module';
 import { HelpModule } from './modules/help/help.module';
@@ -57,24 +48,17 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { ExternalApiModule } from './modules/external-api/external-api.module';
 import { PlatformAdminGlobalModule } from './modules/platform-admin/platform-admin.module';
 import { Vision360Module } from './modules/vision360/vision360.module';
-import { AutomationsModule } from './modules/automations/automations.module';
 import { MyDayModule } from './modules/my-day/my-day.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { WorkItemEventsModule } from './modules/my-day/work-item-event-bus';
 import { LgpdModule } from './modules/lgpd/lgpd.module';
 import { PrizeModule } from './modules/prize/prize.module';
-import { CompensationModule } from './modules/compensation/compensation.module';
-import { PersonnelModule } from './modules/personnel/personnel.module';
-import { TrainingModule } from './modules/training/training.module';
-import { PayrollModule } from './modules/payroll/payroll.module';
-import { RecruitmentModule } from './modules/recruitment/recruitment.module';
-import { SuppliesModule } from './modules/supplies/supplies.module';
 import { MonthlyResultsModule } from './modules/monthly-results/monthly-results.module';
 import { StorageModule } from './storage/storage.module';
 import { PublicModule } from './modules/public/public.module';
-import { JobsModule } from './jobs/jobs.module';
-import { MaintenanceModule } from './jobs/maintenance.module';
-import { workersEnabled } from './jobs/jobs.constants';
+import { FocusMaintenanceModule } from './jobs/focus-maintenance.module';
+import { ProfileInfrastructureModule } from './modules/communication/profile-infrastructure.module';
+import { parkedProductModules } from './parked-product-modules';
 import { CompanyAdminModule } from './modules/company-admin/company-admin.module';
 
 @Module({
@@ -97,14 +81,6 @@ import { CompanyAdminModule } from './modules/company-admin/company-admin.module
     StrategyModule,
     OkrsModule,
     ProjectsModule,
-    RisksModule,
-    NonConformitiesModule,
-    DocumentsModule,
-    AuditsModule,
-    ProcessesModule,
-    FoodSafetyModule,
-    AssetSecurityModule,
-    FormsModule,
     MeetingsModule,
     NotificationsModule,
     PushModule,
@@ -121,7 +97,6 @@ import { CompanyAdminModule } from './modules/company-admin/company-admin.module
     PeriodsModule,
     ClosedMonthsModule,
     AiModule,
-    CommunicationModule,
     HelpModule,
     SupportTicketsModule,
     IntegrationsModule,
@@ -131,26 +106,21 @@ import { CompanyAdminModule } from './modules/company-admin/company-admin.module
     AccessModule,
     WorkItemEventsModule,
     Vision360Module,
-    AutomationsModule,
     MyDayModule,
     TasksModule,
     LgpdModule,
     PrizeModule,
-    CompensationModule,
-    PersonnelModule,
-    TrainingModule,
-    PayrollModule,
-    RecruitmentModule,
-    SuppliesModule,
     MonthlyResultsModule,
     StorageModule,
     PublicModule,
     CompanyAdminModule,
     // Rotinas de manutenção in-process (vencimento de documentos, alertas):
     // sempre ativas, sem dependência de Redis.
-    MaintenanceModule,
+    FocusMaintenanceModule,
+    ProfileInfrastructureModule,
+    ...parkedProductModules(),
     // Workers BullMQ: importados apenas quando WORKERS_ENABLED=true (sem Redis no boot padrão).
-    ...(workersEnabled() ? [JobsModule] : []),
+
   ],
   providers: [
     // Filtro global de exceção via DI (injeta o logger estruturado).

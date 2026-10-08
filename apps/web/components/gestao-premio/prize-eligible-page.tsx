@@ -1,5 +1,6 @@
 'use client';
 
+import { isProductModuleActive } from '@g360/shared';
 import { useMutation } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -253,7 +254,7 @@ export function PrizeEligiblePage() {
             <Button onClick={() => setImportOpen(true)}>
               <Upload className="mr-1 h-4 w-4" />Importar arquivo
             </Button>
-            <Button variant="outline" onClick={() => importInternal.mutate()} disabled={importInternal.isPending} title="Gera a base elegível a partir dos colaboradores cadastrados na plataforma (Serviço Pessoal)">
+            <Button variant="outline" onClick={() => importInternal.mutate()} disabled={!isProductModuleActive('personnel') || importInternal.isPending} title="Serviço Pessoal suspenso nesta versão. Gera a base elegível a partir dos colaboradores cadastrados na plataforma (Serviço Pessoal)">
               <RefreshCw className="mr-1 h-4 w-4" />{importInternal.isPending ? 'Sincronizando…' : 'Sincronizar da base da empresa'}
             </Button>
             <Button variant="outline" onClick={() => setAtestadosOpen(true)} title="Importa a planilha DatasAtestados (espelho de ponto) para a competência selecionada">

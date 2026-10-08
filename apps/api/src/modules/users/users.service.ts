@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UserCreateInput } from '@g360/shared';
+import { UserCreateInput, isProductPermissionActive } from '@g360/shared';
 import { Prisma, UserAccessStatus, UserRoleEnum } from '@prisma/client';
 import { DEFAULT_PROFILES, PERMISSION_CATALOG } from './permission-catalog';
 
@@ -59,7 +59,7 @@ export class UsersService {
     await this.ensurePermissionCatalog();
     return this.prisma.permission.findMany({
       orderBy: [{ module: 'asc' }, { action: 'asc' }, { key: 'asc' }],
-    });
+    }).then((rows) => rows.filter((row) => isProductPermissionActive(row.key)));
   }
 
   async accessContext(companyId: string) {

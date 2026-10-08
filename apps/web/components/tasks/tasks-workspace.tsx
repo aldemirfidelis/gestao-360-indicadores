@@ -228,7 +228,7 @@ export function TasksWorkspace() {
             <Button variant="outline" size="sm" onClick={() => setPersonalizeOpen(true)}>
               <Settings2 className="mr-2 h-4 w-4" />Personalizar
             </Button>
-            <Button size="sm" onClick={() => openCreate()}>
+            <Button size="sm" disabled={user?.isDemo} onClick={() => openCreate()}>
               <Plus className="mr-2 h-4 w-4" />Nova tarefa
             </Button>
             <Button variant="ghost" size="icon" title="Abrir alertas" onClick={() => router.push('/meu-dia')}>
@@ -267,7 +267,7 @@ export function TasksWorkspace() {
               );
             })}
           </div>
-          <Button variant="ghost" size="icon" onClick={() => refresh.mutate()} disabled={refresh.isPending} title="Atualizar tarefas automáticas">
+          <Button variant="ghost" size="icon" onClick={() => refresh.mutate()} disabled={user?.isDemo || refresh.isPending} title="Atualizar tarefas automáticas">
             <RefreshCw className={cn('h-4 w-4', refresh.isPending && 'animate-spin')} />
           </Button>
         </div>
@@ -300,7 +300,7 @@ export function TasksWorkspace() {
       {data && view === 'list' && <TaskListView tasks={data.tasks} onOpen={openTask} />}
       {data && view === 'calendar' && <TaskCalendarView tasks={data.tasks} onOpen={openTask} />}
       {data && view === 'timeline' && <TaskTimelineView tasks={data.tasks} onOpen={openTask} />}
-      {data && view === 'wiki' && <TaskWikiView board={data.board} tasks={data.tasks} saving={saveWiki.isPending} onSave={(content) => saveWiki.mutate(content)} onOpen={openTask} />}
+      {data && view === 'wiki' && <fieldset disabled={user?.isDemo}><TaskWikiView board={data.board} tasks={data.tasks} saving={saveWiki.isPending} onSave={(content) => saveWiki.mutate(content)} onOpen={openTask} /></fieldset>}
 
       <CreateTaskDialog
         open={createOpen}
