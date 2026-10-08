@@ -576,3 +576,32 @@ Entre 2026-07-02 e 2026-08-05 (sem deploy confirmado):
 Esses itens sao contexto funcional. Antes de alterar um modulo, conferir o
 historico recente e os diffs locais, pois pode haver trabalho ainda nao
 publicado.
+
+
+## Retomada após travamento — foco BSC / demo (2026-10-07)
+
+- Implementação local concluída; publicação e seed fictício em produção
+  autorizados explicitamente pelo usuário. Execução em andamento.
+  Detalhes, escopo e evidências: `docs/FOCO_BSC_DEMO.md`.
+- Menu de negócio focado em Meu Dia, Tarefas, Gestão à Vista e Gestão de Prêmio.
+  Módulos restantes preservados em fonte e suspensos pelo registro central
+  `packages/shared/src/product-scope.json`. Infraestrutura administrativa fica.
+- Home com acesso público à demo; conta reservada somente leitura, sem senha
+  pública nem refresh compartilhado, restrita à Empresa Demonstração fictícia.
+- Seed dedicado `apps/api/prisma/seed-focused-demo.ts` executado SOMENTE no
+  Postgres local de desenvolvimento. Não usar seed geral para publicar a demo.
+  OK específico recebido; confirmar alvo e backup antes de executar em produção.
+- Builds executados sequencialmente (API heap 4096 MB, Web heap 3584 MB / um
+  worker), evitando watchers concorrentes. Cópia temporária de build Web não
+  modifica fontes, protegendo contra novo travamento durante compilação.
+- Após queda, conferir primeiro listeners 3000/3333 e memória; não iniciar
+  outro `pnpm dev` se os servidores compilados já estiverem rodando.
+- Web compilado local pode iniciar com
+  `HOSTNAME=127.0.0.1 PORT=3000 node apps/web/.next/standalone/apps/web/server.js`.
+  API focada: após build e `node scripts/package-focused-api.cjs`, executar
+  `node dist-active/src/main.js` dentro de `apps/api` (usa o .env local).
+- Validação: API 871 testes da suíte completa + 1 teste novo separado; Web 75;
+  Chromium 9 E2E; builds e Prisma validate aprovados. Reexecução do seed compilado
+  preservou integralmente as 406 tabelas com companyId fora da demo.
+- Alterações anteriores de CI/migrations, tenant-host e controller público foram
+  preservadas. Revisar o diff e obter OK explícito antes de qualquer publicação.
