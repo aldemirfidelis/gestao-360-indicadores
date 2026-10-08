@@ -135,6 +135,36 @@ collabora.gestao360.org {
 }
 
 # =====================================================
+# ZapFácil — outro produto no mesmo droplet (/opt/zapfacil)
+# =====================================================
+# - DNS (HostGator): registros A zapfacil.net e www.zapfacil.net -> IP do droplet
+# - O frontend do ZapFácil (Nginx :8080) entra nesta rede como "zapfacil-web"
+#   (docker-compose.proxy.yml do ZapFácil) e encaminha /api para a API dele.
+www.zapfacil.net {
+    redir https://zapfacil.net{uri} permanent
+}
+
+zapfacil.net {
+    # Mídia de cabeçalho dos templates (o Nginx do ZapFácil aceita até 110 MB)
+    request_body {
+        max_size 110MB
+    }
+
+    encode zstd gzip
+
+    log {
+        output stdout
+        format console
+    }
+
+    reverse_proxy zapfacil-web:8080 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# =====================================================
 # Exemplo com dominio (descomente quando aplicavel)
 # =====================================================
 # gestao.suaempresa.com.br {
