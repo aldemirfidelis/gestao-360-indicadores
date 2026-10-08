@@ -14,6 +14,7 @@ import { findRoutePermissions } from '@/components/shell/navigation';
 import { Vision360Provider } from '@/components/ui/vision360-context';
 import { Vision360Sidebar } from '@/components/ui/vision360-sidebar';
 import { HelpBotFloatingButton } from '@/components/help-bot/help-bot-floating-button';
+import { DemoContactCard } from '@/components/shell/demo-contact-card';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -62,7 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <MobileNav />
             <Vision360Sidebar />
-            {!user.isDemo && <HelpBotFloatingButton />}
+            {user.isDemo ? <DemoContactCard /> : <HelpBotFloatingButton />}
           </div>
         </Vision360Provider>
   );

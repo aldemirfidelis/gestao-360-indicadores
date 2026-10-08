@@ -39,3 +39,11 @@ export function whatsappLink(phone?: string | null, message?: string): string | 
   const text = message?.trim() ? `?text=${encodeURIComponent(message.trim())}` : '';
   return `https://wa.me/${number}${text}`;
 }
+
+/** Telefone em formato de leitura: `5564981009108` → `(64) 98100-9108`. */
+export function formatWhatsappNumber(phone?: string | null): string | null {
+  const number = normalizeWhatsappNumber(phone);
+  if (!number) return null;
+  const brazilian = number.match(/^55(\d{2})(\d{4,5})(\d{4})$/);
+  return brazilian ? `(${brazilian[1]}) ${brazilian[2]}-${brazilian[3]}` : `+${number}`;
+}

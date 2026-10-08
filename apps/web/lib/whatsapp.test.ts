@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeWhatsappNumber, whatsappLink } from './whatsapp';
+import { formatWhatsappNumber, normalizeWhatsappNumber, whatsappLink } from './whatsapp';
 
 describe('normalizeWhatsappNumber', () => {
   it('celular com DDD (11 dígitos) recebe o DDI do Brasil', () => {
@@ -51,5 +51,20 @@ describe('whatsappLink', () => {
 
   it('telefone inválido não gera link', () => {
     expect(whatsappLink('123')).toBeNull();
+  });
+});
+
+describe('formatWhatsappNumber', () => {
+  it('formata celular e fixo brasileiros com DDD', () => {
+    expect(formatWhatsappNumber('5564981009108')).toBe('(64) 98100-9108');
+    expect(formatWhatsappNumber('6432112233')).toBe('(64) 3211-2233');
+  });
+
+  it('número de outro país fica com DDI', () => {
+    expect(formatWhatsappNumber('351912345678')).toBe('+351912345678');
+  });
+
+  it('telefone inválido não gera texto', () => {
+    expect(formatWhatsappNumber('123')).toBeNull();
   });
 });
