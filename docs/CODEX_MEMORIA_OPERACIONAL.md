@@ -580,17 +580,17 @@ publicado.
 
 ## Retomada após travamento — foco BSC / demo (2026-10-07)
 
-- Implementação local concluída; publicação e seed fictício em produção
-  autorizados explicitamente pelo usuário. Execução em andamento.
+- Implementação, commit, push, deploy e seed fictício em produção concluídos
+  com autorização explícita do usuário em 2026-10-07 (BRT).
   Detalhes, escopo e evidências: `docs/FOCO_BSC_DEMO.md`.
 - Menu de negócio focado em Meu Dia, Tarefas, Gestão à Vista e Gestão de Prêmio.
   Módulos restantes preservados em fonte e suspensos pelo registro central
   `packages/shared/src/product-scope.json`. Infraestrutura administrativa fica.
 - Home com acesso público à demo; conta reservada somente leitura, sem senha
   pública nem refresh compartilhado, restrita à Empresa Demonstração fictícia.
-- Seed dedicado `apps/api/prisma/seed-focused-demo.ts` executado SOMENTE no
-  Postgres local de desenvolvimento. Não usar seed geral para publicar a demo.
-  OK específico recebido; confirmar alvo e backup antes de executar em produção.
+- Seed dedicado `apps/api/prisma/seed-focused-demo.ts` executado no Postgres de
+  desenvolvimento e no Postgres local do droplet confirmado, com backup prévio.
+  Não usar seed geral para publicar a demo nem repetir em outro alvo sem revisão.
 - Builds executados sequencialmente (API heap 4096 MB, Web heap 3584 MB / um
   worker), evitando watchers concorrentes. Cópia temporária de build Web não
   modifica fontes, protegendo contra novo travamento durante compilação.
@@ -605,3 +605,30 @@ publicado.
   preservou integralmente as 406 tabelas com companyId fora da demo.
 - Alterações anteriores de CI/migrations, tenant-host e controller público foram
   preservadas. Revisar o diff e obter OK explícito antes de qualquer publicação.
+
+### Publicação confirmada desta retomada
+
+- Imagens API/Web em produção: `0.1.0+b7ab4ecd`; Caddyfile adicional `423aa83`
+  aplicado separadamente. Commits enviados para `origin/main`.
+- API/Web/Postgres saudáveis, Caddy ativo, Collabora suspenso. 152 migrations
+  aplicadas; nenhuma alteração de schema ou exclusão de dados.
+- Backup protegido no droplet:
+  `/opt/gestao-360-indicadores/db-backups/pre-focus-20261007/g360-20261008-002632.dump`.
+  Validado com pg_restore, sem exportar dados reais para desenvolvimento.
+  Tags de recuperação: `g360-api:rollback-c8fbd5a-20261007` e Web equivalente.
+- Empresa Demo: `36090c9d-47a9-4afa-8327-963affe6def3`, slug `demonstracao`.
+  Conta `visitante@demonstracao.local`, perfil `DEMO_PUBLIC`, somente consulta.
+  32 indicadores, 384 resultados, BSC, ações, projetos, reuniões, tarefas e
+  3 competências / 9 espelhos fictícios de prêmio confirmados.
+- Auditoria do seed: 406 tabelas com companyId fora da demo e Company preservadas
+  por contagem/hash. Acesso público acrescenta auditoria global de login normal.
+  E2E de produção: 22 rotas, 4 escritas bloqueadas, 11 rotas suspensas 404,
+  zero erros JS/GET; mobile sem overflow. Home/health 200 e www HTTPS 301.
+- Empacotamento Web deve preservar symlinks relativos (`verbatimSymlinks`),
+  validar portabilidade e imports na imagem isolada; testes adicionais (3) passaram.
+  Não basta smoke dentro do monorepo, onde node_modules externos podem mascarar
+  falta de dependência. O primeiro deploy foi recuperado antes desta correção.
+- Ao atualizar deploy.sh, puxar o Git antes de iniciar o script. O deploy novo
+  aguarda containers saudáveis e recupera imagens pelos IDs anteriores.
+- Ao alterar Caddyfile, validar e garantir que o bind mount não conserva o inode
+  antigo. Nesta publicação foi recriado apenas Caddy; certificados/volumes mantidos.
