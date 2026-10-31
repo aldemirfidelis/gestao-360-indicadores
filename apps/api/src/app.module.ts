@@ -56,6 +56,7 @@ import { PrizeModule } from './modules/prize/prize.module';
 import { MonthlyResultsModule } from './modules/monthly-results/monthly-results.module';
 import { StorageModule } from './storage/storage.module';
 import { PublicModule } from './modules/public/public.module';
+import { SiteAnalyticsModule } from './modules/site-analytics/site-analytics.module';
 import { FocusMaintenanceModule } from './jobs/focus-maintenance.module';
 import { ProfileInfrastructureModule } from './modules/communication/profile-infrastructure.module';
 import { parkedProductModules } from './parked-product-modules';
@@ -113,6 +114,8 @@ import { CompanyAdminModule } from './modules/company-admin/company-admin.module
     MonthlyResultsModule,
     StorageModule,
     PublicModule,
+    // Visitantes do site e da demonstração (coleta pública + rotinas de localização e retenção).
+    SiteAnalyticsModule,
     CompanyAdminModule,
     // Rotinas de manutenção in-process (vencimento de documentos, alertas):
     // sempre ativas, sem dependência de Redis.

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/components/auth/auth-provider';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { DEMO_PATH } from '@/lib/public-site';
+import { track } from '@/lib/site-analytics';
 
 type DemoLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'onClick'> & {
   children: ReactNode;
@@ -23,6 +24,7 @@ export function DemoLink({ children, href = DEMO_PATH, source = 'site_cta', ...p
   if (pathname === href.split('?')[0]) return null;
 
   function trackDemoAccess() {
+    track('demo_click', source);
     const payload = {
       event: 'demo_access_click',
       page: window.location.pathname,

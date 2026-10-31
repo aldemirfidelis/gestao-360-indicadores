@@ -11,6 +11,7 @@ import {
   defaultLandingFor,
 } from '@/components/shell/navigation';
 import { authPublicRoutes } from '@/lib/public-site';
+import { track } from '@/lib/site-analytics';
 
 
 export interface AuthUser {
@@ -131,7 +132,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loginDemo = async () => {
-    const out = await api<{ accessToken: string; refreshToken: string; user: AuthUser }>('/auth/demo', { method: 'POST' });
+    let out: { accessToken: string; refreshToken: string; user: AuthUser };
+    try {
+      out = await api<{ accessToken: string; refreshToken: string; user: AuthUser }>('/auth/demo', { method: 'POST' });
+    } catch (err) {
+      track('demo_error', err instanceof Error ? err.message : 'Falha ao abrir a demonstração');
+      throw err;
+    }
+    // Ainda na página pública: a visita registra a entrada antes de virar sessão da demo.
+    track('demo_start');
     queryClient.clear();
     clearTokens(); // Não herdar o refresh token de uma sessão administrativa.
     setTokens(out.accessToken, out.refreshToken);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { internalApiBaseUrl as apiBaseUrl } from '@/lib/internal-api';
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function responseMessage(status: number): string {
   if (status === 429) return 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente novamente.';
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: 'Preencha os campos obrigatórios e aceite a política de privacidade.' }, { status: 400 });
   }
 
+  const siteVisitId = typeof data.siteVisitId === 'string' && uuidRegex.test(data.siteVisitId) ? data.siteVisitId : undefined;
   const payload = {
     name,
     company,
@@ -53,6 +55,7 @@ export async function POST(req: NextRequest) {
     message,
     privacy,
     website: '',
+    siteVisitId,
   };
 
   try {

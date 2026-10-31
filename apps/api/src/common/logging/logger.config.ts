@@ -32,7 +32,7 @@ export const loggerParams: Params = {
     autoLogging: {
       ignore: (req: IncomingMessage) => {
         const url = req.url ?? '';
-        return url.includes('/health') || url.includes('/wopi') || req.method === 'OPTIONS';
+        return url.includes('/health') || url.includes('/wopi') || url.includes('/public/site-events') || req.method === 'OPTIONS';
       },
     },
     redact: { paths: PINO_REDACT_PATHS, censor: '[redacted]' },

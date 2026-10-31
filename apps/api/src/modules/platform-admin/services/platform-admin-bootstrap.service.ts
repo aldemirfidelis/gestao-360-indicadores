@@ -41,10 +41,34 @@ export class PlatformAdminBootstrapService implements OnApplicationBootstrap {
 
   /** Catalogo de permissoes internas (reference data) — sempre reconciliado. */
   private async ensurePermissions(): Promise<void> {
+    const before = await this.prisma.platformAdminPermission.findMany({ select: { key: true } });
+    const known = new Set(before.map((permission) => permission.key));
     await this.prisma.platformAdminPermission.createMany({
       data: PLATFORM_PERMISSIONS.map(([key, description, group, action]) => ({ key, description, group, action })),
       skipDuplicates: true,
     });
+    const added = PLATFORM_PERMISSIONS.map(([key]) => key).filter((key) => !known.has(key));
+    if (known.size > 0 && added.length > 0) await this.grantNewPermissionsToSystemRoles(added);
+  }
+
+  /**
+   * Permissao que acabou de entrar no catalogo vai para os papeis de sistema ja
+   * existentes que a recebem no catalogo. So no momento em que ela nasce: o que a
+   * administracao tirou de um papel depois disso continua fora.
+   */
+  private async grantNewPermissionsToSystemRoles(keys: string[]): Promise<void> {
+    const permissions = await this.prisma.platformAdminPermission.findMany({ where: { key: { in: keys } }, select: { id: true, key: true } });
+    const idByKey = new Map(permissions.map((permission) => [permission.key, permission.id]));
+    for (const role of PLATFORM_ROLES) {
+      const granted = (role.permissions as readonly string[]).filter((key) => idByKey.has(key));
+      if (granted.length === 0) continue;
+      const existing = await this.prisma.platformAdminRole.findUnique({ where: { code: role.code } });
+      if (!existing?.system) continue;
+      await this.prisma.platformAdminRolePermission.createMany({
+        data: granted.map((key) => ({ roleId: existing.id, permissionId: idByKey.get(key)! })),
+        skipDuplicates: true,
+      });
+    }
   }
 
   /**

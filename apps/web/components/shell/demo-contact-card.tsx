@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/recruitment/whatsapp-button';
 import { WHATSAPP_NUMBER, WHATSAPP_URL } from '@/lib/public-site';
 import { formatWhatsappNumber } from '@/lib/whatsapp';
+import { track } from '@/lib/site-analytics';
 import { cn } from '@/lib/utils';
 
 const STORAGE_KEY = 'g360.demoContactCardClosed';
@@ -21,6 +22,7 @@ function readCollapsed() {
 }
 
 function trackWhatsAppClick(cta: string) {
+  track('whatsapp_click', cta);
   const payload = { event: 'whatsapp_contact_click', page: window.location.pathname, clickedAt: new Date().toISOString(), cta };
   (window as any).dataLayer = (window as any).dataLayer || [];
   (window as any).dataLayer.push(payload);

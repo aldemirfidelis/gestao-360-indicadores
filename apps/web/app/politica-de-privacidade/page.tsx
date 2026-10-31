@@ -26,6 +26,7 @@ const sections: LegalSection[] = [
       'Dados informados em formulários: nome, empresa, cargo, e-mail, telefone, assunto e mensagem.',
       'Dados de conta e uso: identificação do usuário, organização, permissões, registros de autenticação, ações realizadas e conteúdo corporativo autorizado.',
       'Dados técnicos: endereço IP, data e hora, navegador, dispositivo, páginas acessadas, registros de erro e eventos de segurança.',
+      'Estatísticas de visitas ao site e à demonstração, sem login: endereço IP, cidade e estado aproximados a partir do IP, tipo de aparelho, navegador e sistema, idioma, tamanho da tela, site de origem e parâmetros de campanha do link, data e hora, tempo na página, até onde a página inicial foi rolada, páginas abertas no site e na demonstração e botões clicados, nunca o que é digitado. O navegador guarda um identificador aleatório, sem nome nem e-mail, para separar uma visita da outra. Quem está logado na plataforma não é contado.',
       'Preferências armazenadas no navegador e métricas de navegação, quando os respectivos recursos estiverem habilitados.',
     ],
   },
@@ -35,6 +36,7 @@ const sections: LegalSection[] = [
       'Responder a solicitações de suporte, contato, demonstração e trial e realizar procedimentos relacionados a uma possível contratação.',
       'Autenticar usuários, fornecer funcionalidades, cumprir o contrato e administrar permissões e ambientes.',
       'Proteger contas, prevenir fraude, investigar incidentes e manter trilhas de auditoria com base em segurança e interesse legítimo.',
+      'Entender de onde vêm os visitantes e melhorar o site e a demonstração, com base no interesse legítimo. A localização é calculada nos nossos servidores, com uma base de dados própria, sem enviar o IP a terceiros. Quando você envia um formulário, a mensagem fica associada à visita em que foi enviada.',
       'Cumprir obrigações legais ou regulatórias e exercer direitos em processos administrativos, arbitrais ou judiciais.',
       'Enviar comunicações autorizadas ou usar tecnologias que exijam consentimento, quando essa for a base aplicável e houver possibilidade de revogação.',
     ],
@@ -50,6 +52,7 @@ const sections: LegalSection[] = [
     title: '5. Cookies, armazenamento local e analytics',
     paragraphs: [
       'Cookies e armazenamento local podem ser usados para autenticação, segurança, preferências e funcionamento da interface. Ferramentas de analytics só são carregadas quando configuradas e devem evitar o envio desnecessário de dados pessoais.',
+      'O armazenamento local do navegador também guarda o identificador aleatório das estatísticas de visitas descritas no item 2, que ficam só com o Gestão 360.',
       'Configurações do navegador podem bloquear ou remover cookies, mas isso pode impedir o funcionamento de recursos essenciais, especialmente autenticação.',
     ],
   },
@@ -63,6 +66,7 @@ const sections: LegalSection[] = [
     title: '7. Retenção e descarte',
     paragraphs: [
       'Os dados são mantidos pelo tempo necessário para atender às finalidades informadas, executar contratos, preservar segurança e auditoria, cumprir obrigações legais e exercer direitos. Depois disso, são eliminados ou anonimizados, salvo quando a conservação for autorizada ou exigida por lei.',
+      'As estatísticas de visitas ao site e à demonstração são apagadas automaticamente após 12 meses.',
     ],
   },
   {
@@ -97,7 +101,7 @@ export default function PrivacyPage() {
     <PublicShell>
       <JsonLd data={[webPageJsonLd({ title: 'Política de privacidade', description: metadata.description as string, path: '/politica-de-privacidade' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Política de privacidade', path: '/politica-de-privacidade' }])]} />
       <PageHero eyebrow="Privacidade" title="Política de Privacidade do Gestão 360." description="Como coletamos, usamos, compartilhamos, protegemos e eliminamos dados pessoais no site e na plataforma." />
-      <LegalDocument version="1.0" updatedAt="28 de junho de 2026" sections={sections} />
+      <LegalDocument version="1.1" updatedAt="31 de outubro de 2026" sections={sections} />
     </PublicShell>
   );
 }

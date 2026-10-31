@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
+import { currentVisitId, track } from '@/lib/site-analytics';
 
 const generalRequestTypes = ['Comercial', 'Suporte', 'SAC', 'Demonstração', 'Parceria', 'Outros'];
 const supportRequestTypes = ['Suporte técnico', 'Dúvida de acesso', 'SAC', 'LGPD e privacidade'];
@@ -57,7 +58,8 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
       const res = await fetch('/contato/enviar', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
+        // A visita do site liga a mensagem ao caminho da pessoa (Portal Admin › Visitantes do Site).
+        body: JSON.stringify({ ...payload, siteVisitId: currentVisitId() }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? 'Falha ao enviar mensagem.');
@@ -70,6 +72,7 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
             : 'Mensagem enviada. A equipe do Gestão 360 retornará pelo canal informado.',
       );
       formRef.current?.reset();
+      track('form_submit', String(payload.requestType ?? ''));
       (window as any).dataLayer = (window as any).dataLayer || [];
       (window as any).dataLayer.push({
         event: 'contact_form_submit',

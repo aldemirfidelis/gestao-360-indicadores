@@ -70,8 +70,13 @@ As permissoes seguem o padrao solicitado, por exemplo:
 - `platform.feature_flags.manage`
 - `platform.maintenance.manage`
 - `platform.internal_users.manage`
+- `platform.site_analytics.view` (Visitantes do Site: tem IP e localizacao, fica so com `PLATFORM_OWNER` e `SUPER_ADMIN`)
 
 O wildcard `platform.*` existe apenas para `PLATFORM_OWNER`.
+
+Permissao nova no catalogo entra, no boot em que nasce, nos papeis de sistema ja existentes que a
+recebem no catalogo (`PlatformAdminBootstrapService`); o que a administracao tirar de um papel depois
+disso continua fora.
 
 ## Bloqueio real de modulos
 

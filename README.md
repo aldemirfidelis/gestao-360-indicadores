@@ -168,6 +168,7 @@ Guia mantido apenas como referencia historica. Veja **[DEPLOY.md](./DEPLOY.md)**
 | `insights` | `GET /insights` | Heuristicas locais: resumo executivo, tendencia, sugestoes |
 | `traceability` | `/traceability`, `/traceability/indicators/:id` | Linha de rastreabilidade e historico completo do indicador |
 | `search` | `/search?q=...` | Busca global entre indicadores, estrutura, acoes, desvios, reunioes, usuarios e objetivos |
+| `site-analytics` | `POST /public/site-events`, `GET /platform-admin/site-analytics/*` | Visitantes do site e da demonstracao (coleta publica + painel do Portal Admin Global) |
 | `health` | `GET /health` | Health check sem auth |
 
 ### Frontend (apps/web)
@@ -204,6 +205,27 @@ Guia mantido apenas como referencia historica. Veja **[DEPLOY.md](./DEPLOY.md)**
 - **Sidebar accordion** com grupos de Visualizacoes, Lancamentos, Gestao e Relatorios, filtrada por permissoes e com Configuracoes separadas no rodape por engrenagem
 - **Topbar** com busca, **sino de notificacoes** com contador, toggle de tema, perfil
 - **NotificationsBell** com dialog + endpoint `POST /notifications/generate` para rodar regras de alerta sob demanda
+
+### Visitantes do site e da demonstracao
+
+Portal Admin Global › **Visitantes do Site** (Platform Owner e Super Admin, permissao
+`platform.site_analytics.view`): visitantes unicos e visitas por dia, funil do acesso a demonstracao
+(entrou no site → se interessou → clicou em "Acesse a Demonstracao" → entrou → navegou), areas e
+paginas abertas na demo, tempo na demo, botoes que levaram a ela, quem nao abriu a demo (ultima secao
+vista, rolagem, tempo), paginas do site mais vistas, cliques em Entrar/trial/WhatsApp e formularios,
+origem (Google, LinkedIn, Instagram, WhatsApp, UTM, outros sites), pagina de entrada, estado, cidade,
+pais, aparelho, navegador, sistema, mapa de dias e horarios e a lista de visitas com IP, local, filtros
+e a linha do tempo de cada uma (inclusive o formulario de contato enviado na visita).
+
+Coleta propria (`POST /api/public/site-events`, sem login, limitada por IP, fora da auditoria e do log
+de requisicoes): id aleatorio do navegador, visita nova apos 30 min parado, eventos em lote por fetch
+keepalive/sendBeacon (`apps/web/lib/site-analytics.ts`, montado em `components/providers.tsx`). Quem esta
+logado no sistema (exceto a sessao da demo) ou no Portal Admin e os robos ficam fora dos numeros; nada vai
+para ferramentas de terceiros. O formulario de contato fica ligado a visita (`PublicContactMessage.siteVisitId`).
+Cidade e estado saem do IP por uma base local gratuita (DB-IP Lite, CC BY 4.0) que a API baixa e renova todo
+mes em `storage/geoip` (volume `g360_storage`, ~130 MB; `GEOIP_STORAGE_PATH` muda o lugar); sem acesso a
+internet, as visitas ficam "Localizando…". Rotinas in-process: localizacao a cada 5 min e retencao de 12 meses
+uma vez por dia (desligadas junto com as demais por `MAINTENANCE_JOBS_ENABLED=false`).
 
 ---
 

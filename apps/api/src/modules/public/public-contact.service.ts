@@ -1,4 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { swallow } from '../../common/logging/swallow';
 import { buildTransport, resolveSmtpConfig, smtpFrom } from '../../common/smtp';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PublicContactDto, PublicContactRequestType } from './public-contact.dto';
@@ -59,6 +60,7 @@ export class PublicContactService {
           phone: phone || null,
           requestType: input.requestType,
           message,
+          siteVisitId: input.siteVisitId ?? null,
         },
       });
       this.logger.log(`Mensagem de contato de ${email} persistida com sucesso.`);
@@ -72,6 +74,13 @@ export class PublicContactService {
         'Falha ao persistir mensagem de contato no banco de dados.',
       );
       throw new ServiceUnavailableException('Não foi possível registrar a mensagem.');
+    }
+
+    // Visitantes do site: a visita conta como contato. Falha aqui nunca derruba o formulário.
+    if (input.siteVisitId) {
+      await this.prisma.siteVisit
+        .updateMany({ where: { id: input.siteVisitId, formAt: null }, data: { formAt: new Date() } })
+        .catch(swallow(undefined, 'publicContact.markSiteVisit'));
     }
 
     // A gravação no inbox do Portal Global é a confirmação da submissão. O e-mail

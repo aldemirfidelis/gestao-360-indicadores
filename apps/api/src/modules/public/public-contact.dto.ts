@@ -4,6 +4,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -66,4 +67,9 @@ export class PublicContactDto {
   @IsString()
   @MaxLength(200)
   website?: string;
+
+  /** Visita do site em que o formulário foi enviado (Portal Admin › Visitantes do Site). */
+  @IsOptional()
+  @IsUUID()
+  siteVisitId?: string;
 }

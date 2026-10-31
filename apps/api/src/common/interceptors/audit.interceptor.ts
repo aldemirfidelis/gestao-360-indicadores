@@ -30,11 +30,14 @@ export class AuditInterceptor implements NestInterceptor {
       this.reflector.getAllAndOverride<boolean>(SENSITIVE_BODY_KEY, [context.getHandler(), context.getClass()]) ?? false;
     // /api/wopi: chamadas do servidor Collabora (lock/save). Tem auditoria
     // propria (EDITOR_SAVE) e corpo binario que nao deve ser serializado aqui.
+    // /api/public/site-events: estatisticas de visitas, enviadas a cada poucos
+    // segundos por visitante; ja ficam na propria tabela de visitas.
     if (
       !action ||
       req.path?.includes('/api/health') ||
       req.path?.includes('/api/auth/refresh') ||
-      req.path?.includes('/api/wopi')
+      req.path?.includes('/api/wopi') ||
+      req.path?.includes('/api/public/site-events')
     ) {
       return next.handle();
     }

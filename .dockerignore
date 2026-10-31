@@ -57,6 +57,9 @@ docker-compose.yml
 *.db
 *.sqlite
 
+# Dados locais da API (GED, base de localizacao por IP): vivem no volume, nunca na imagem
+apps/api/storage
+
 # Pacotes focados gerados localmente
 **/dist-active
 **/public-active

@@ -632,3 +632,49 @@ publicado.
   aguarda containers saudáveis e recupera imagens pelos IDs anteriores.
 - Ao alterar Caddyfile, validar e garantir que o bind mount não conserva o inode
   antigo. Nesta publicação foi recriado apenas Caddy; certificados/volumes mantidos.
+
+## Visitantes do site e da demonstração (2026-10-31)
+
+Pedido do usuário: o mesmo sistema de visitantes do ZapFácil (commit `2555618`
+daquele repositório), adaptado à landing e à demonstração. Commit e push em
+`main` autorizados pelo usuário em 2026-10-31. **Deploy ainda não feito**:
+exige OK próprio e backup antes, por causa da migration nova.
+
+- Portal Admin Global › **Visitantes do Site** (`platform.site_analytics.view`,
+  só Platform Owner e Super Admin). Detalhes de produto no `README.md`.
+- Migration nova e aditiva `20261031120000_site_visits`: tabelas `SiteVisit` e
+  `SiteEvent` e coluna `PublicContactMessage.siteVisitId`. Backup antes do deploy,
+  como em toda migration nova.
+- A API baixa todo mês a base DB-IP Lite
+  (`https://download.db-ip.com/free/dbip-city-lite-AAAA-MM.mmdb.gz`, ~60 MB) para
+  `storage/geoip` no volume `g360_storage` (~130 MB em disco). Precisa de saída
+  HTTPS no container; sem ela as visitas ficam "Localizando…". Leitor `.mmdb`
+  próprio (`mmdb-reader.ts`), sem dependência nova no lockfile.
+- Coleta em `POST /api/public/site-events`: fora do `AuditInterceptor` e do log de
+  requisições do pino. Rotinas in-process (localização a cada 5 min, retenção de
+  12 meses), desligadas com `MAINTENANCE_JOBS_ENABLED=false`.
+- No primeiro boot, o bootstrap liga a permissão nova ao papel `SUPER_ADMIN` já
+  existente; o `PLATFORM_OWNER` tem acesso pelo curinga `platform.*`.
+- Para testar a contagem: navegador com sessão do Portal Admin (ou logado no
+  sistema) não é contado; usar janela anônima ou outro navegador.
+- Datas passadas a SQL bruto do Prisma vão como `timestamptz` e o Postgres as
+  converte pelo fuso da sessão; com o banco fora de UTC o período e os
+  `LEAST`/`GREATEST` deslocavam horas. O serviço converte toda data para UTC
+  (`utc()` em `site-analytics.service.ts`). A produção roda em UTC, mas o código
+  não depende mais disso.
+- Validação em 2026-10-31, numa máquina Windows (`E:\Projetos\gestao-360-indicadores`)
+  que não tinha Node, pnpm nem Docker: Node 24.22.2 portátil instalado em
+  `%LOCALAPPDATA%\Programs\node-v24.22.2-win-x64` e pnpm 9.7.0 via corepack.
+  Gate aprovado: `prisma validate`, `tsc` de API e web, API 126 arquivos / 898
+  testes, web 12 / 90, shared 3 / 17, `nest build` e empacotamento focado da API
+  (332 arquivos). As 153 migrations aplicaram do zero num Postgres 17 embutido
+  (pacote npm `embedded-postgres`, UTF-8), o `prisma migrate diff` não mostrou
+  diferença nas tabelas novas e o serviço rodou contra esse banco (coleta,
+  painel, lista, detalhe, localização e retenção), com a sessão em
+  `America/Sao_Paulo`. E2E não rodados.
+- Build web no Windows: `scripts/build-focused-web.cjs` falha com `EPERM` ao
+  copiar os links do `node_modules` (sem Modo de Desenvolvedor). A validação usou
+  uma cópia temporária com junction no `node_modules`, que gerou as 107 páginas.
+  O `outputFileTracingRoot` feito com `new URL().pathname` vira `/E:/...` no
+  Windows e a saída standalone escapa para `apps/Projetos/...`, que precisa ser
+  apagado depois. Nada disso acontece no Linux nem no Docker.

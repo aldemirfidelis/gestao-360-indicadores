@@ -10,8 +10,10 @@ import { LgpdModule } from '../lgpd/lgpd.module';
 import { OrgNodesModule } from '../orgnodes/orgnodes.module';
 import { PortalAdminModule } from '../portal-admin/portal-admin.module';
 import { PrizeModule } from '../prize/prize.module';
+import { SiteAnalyticsModule } from '../site-analytics/site-analytics.module';
 import { UsersModule } from '../users/users.module';
 import { PlatformAdminController } from './platform-admin.controller';
+import { PlatformSiteAnalyticsController } from './platform-site-analytics.controller';
 import {
   PlatformAdminLegacyAccessController,
   PlatformAdminLegacyCompanyAuditController,
@@ -44,10 +46,12 @@ import { PlatformEmailService } from './services/platform-email.service';
     OrgNodesModule,
     PortalAdminModule,
     PrizeModule,
+    SiteAnalyticsModule,
     UsersModule,
   ],
   controllers: [
     PlatformAdminController,
+    PlatformSiteAnalyticsController,
     PlatformAdminLegacySettingsController,
     PlatformAdminLegacyDatabaseController,
     PlatformAdminLegacyPortalController,

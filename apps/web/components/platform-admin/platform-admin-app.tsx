@@ -20,6 +20,7 @@ import {
   ListChecks,
   LogOut,
   Mail,
+  MousePointerClick,
   Network,
   PackageCheck,
   Pencil,
@@ -46,6 +47,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { dbAdminNav, DB_ADMIN_BASE } from '@/components/database-admin/nav';
+import { SiteVisitorsSection } from '@/components/platform-admin/site-visitors-section';
 import { cn } from '@/lib/utils';
 import {
   clearPlatformAdminTokens,
@@ -90,6 +92,7 @@ type SectionKey =
   | 'portalAdmin'
   | 'email'
   | 'seoPresence'
+  | 'siteVisitors'
   | 'companyAudit'
   | 'companies'
   | 'modules'
@@ -245,6 +248,7 @@ const SECTIONS: SectionItem[] = [
   { key: 'modules', label: 'Matriz de Módulos', icon: PackageCheck, group: 'Plataforma' },
   { key: 'plans', label: 'Planos', icon: ListChecks, group: 'Plataforma' },
   { key: 'seoPresence', label: 'SEO e Presenca Digital', icon: Globe2, group: 'Plataforma' },
+  { key: 'siteVisitors', label: 'Visitantes do Site', icon: MousePointerClick, group: 'Plataforma' },
   { key: 'inbox', label: 'HelpDesk e Caixa de Entrada', icon: Inbox, group: 'Plataforma' },
   { key: 'security', label: 'Seguranca e Suporte', icon: ShieldCheck, group: 'Plataforma' },
   // Operam sobre a empresa selecionada no seletor do topo.
@@ -720,6 +724,7 @@ export function PlatformAdminApp() {
           {section === 'modules' && <ModulesSection />}
           {section === 'plans' && <PlansSection />}
           {section === 'seoPresence' && <SeoPresenceSection />}
+          {section === 'siteVisitors' && <SiteVisitorsSection />}
           {section === 'inbox' && <InboxSection />}
           {section === 'users' && <UsersManagementSection />}
           {section === 'security' && <SecuritySection />}

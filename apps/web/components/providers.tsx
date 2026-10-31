@@ -8,6 +8,7 @@ import { AuthProvider } from '@/components/auth/auth-provider';
 import { PortalConfigProvider } from '@/components/portal-admin/portal-config-provider';
 import { CompanyBrandingProvider } from '@/components/brand/company-branding-provider';
 import { PwaManager } from '@/components/pwa/pwa-manager';
+import { SiteTracker } from '@/components/marketing/site-tracker';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [qc] = useState(
@@ -27,6 +28,7 @@ export function Providers({ children }: { children: ReactNode }) {
               {children}
               <Toaster position="top-right" richColors />
               <PwaManager />
+              <SiteTracker />
             </CompanyBrandingProvider>
           </PortalConfigProvider>
         </AuthProvider>

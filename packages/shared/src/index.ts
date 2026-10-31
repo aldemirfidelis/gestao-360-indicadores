@@ -4,3 +4,4 @@ export * from './status';
 export * from './traceability';
 export * from './work-item';
 export * from './product-scope';
+export * from './site-analytics';

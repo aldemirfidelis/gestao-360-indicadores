@@ -1,12 +1,14 @@
 'use client';
 import { useState } from 'react';
 import { useAuth } from '@/components/auth/auth-provider';
+import { track } from '@/lib/site-analytics';
 
 export function DemoAccess() {
   const { loginDemo } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function enter() {
+    track('demo_click', 'demo_page');
     setBusy(true); setError('');
     try { await loginDemo(); }
     catch { setError('Não foi possível abrir a demonstração agora. Tente novamente em instantes.'); setBusy(false); }

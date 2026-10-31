@@ -109,4 +109,44 @@ describe('publicContactDestination', () => {
     expect(prismaMocks.createContact).toHaveBeenCalledOnce();
     rejectSend(new Error('Connection timeout'));
   });
+
+  it('liga o formulário à visita do site e marca a visita como contato', async () => {
+    const updateVisit = vi.fn().mockResolvedValue({ count: 1 });
+    const service = new PublicContactService({
+      publicContactMessage: { create: prismaMocks.createContact },
+      siteVisit: { updateMany: updateVisit },
+    } as never);
+    const siteVisitId = '3f2a9c1e-1b2c-4d5e-8f90-123456789abc';
+
+    await service.send({
+      name: 'Pessoa Teste',
+      company: 'Empresa Teste',
+      email: 'pessoa@example.com',
+      requestType: 'Demonstração',
+      message: 'Gostei da demonstração e quero uma proposta.',
+      privacy: 'accepted',
+      siteVisitId,
+    });
+
+    expect(prismaMocks.createContact).toHaveBeenCalledWith({ data: expect.objectContaining({ siteVisitId }) });
+    expect(updateVisit).toHaveBeenCalledWith({ where: { id: siteVisitId, formAt: null }, data: { formAt: expect.any(Date) } });
+  });
+
+  it('a visita do site é opcional e nunca impede o envio', async () => {
+    const service = new PublicContactService({
+      publicContactMessage: { create: prismaMocks.createContact },
+      siteVisit: { updateMany: vi.fn().mockRejectedValue(new Error('tabela indisponível')) },
+    } as never);
+
+    await expect(service.send({
+      name: 'Pessoa Teste',
+      company: 'Empresa Teste',
+      email: 'pessoa@example.com',
+      requestType: 'Comercial',
+      message: 'Preciso de mais informações sobre o portal.',
+      privacy: 'accepted',
+      siteVisitId: '3f2a9c1e-1b2c-4d5e-8f90-123456789abc',
+    })).resolves.toEqual({ ok: true });
+    expect(prismaMocks.createContact).toHaveBeenCalledWith({ data: expect.objectContaining({ siteVisitId: '3f2a9c1e-1b2c-4d5e-8f90-123456789abc' }) });
+  });
 });

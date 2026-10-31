@@ -76,7 +76,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main>{children}</main>
-      <footer className="border-t border-slate-200 bg-slate-950 text-white">
+      <footer id="rodape" className="border-t border-slate-200 bg-slate-950 text-white">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.1fr,2fr] lg:px-8">
           <div>
             <BrandLogo variant="horizontal" size="sm" theme="dark" animated={true} />

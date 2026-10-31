@@ -27,10 +27,12 @@ export const PLATFORM_PERMISSIONS = [
   ['platform.integrations.manage', 'Gerenciar integracoes globais', 'Integracoes', 'manage'],
   ['platform.jobs.manage', 'Visualizar e reprocessar jobs', 'Jobs', 'manage'],
   ['platform.internal_users.manage', 'Gerenciar usuarios internos da plataforma', 'Usuarios Internos', 'manage'],
+  ['platform.site_analytics.view', 'Visualizar visitantes do site e da demonstracao', 'Visitantes do Site', 'view'],
 ] as const;
 
 const ALL = PLATFORM_PERMISSIONS.map(([key]) => key);
-const VIEW_ONLY = ALL.filter((key) => key.endsWith('.view') || key.endsWith('.health') || key.endsWith('.read'));
+// Visitantes do site trazem IP e localização: ficam só com Platform Owner e Super Admin.
+const VIEW_ONLY = ALL.filter((key) => (key.endsWith('.view') || key.endsWith('.health') || key.endsWith('.read')) && key !== 'platform.site_analytics.view');
 
 export const PLATFORM_ROLES = [
   {

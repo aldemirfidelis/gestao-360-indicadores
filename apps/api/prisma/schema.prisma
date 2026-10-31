@@ -12043,11 +12043,99 @@ model PublicContactMessage {
   requestType String
   message     String
   read        Boolean  @default(false)
+  /// Visita do site em que o formulário foi enviado (sem chave estrangeira: a visita expira em 12 meses).
+  siteVisitId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([createdAt])
   @@index([read])
+  @@index([siteVisitId])
+}
+
+/// Visitantes do site e da demonstração (Portal Admin Global): uma linha por visita às
+/// páginas públicas, com origem, localização aproximada pelo IP, rolagem da página inicial,
+/// entrada e navegação na demonstração e contato. Os eventos formam a linha do tempo.
+model SiteVisit {
+  /// Gerado pelo navegador.
+  id               String      @id
+  /// Id aleatório guardado no navegador (sem nome nem e-mail).
+  visitorId        String
+  startedAt        DateTime    @default(now())
+  lastSeenAt       DateTime    @default(now())
+  /// Tempo com a página na tela (aba visível), no site e na demonstração, em milissegundos.
+  activeMs         Int         @default(0)
+  /// Parte de activeMs passada dentro da demonstração.
+  demoMs           Int         @default(0)
+  /// Até onde rolou a página inicial (0 a 100%).
+  maxScrollPct     Int         @default(0)
+  ip               String?
+  /// ISO 3166-1 (BR, US...).
+  country          String?
+  /// UF no Brasil (SP); fora dele, o nome do estado ou província.
+  region           String?
+  city             String?
+  /// Quando a localização foi consultada; null = aguardando a rotina de localização.
+  geoAt            DateTime?
+  userAgent        String?
+  /// desktop | mobile | tablet
+  device           String
+  browser          String?
+  os               String?
+  /// Robô ou navegador automatizado: fica fora dos números do portal.
+  isBot            Boolean     @default(false)
+  language         String?
+  screen           String?
+  timezone         String?
+  /// Página de entrada, com os parâmetros de campanha (utm_*).
+  entryPath        String
+  /// Página de origem, sem parâmetros.
+  referrer         String?
+  referrerHost     String?
+  /// direct, google, google_ads, linkedin, instagram, whatsapp... (site-context.ts)
+  source           String
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmTerm          String?
+  utmContent       String?
+  /// Páginas do site abertas (caminhos distintos).
+  pages            String[]    @default([])
+  pageViews        Int         @default(0)
+  /// Seções da página inicial que apareceram na tela.
+  sections         String[]    @default([])
+  /// Cliques em "Acesse a Demonstração".
+  demoClicks       Int         @default(0)
+  firstDemoClickAt DateTime?
+  /// Primeira vez dentro da demonstração nesta visita.
+  demoStartedAt    DateTime?
+  demoErrors       Int         @default(0)
+  demoPageViews    Int         @default(0)
+  /// Páginas da demonstração abertas (caminhos distintos, ids trocados por :id).
+  demoPaths        String[]    @default([])
+  demoPathCount    Int         @default(0)
+  whatsappAt       DateTime?
+  /// Formulário de contato enviado nesta visita (a mensagem fica em PublicContactMessage).
+  formAt           DateTime?
+  eventCount       Int         @default(0)
+  events           SiteEvent[]
+
+  @@index([startedAt])
+  @@index([visitorId, startedAt])
+  @@index([geoAt])
+}
+
+/// Página aberta, clique, seção vista... de uma visita (linha do tempo no portal).
+model SiteEvent {
+  id        String    @id @default(uuid())
+  visitId   String
+  visit     SiteVisit @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  type      String
+  label     String?
+  path      String?
+  createdAt DateTime  @default(now())
+
+  @@index([visitId, createdAt])
 }
 
 // ===========================================================================
