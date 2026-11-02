@@ -1026,7 +1026,7 @@ português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`
   e redação corrigidos. Singular/plural conferidos no shared e no JavaScript
   do Meu Dia servido publicamente (idêntico ao arquivo da imagem implantada).
 
-## Visitantes do Site: regressão na consulta (2026-11-02, correção local)
+## Visitantes do Site: regressão na consulta (2026-11-02, publicado)
 
 - O usuário relatou erro 500 em `/platform-admin?section=siteVisitors`.
   Logs confirmaram `P2010` / Postgres `42703`: `column "área" does not exist`.
@@ -1042,5 +1042,20 @@ português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`
   em transação `READ ONLY`: todas as consultas funcionaram no período da captura
   (04/10 a 03/11, 30 dias). Somente agregados de resultado foram exibidos.
   Arquivos de validação em `/tmp/g360-visitors-*`; app em execução não alterado.
-- Sem navegador nem tsc local da API. Publicação autorizada pelo usuário em
-  2026-11-02; commit, push e deploy desta correção em andamento.
+- Publicado na Vultr em 2026-11-02 com OK do usuário: commit `6b796a8`, versão
+  `0.1.0+6b796a88`. Builds antecipados aprovados com o site no ar (API 71 s,
+  web 135 s); `make deploy` em 26 s (22:46:12Z a 22:46:38Z).
+- Backup `db-backups/g360-20261102-224218.dump` (2,1 MB), validado com
+  `pg_restore --list` (4.086 linhas); SHA-256
+  `4802094702a7f0c22746fa3060741370c46360a1fe3e25ceed5bb8d8cb61b4a6`.
+  Rollback: `g360-api:rollback-57a4755-visitors-20261102` e Web equivalente.
+- Validação posterior com o módulo realmente implantado, em transação READ ONLY:
+  resumo de 1, 7, 30 e 90 dias, lista e detalhe de visitas aprovados.
+  Identificador `area` confirmado no JavaScript compilado da API.
+- API/Web/Postgres saudáveis; banco em dia (154 migrations, nenhuma nova nesta
+  correção). Health, home, login, demonstração e tela de visitantes com HTTP 200;
+  versão pública no login conferida; API de analytics sem token retorna 401.
+- Sem teste em navegador nem tsc local da API, conforme a preferência registrada.
+  Builds Docker fizeram a checagem de compilação. Em revisões de português,
+  preservar também identificadores dentro de SQL/tagged templates e validar as
+  consultas afetadas no Postgres; mocks não detectam nomes de coluna inválidos.

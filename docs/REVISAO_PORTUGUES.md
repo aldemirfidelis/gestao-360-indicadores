@@ -87,4 +87,11 @@ O teste de regressão passou junto dos testes de analytics/contexto (20 testes).
 As consultas de resumo e lista corrigidas também passaram no Postgres da Vultr,
 em processo isolado e transação somente leitura. A auditoria dos 81 trechos SQL
 nos arquivos da API revisados não encontrou outras alterações após essa correção.
-A publicação desta correção foi autorizada pelo usuário e está em andamento.
+Correção publicada na Vultr com OK do usuário: commit `6b796a8`, versão
+`0.1.0+6b796a88`, em 02/11/2026. Builds finais aprovados e deploy em 26 s,
+com backup validado antes da atualização. Sem migration nova.
+
+A versão implantada passou nas consultas de resumo de 1, 7, 30 e 90 dias,
+lista e detalhe de visitas, em transação somente leitura. Containers saudáveis,
+banco em dia, versão pública conferida e página do painel com HTTP 200.
+A API de analytics continua exigindo autenticação (401 sem token).
