@@ -959,3 +959,22 @@ Pedido do usuário depois de testar em produção:
   Validado: containers saudáveis, `migrate status` em dia, health/home/login/
   demonstração/`/actions` 200, PDCA novo nos chunks da web. Sem teste em
   navegador (o usuário testa).
+
+## Logo e cores com acesso direto (2026-11-02, local)
+
+Pedido do usuario: voltar a encontrar as opcoes de logo da empresa e cores do
+portal em Configuracoes. A tela e a API de identidade visual continuam no codigo.
+
+- Atalho em destaque no inicio de `/settings`: **Logo e cores do portal**, com
+  botao **Personalizar portal**.
+- Nova pagina `/settings/identidade-visual` reutiliza `BrandingSection`: envio e
+  remocao de logo, cor do portal, cor das letras, contraste automatico, previa e
+  salvamento para toda a empresa. A pagina abre sem carregar o bootstrap admin.
+- Consulta exige `settings:view` ou `settings:manage`; alteracoes continuam com
+  `settings:manage` na interface e na API. Demonstracao permanece bloqueada.
+- Sem mudanca de API, banco ou migration. A identidade visual existente e
+  preservada; somente o acesso a tela foi reorganizado.
+- Validado: web 15 arquivos / 112 testes, `tsc --noEmit` da web e lint dos arquivos
+  alterados. Sem build completo ou teste em navegador nesta tarefa.
+- Publicacao autorizada pelo usuario em 2026-11-02 na Vultr, seguindo o fluxo
+  de commit, push, backup, build antecipado e deploy. Resultado registrado abaixo.

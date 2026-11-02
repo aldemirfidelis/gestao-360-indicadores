@@ -39,7 +39,6 @@ import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
 import { useAuth } from '@/components/auth/auth-provider';
 import { AccessRoleGuide, PermissionMatrix } from '@/components/access-control/permission-matrix';
-import { BrandingSection } from '@/components/settings/branding-section';
 import {
   ACCESS_ROLE_DEFINITIONS,
   getRoleDefinition,
@@ -47,7 +46,7 @@ import {
   type PermissionRecord,
 } from '@/lib/access-control';
 
-type ModuleKey = 'users' | 'audit' | 'parameters' | 'security' | 'system' | 'branding';
+type ModuleKey = 'users' | 'audit' | 'parameters' | 'security' | 'system';
 type ParamView = 'companies' | 'branches' | 'structure' | 'categories' | 'items';
 
 interface Company {
@@ -184,7 +183,6 @@ const adminCards: Array<{ title: string; description: string; icon: any; active:
   { title: 'Empresas', description: 'Empresas, dados cadastrais e status.', icon: Building2, active: 'parameters', view: 'companies', tone: 'text-status-blue bg-status-blue/10' },
   { title: 'Filiais', description: 'Unidades de negócio e localizações.', icon: GitBranch, active: 'parameters', view: 'branches', tone: 'text-status-purple bg-status-purple/10' },
   { title: 'Áreas e Setores', description: 'Hierarquia organizacional e processos.', icon: Layers3, active: 'parameters', view: 'structure', tone: 'text-status-green bg-status-green/10' },
-  { title: 'Identidade visual', description: 'Cor do portal e logo da empresa no topo.', icon: Palette, active: 'branding', tone: 'text-status-purple bg-status-purple/10' },
   { title: 'Notificações', description: 'Preferências, alertas e regras globais.', icon: Settings, active: 'system', tone: 'text-status-yellow bg-status-yellow/10' },
   { title: 'Sistema', description: 'Configurações gerais e comportamento global.', icon: Settings, active: 'system', tone: 'text-muted-foreground bg-muted' },
 ];
@@ -358,6 +356,26 @@ export default function SettingsPage() {
           </Button>
         ) : undefined}
       />
+
+      {!platformAdminContext && canViewSettings && (
+        <SectionCard
+          title="Logo e cores do portal"
+          description="Personalize a identidade visual da sua empresa: logo, cor do cabeçalho e do menu e cor das letras."
+          className="mb-6 border-primary/30"
+          actions={
+            <Button asChild>
+              <Link href="/settings/identidade-visual">
+                <Palette className="mr-2 h-4 w-4" />
+                Personalizar portal
+              </Link>
+            </Button>
+          }
+        >
+          <p className="text-sm text-muted-foreground">
+            Envie o logo, escolha as cores e confira a prévia antes de salvar. A identidade visual vale para todos os usuários da empresa.
+          </p>
+        </SectionCard>
+      )}
 
       {!platformAdminContext && overview.data && (
         <SectionCard
@@ -572,8 +590,6 @@ export default function SettingsPage() {
             );
           })}
       </SectionCard>}
-
-      {active === 'branding' && <BrandingSection canManage={canManageSettings} />}
 
       {active === 'users' && canViewUsers && (
         <SectionCard

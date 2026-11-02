@@ -37,6 +37,15 @@ describe('granular navigation', () => {
     expect(canAccessRoute(user, '/gestao-premio/integracoes')).toBe(false);
     expect(canAccessRoute(user, '/indicators')).toBe(true);
   });
+  it('protege a identidade visual com as permissões de configurações da empresa', () => {
+    const route = '/settings/identidade-visual';
+    expect(canAccessRoute({ role: 'COMPANY_ADMIN', permissions: ['settings:manage'] }, route)).toBe(true);
+    expect(canAccessRoute({ role: 'VIEWER', permissions: ['settings:view'] }, route)).toBe(true);
+    expect(canAccessRoute({ role: 'VIEWER', permissions: ['users:view'] }, route)).toBe(false);
+    expect(canAccessRoute({ role: 'SUPER_ADMIN', permissions: [] }, route)).toBe(true);
+    expect(canAccessRoute({ role: 'COMPANY_ADMIN', isDemo: true, permissions: ['settings:manage'] }, route)).toBe(false);
+  });
+
   it('does not expose Meu Dia or Tarefas without myday:view', () => {
     const user = { role: 'VIEWER', permissions: ['indicators:view'] };
     const hrefs = visibleAllNavSections(user).flatMap((section) =>
