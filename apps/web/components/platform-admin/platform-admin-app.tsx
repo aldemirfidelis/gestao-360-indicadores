@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { isProductModuleActive } from '@g360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -622,7 +623,8 @@ export function PlatformAdminApp() {
     selectSection(next);
   }
 
-  if (me.isLoading) {
+  // Sem sessão confirmada nada monta: as seções disparariam consultas sem token antes de ir ao login.
+  if (me.isLoading || !me.data) {
     return <div className="grid min-h-screen place-items-center bg-[#f4f7f8] text-sm text-muted-foreground">Carregando Portal Administrativo Global...</div>;
   }
 
@@ -703,7 +705,7 @@ export function PlatformAdminApp() {
           {section === 'governance' && <GovernanceSection onNavigate={selectSection} />}
           {section === 'generalSettings' && <GeneralSettingsSection />}
           {section === 'visibilityAdmin' && <VisibilitySettingsSection />}
-          {section === 'externalIntegrations' && <ExternalIntegrationsSection initialTab={requestedExternalTab === 'prize' ? 'prize' : 'external'} />}
+          {section === 'externalIntegrations' && <ExternalIntegrationsSection initialTab={requestedExternalTab === 'prize' && isProductModuleActive('prize') ? 'prize' : 'external'} />}
           {section === 'orgStructure' && <OrgStructureSection />}
           {section === 'privacidade' && <PrivacidadeSection />}
           {section === 'databaseAdmin' && (
@@ -973,16 +975,18 @@ function ExternalIntegrationsSection({ initialTab }: { initialTab: ExternalInteg
         >
           APIs Externas
         </button>
-        <button
-          type="button"
-          onClick={() => selectTab('prize')}
-          className={cn(
-            'border px-3 py-1.5 text-xs font-medium transition-colors',
-            tab === 'prize' ? 'border-[#101820] bg-[#101820] text-white' : 'border-border bg-white text-muted-foreground hover:text-foreground',
-          )}
-        >
-          Integracoes do Premio
-        </button>
+        {isProductModuleActive('prize') && (
+          <button
+            type="button"
+            onClick={() => selectTab('prize')}
+            className={cn(
+              'border px-3 py-1.5 text-xs font-medium transition-colors',
+              tab === 'prize' ? 'border-[#101820] bg-[#101820] text-white' : 'border-border bg-white text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Integracoes do Premio
+          </button>
+        )}
       </div>
       {tab === 'external' && <ExternalIntegrationsPage />}
       {tab === 'prize' && <PrizeConnectorsPanel embedded canAdmin />}

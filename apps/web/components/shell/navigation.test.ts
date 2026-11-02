@@ -8,11 +8,27 @@ import {
 } from './navigation';
 
 describe('granular navigation', () => {
-  it('mostra apenas as quatro abas de negócio mesmo para super admin', () => {
+  it('mostra apenas os menus principais do produto mesmo para super admin', () => {
     const user = { role: 'SUPER_ADMIN', permissions: [] };
-    expect(visibleNavSections(user).map(section => section.heading)).toEqual(['Meu Dia', 'Tarefas', 'Gestão à Vista', 'Gestão de Prêmio']);
+    const sections = visibleNavSections(user);
+    expect(sections.map(section => section.heading)).toEqual([
+      'Meu Dia',
+      'Tarefas',
+      'Painel Executivo',
+      'Árvore Organizacional',
+      'Mapa Estratégico',
+      'Indicadores',
+      'Desvios',
+      'Plano de Ação',
+      'Ata da Reunião',
+      'Reuniões',
+      'Reunião Mensal',
+      'OKRs',
+    ]);
+    expect(sections.every(section => section.flat && section.items.length === 1)).toBe(true);
     expect(canAccessRoute(user, '/documents')).toBe(false);
     expect(canAccessRoute(user, '/servico-pessoal')).toBe(false);
+    expect(canAccessRoute(user, '/gestao-premio')).toBe(false);
   });
   it('visitante demo só encontra os módulos apresentados', () => {
     const user = { role: 'COMPANY_ADMIN', isDemo: true, permissions: ['myday:view', 'indicators:view', 'prize:view', 'settings:manage'] };

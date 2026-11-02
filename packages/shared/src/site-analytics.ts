@@ -53,7 +53,7 @@ export function normalizeSitePath(raw: string | null | undefined): string | null
   return `/${segments.join('/')}`;
 }
 
-/** Área da demonstração ("/gestao-premio/espelhos" → "gestao-premio"); null fora das rotas da demo. */
+/** Área da demonstração ("/monthly-results/:id" → "monthly-results"); null fora das rotas da demo. */
 export function demoAreaOf(raw: string | null | undefined): string | null {
   const path = normalizeSitePath(raw);
   if (!path || path === '/' || !isDemoRouteAllowed(path)) return null;

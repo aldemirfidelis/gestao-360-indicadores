@@ -29,5 +29,5 @@ export function isDemoReadAllowed(path: string): boolean {
 export function isProductPermissionActive(key: string): boolean {
   if (key.startsWith('org:positions:') || key.startsWith('org:employees:') || key.startsWith('org:career:')) return false;
   const family = key.split(':')[0];
-  return !['nc', 'doc', 'fsms', 'compras', 'estoque', 'approvals', 'automation', 'automations', 'risks', 'nonconformities', 'audits', 'documents', 'processes', 'forms', 'food-safety', 'asset-security', 'compensation', 'cargos-salarios', 'recruit', 'recruitment', 'saude', 'ponto', 'folha', 'pessoal', 'personnel', 'payroll', 'training', 'procurement', 'inventory', 'supplies', 'communication', 'directory'].includes(family);
+  return !['nc', 'doc', 'fsms', 'compras', 'estoque', 'approvals', 'automation', 'automations', 'risks', 'nonconformities', 'audits', 'documents', 'processes', 'forms', 'food-safety', 'asset-security', 'compensation', 'cargos-salarios', 'recruit', 'recruitment', 'saude', 'ponto', 'folha', 'pessoal', 'personnel', 'payroll', 'training', 'procurement', 'inventory', 'supplies', 'communication', 'directory', 'prize'].includes(family);
 }

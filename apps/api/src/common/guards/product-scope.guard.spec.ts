@@ -12,16 +12,16 @@ function context(path: string, method = 'GET', demo = true): ExecutionContext {
 
 describe('escopo de produto e demonstração', () => {
   const guard = new ProductScopeGuard();
-  it.each(['/indicators', '/strategy', '/tasks/board', '/monthly-results', '/prize/overview', '/auth/me', '/portal/config'])('permite consultar %s', path => {
+  it.each(['/indicators', '/strategy', '/tasks/board', '/monthly-results', '/auth/me', '/portal/config'])('permite consultar %s', path => {
     expect(guard.canActivate(context(path))).toBe(true);
   });
   it.each(['POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'])('bloqueia escrita %s mesmo com papel administrativo', method => {
     expect(() => guard.canActivate(context('/indicators', method))).toThrow(ForbiddenException);
   });
-  it.each(['/users', '/companies', '/platform/switch', '/database-admin', '/ai', '/prize/eligible/connectors', '/prize/eligible/jobs'])('bloqueia infraestrutura sensível %s', path => {
+  it.each(['/users', '/companies', '/platform/switch', '/database-admin', '/ai'])('bloqueia infraestrutura sensível %s', path => {
     expect(() => guard.canActivate(context(path))).toThrow(ForbiddenException);
   });
-  it.each(['/documents/123', '/risks', '/forms', '/personnel', '/strategy/employees', '/actions/general-approvals', '/communication/conversations', '/communication/me/profile'])('módulo suspenso %s não é acessível nem para super admin', path => {
+  it.each(['/documents/123', '/risks', '/forms', '/personnel', '/strategy/employees', '/actions/general-approvals', '/communication/conversations', '/communication/me/profile', '/prize/overview', '/platform-admin/prize/eligible/connectors', '/external/v1/prize/events'])('módulo suspenso %s não é acessível nem para super admin', path => {
     expect(() => guard.canActivate(context(path, 'GET', false))).toThrow(NotFoundException);
   });
   it('mantém logout e as operações normais de clientes fora da demo', () => {

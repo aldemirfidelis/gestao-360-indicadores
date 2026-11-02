@@ -58,19 +58,23 @@ export function AccordionNavigation({
     refetchInterval: 30_000,
   });
   const unreadMessages = (conversations.data ?? []).reduce((sum, c) => sum + c.unread, 0);
-  const [open, setOpen] = useState<Set<string>>(() => {
-    const initial = currentSection?.heading ?? sections[0]?.heading;
-    return new Set(initial ? [initial] : []);
-  });
+  // Guarda as seções recolhidas pelo usuário: por padrão todas ficam expandidas,
+  // inclusive as que surgem depois (ex.: quando o usuário termina de carregar).
+  const [closed, setClosed] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     if (!currentSection) return;
-    setOpen((prev) => new Set(prev).add(currentSection.heading));
+    setClosed((prev) => {
+      if (!prev.has(currentSection.heading)) return prev;
+      const next = new Set(prev);
+      next.delete(currentSection.heading);
+      return next;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSection?.heading]);
 
   function toggle(heading: string) {
-    setOpen((prev) => {
+    setClosed((prev) => {
       const next = new Set(prev);
       if (next.has(heading)) next.delete(heading);
       else next.add(heading);
@@ -106,7 +110,7 @@ export function AccordionNavigation({
         <div className="space-y-1">
           {sections.map((section) => {
             const SectionIcon = section.icon;
-            const isOpen = collapsed ? true : open.has(section.heading);
+            const isOpen = collapsed ? true : !closed.has(section.heading);
             const sectionActive = currentSection?.heading === section.heading;
 
             // Seção "flat": item único, renderizado como link direto (sem accordion/sub-menu).

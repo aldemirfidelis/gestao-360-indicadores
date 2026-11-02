@@ -178,11 +178,11 @@ export default function MeetingMinutesPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Gestão à Vista"
+        eyebrow="Gestão"
         tone="view"
         title="Ata da Reunião Mensal"
         description="Acompanhamento das ações que saíram da reunião — por área, setor e responsável, com prazo e situação de cada uma."
-        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Gestão à Vista' }, { label: 'Ata da Reunião' }]}
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Ata da Reunião' }]}
         actions={
           <Button asChild variant="outline">
             <Link href="/monthly-results">

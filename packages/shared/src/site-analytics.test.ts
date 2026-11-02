@@ -24,13 +24,13 @@ describe('demoAreaOf', () => {
   it('devolve a área das rotas liberadas à demonstração', () => {
     expect(demoAreaOf('/meu-dia')).toBe('meu-dia');
     expect(demoAreaOf('/indicators/3f2a9c1e-1b2c-4d5e-8f90-123456789abc')).toBe('indicators');
-    expect(demoAreaOf('/gestao-premio/espelhos')).toBe('gestao-premio');
+    expect(demoAreaOf('/monthly-results/2026-10')).toBe('monthly-results');
   });
 
   it('fora da demonstração não há área', () => {
     expect(demoAreaOf('/')).toBeNull();
     expect(demoAreaOf('/settings')).toBeNull();
-    expect(demoAreaOf('/gestao-premio/integracoes')).toBeNull();
+    expect(demoAreaOf('/gestao-premio/espelhos')).toBeNull();
     expect(demoAreaOf('/recrutamento')).toBeNull();
   });
 });

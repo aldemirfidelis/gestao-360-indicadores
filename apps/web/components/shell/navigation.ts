@@ -130,6 +130,11 @@ export const portalServiceSections: NavSection[] = [
   },
 ];
 
+/** Seção "flat" com o nome e a descrição do próprio item (menu principal de link direto). */
+function flatSection(item: NavItem): NavSection {
+  return { heading: item.label, description: item.description ?? item.label, intent: 'view', icon: item.icon, flat: true, items: [item] };
+}
+
 export const navSections: NavSection[] = [
   {
     heading: 'Meu Dia',
@@ -161,24 +166,20 @@ export const navSections: NavSection[] = [
       { href: '/totem', label: 'Totem', description: 'Tela de reconhecimento facial do ponto', icon: Fingerprint, permissions: ['ponto:kiosk'], exact: true },
     ],
   },
-  {
-    heading: 'Gestão à Vista',
-    description: 'Painel executivo, estratégia, indicadores e ritos de gestão',
-    intent: 'view',
-    icon: Compass,
-    items: [
-      { href: '/visualization', label: 'Painel Executivo', description: 'Visão 360 para decisão', icon: BarChart3, permissions: ['visualization:view', 'dashboard:view'] },
-      { href: '/org', label: 'Árvore Organizacional', description: 'Áreas, setores, pilares e diretrizes', icon: Network, permissions: ['org:view', 'org:view_all'] },
-      { href: '/strategy', label: 'Mapa Estratégico', description: 'Perspectivas, objetivos e impactos', icon: Compass, permissions: ['strategy:view'] },
-      { href: '/indicators', label: 'Indicadores', description: 'Farol, ranking e histórico', icon: Target, permissions: ['indicators:view'], exact: true },
-      { href: '/deviations', label: 'Desvios', description: 'Indicadores fora da meta, causas e tratativas', icon: AlertTriangle, permissions: ['deviations:view'] },
-      { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },
-      { href: '/projects', label: 'Ata da Reunião', description: 'Ações da reunião mensal por área, setor e responsável', icon: GanttChartSquare, permissions: ['projects:view', 'actions:view'], exact: true },
-      { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: CalendarDays, permissions: ['meetings:view'] },
-      { href: '/monthly-results', label: 'Reunião Mensal', description: 'Fechamento de resultados, pauta, ata e acompanhamento semanal', icon: CalendarDays, permissions: ['monthly:view'] },
-      { href: '/okrs', label: 'OKRs', description: 'Ciclos e resultados-chave', icon: Goal, permissions: ['okrs:view'] },
-    ],
-  },
+  // Painel, estratégia, indicadores e ritos de gestão: cada página é um menu
+  // principal (link direto), como Meu Dia e Tarefas.
+  ...([
+    { href: '/visualization', label: 'Painel Executivo', description: 'Visão 360 para decisão', icon: BarChart3, permissions: ['visualization:view', 'dashboard:view'] },
+    { href: '/org', label: 'Árvore Organizacional', description: 'Áreas, setores, pilares e diretrizes', icon: Network, permissions: ['org:view', 'org:view_all'] },
+    { href: '/strategy', label: 'Mapa Estratégico', description: 'Perspectivas, objetivos e impactos', icon: Compass, permissions: ['strategy:view'] },
+    { href: '/indicators', label: 'Indicadores', description: 'Farol, ranking e histórico', icon: Target, permissions: ['indicators:view'], exact: true },
+    { href: '/deviations', label: 'Desvios', description: 'Indicadores fora da meta, causas e tratativas', icon: AlertTriangle, permissions: ['deviations:view'] },
+    { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },
+    { href: '/projects', label: 'Ata da Reunião', description: 'Ações da reunião mensal por área, setor e responsável', icon: GanttChartSquare, permissions: ['projects:view', 'actions:view'], exact: true },
+    { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: CalendarDays, permissions: ['meetings:view'] },
+    { href: '/monthly-results', label: 'Reunião Mensal', description: 'Fechamento de resultados, pauta, ata e acompanhamento semanal', icon: CalendarDays, permissions: ['monthly:view'] },
+    { href: '/okrs', label: 'OKRs', description: 'Ciclos e resultados-chave', icon: Goal, permissions: ['okrs:view'] },
+  ] satisfies NavItem[]).map(flatSection),
   {
     heading: 'Qualidade e Compliance',
     description: 'Sistema de gestão da qualidade: documentos, processos, auditorias, não conformidades e riscos',
