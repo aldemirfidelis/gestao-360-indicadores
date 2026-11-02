@@ -22,7 +22,7 @@ function platformCompanyHeader(req?: Request) {
 
 function requirePlatformCompanyHeader(req?: Request) {
   const companyId = platformCompanyHeader(req);
-  if (!companyId) throw new BadRequestException('Selecione uma empresa para gerenciar usuarios.');
+  if (!companyId) throw new BadRequestException('Selecione uma empresa para gerenciar usuários.');
   return companyId;
 }
 

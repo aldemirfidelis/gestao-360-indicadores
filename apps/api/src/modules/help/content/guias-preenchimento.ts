@@ -11,7 +11,7 @@ export const guiasPreenchimento: HelpCatalogCategory = {
       slug: 'como-preencher-ishikawa',
       title: 'Como preencher o Ishikawa (diagrama de causa e efeito / espinha de peixe)',
       summary: 'Guia completo: o método 6M, exemplos de causas por categoria e o passo a passo na tela.',
-      tags: ['ishikawa', 'preencher ishikawa', 'espinha de peixe', 'causa e efeito', '6m', 'diagrama', 'analise de causa'],
+      tags: ['ishikawa', 'preencher ishikawa', 'espinha de peixe', 'causa e efeito', '6m', 'diagrama', 'análise de causa'],
       body: `O **Ishikawa** (diagrama de causa e efeito, ou espinha de peixe) organiza as possíveis causas de um problema em 6 categorias — os **6M**. É a primeira ferramenta da sequência de análise (Ishikawa → 5 Porquês → 5W2H → PDCA).
 
 ## Onde fica
@@ -42,7 +42,7 @@ Abra o **plano de ação** ou a **reunião** vinculada ao desvio e vá na aba **
       slug: 'como-preencher-5-porques',
       title: 'Como preencher os 5 Porquês',
       summary: 'Guia com exemplo encadeado completo até a causa raiz.',
-      tags: ['5 porques', 'cinco porques', 'preencher 5 porques', 'causa raiz', 'porque'],
+      tags: ['5 porquês', 'cinco porquês', 'preencher 5 porquês', 'causa raiz', 'porque'],
       body: `Os **5 Porquês** aprofundam uma causa do Ishikawa perguntando "por quê?" em cadeia até chegar à **causa raiz** — aquela que, resolvida, impede o problema de voltar.
 
 ## Onde fica
@@ -98,7 +98,7 @@ Problema: "entrega ao cliente atrasou".
       slug: 'como-preencher-pdca',
       title: 'Como preencher o PDCA',
       summary: 'Os 4 quadrantes explicados, o que escrever em cada um e como acompanhar o giro.',
-      tags: ['pdca', 'preencher pdca', 'plan do check act', 'melhoria continua', 'quadrante'],
+      tags: ['pdca', 'preencher pdca', 'plan do check act', 'melhoria contínua', 'quadrante'],
       body: `O **PDCA** (Planejar, Fazer, Checar, Agir) fecha a sequência de análise: é o ciclo de gestão que garante que o plano gira até o problema ser resolvido de verdade. Na plataforma fica na aba **Análise de Causa**, desbloqueado após o 5W2H.
 
 ## Os 4 quadrantes (o que escrever)
@@ -174,7 +174,7 @@ Lance **metas** e **resultados** por período — o sistema calcula atingimento,
       slug: 'como-preencher-uma-nc',
       title: 'Como preencher uma Não Conformidade (campo a campo)',
       summary: 'Origem, severidade, contenção, causa raiz e verificação de eficácia bem escritas.',
-      tags: ['nao conformidade', 'preencher nc', 'contencao', 'acao imediata', 'eficacia', 'origem', 'capa'],
+      tags: ['não conformidade', 'preencher nc', 'contencao', 'ação imediata', 'eficacia', 'origem', 'capa'],
       body: `Em **Qualidade e Compliance > Não Conformidades > Nova NC**:
 
 ## Campo a campo
@@ -217,7 +217,7 @@ Status: Identificado → Analisando → Mitigando → Monitorando → Aceito/Fec
       slug: 'como-montar-um-checklist',
       title: 'Como montar um checklist: tipos de pergunta e configurações',
       summary: 'Cada tipo de campo explicado, criticidade, evidência obrigatória e boas práticas.',
-      tags: ['checklist', 'formulario', 'tipos de pergunta', 'campo', 'criticidade', 'evidencia obrigatoria'],
+      tags: ['checklist', 'formulario', 'tipos de pergunta', 'campo', 'criticidade', 'evidência obrigatória'],
       body: `Em **Qualidade e Compliance > Formulários > Novo modelo**, cada pergunta é um cartão com tipo e configurações:
 
 ## Tipos de resposta (quando usar cada um)
@@ -249,7 +249,7 @@ Status: Identificado → Analisando → Mitigando → Monitorando → Aceito/Fec
       slug: 'como-preencher-um-plano-de-acao-bem-feito',
       title: 'Como preencher um plano de ação bem feito',
       summary: 'Título, origem, prioridade, tarefas e evidências que passam em auditoria.',
-      tags: ['plano de acao', 'preencher plano', 'tarefas', 'prioridade', 'criticidade', 'boas praticas'],
+      tags: ['plano de ação', 'preencher plano', 'tarefas', 'prioridade', 'criticidade', 'boas práticas'],
       body: `Em **Gestão à Vista > Plano de Ação > Nova ação** (ou a partir de desvio/reunião/NC/5W2H):
 
 ## Campo a campo

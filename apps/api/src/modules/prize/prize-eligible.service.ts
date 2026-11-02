@@ -354,7 +354,7 @@ export class PrizeEligibleService {
     const wb = new Workbook();
     const ws = wb.addWorksheet('Colaboradores');
     ws.addRow([...ELIGIBLE_TEMPLATE_HEADERS]);
-    ws.addRow(['1001', 'Ana Silva (EXEMPLO — apague esta linha)', '529.982.247-25', 'CLT', 'Matriz', 'Usina', 'Operador I', 'Operacao', 'Producao', 'Moagem', 'CC-100', '3.500,75', '10/01/2022', '', 'ATIVO', 30]);
+    ws.addRow(['1001', 'Ana Silva (EXEMPLO — apague esta linha)', '529.982.247-25', 'CLT', 'Matriz', 'Usina', 'Operador I', 'Operação', 'Produção', 'Moagem', 'CC-100', '3.500,75', '10/01/2022', '', 'ATIVO', 30]);
     ws.getRow(1).font = { bold: true };
     ws.columns.forEach((c) => { c.width = 18; });
 
@@ -364,14 +364,14 @@ export class PrizeEligibleService {
     we.getRow(1).font = { bold: true };
     we.columns.forEach((c) => { c.width = 18; });
 
-    const wi = wb.addWorksheet('Instrucoes');
+    const wi = wb.addWorksheet('Instruções');
     [
       'IMPORTAÇÃO MANUAL DA BASE ELEGÍVEL (contingência do Apdata)',
       '',
-      'Aba "Colaboradores": um colaborador por linha. Obrigatórios: matricula e nome.',
+      'Aba "Colaboradores": um colaborador por linha. Obrigatórios: matrícula e nome.',
       'CPF: com ou sem máscara; o dígito verificador é validado e o CPF é gravado mascarado (LGPD).',
       'salario_base: aceita 3.500,75 / 3500.75. Sem salário o colaborador não é apurado.',
-      'Datas: dd/mm/aaaa. situacao: ATIVO, DESLIGADO, AFASTADO, FERIAS ou TREINAMENTO.',
+      'Datas: dd/mm/aaaa. situação: ATIVO, DESLIGADO, AFASTADO, FÉRIAS ou TREINAMENTO.',
       'dias_trabalhados: inteiro entre 0 e 31 (proporcionalidade).',
       '',
       `Aba "Eventos": tipos aceitos: ${KNOWN_EVENT_TYPES.join(', ')}.`,

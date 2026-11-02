@@ -13,25 +13,25 @@ export function traceabilityNextSteps(signals: TraceabilitySignals): string[] {
   const steps: string[] = [];
 
   if (signals.hasOffTargetResult && !signals.hasOpenDeviation) {
-    steps.push('Criar analise de causa para o indicador fora da meta.');
+    steps.push('Criar análise de causa para o indicador fora da meta.');
   }
   if (signals.hasOpenDeviation && !signals.hasCauseAnalysis) {
-    steps.push('Registrar causa provavel, causa raiz e evidencias da analise.');
+    steps.push('Registrar causa provável, causa raiz e evidências da análise.');
   }
   if (signals.hasCauseAnalysis && !signals.hasMeeting) {
-    steps.push('Registrar reuniao ou decisao formal para tratar a causa raiz.');
+    steps.push('Registrar reunião ou decisão formal para tratar a causa raiz.');
   }
   if ((signals.hasCauseAnalysis || signals.hasMeeting) && !signals.hasOpenAction && !signals.hasCompletedAction) {
-    steps.push('Criar plano de acao com responsavel, prazo e resultado esperado.');
+    steps.push('Criar plano de ação com responsável, prazo e resultado esperado.');
   }
   if (signals.hasOpenAction && !signals.hasEvidence) {
-    steps.push('Solicitar evidencia de execucao antes da conclusao.');
+    steps.push('Solicitar evidência de execução antes da conclusão.');
   }
   if (signals.hasCompletedAction && !signals.indicatorBackInGoal) {
-    steps.push('Reavaliar o indicador apos a acao concluida.');
+    steps.push('Reavaliar o indicador após a ação concluída.');
   }
   if (signals.hasCompletedAction && signals.indicatorBackInGoal) {
-    steps.push('Concluir o caso e manter o historico para auditoria.');
+    steps.push('Concluir o caso e manter o histórico para auditoria.');
   }
 
   return steps;
@@ -52,15 +52,15 @@ export interface TreatmentFlowSignals {
 export function treatmentFlowAlerts(signals: TreatmentFlowSignals): string[] {
   const alerts: string[] = [];
 
-  if (!signals.hasCauseAnalysis) alerts.push('Indicador fora da meta sem analise de causa.');
-  if (signals.hasCauseAnalysis && !signals.hasMeeting) alerts.push('Analise criada sem reuniao de tratativa.');
-  if (signals.hasMeeting && signals.actionCount === 0) alerts.push('Reuniao agendada sem plano de acao.');
-  if (signals.actionsWithoutResponsible > 0) alerts.push('Existem acoes sem responsavel.');
-  if (signals.actionsWithoutDeadline > 0) alerts.push('Existem acoes sem prazo definido.');
-  if (signals.overdueActionCount > 0) alerts.push('Existem acoes atrasadas.');
-  if (signals.invalidParticipantEmails > 0) alerts.push('Existem participantes com e-mail invalido.');
-  if (signals.completedActionWithoutEvidence) alerts.push('Acao concluida sem evidencia vinculada.');
-  if (signals.indicatorStillOffTargetAfterActions) alerts.push('Indicador continua fora da meta apos acao concluida.');
+  if (!signals.hasCauseAnalysis) alerts.push('Indicador fora da meta sem análise de causa.');
+  if (signals.hasCauseAnalysis && !signals.hasMeeting) alerts.push('Análise criada sem reunião de tratativa.');
+  if (signals.hasMeeting && signals.actionCount === 0) alerts.push('Reunião agendada sem plano de ação.');
+  if (signals.actionsWithoutResponsible > 0) alerts.push('Existem ações sem responsável.');
+  if (signals.actionsWithoutDeadline > 0) alerts.push('Existem ações sem prazo definido.');
+  if (signals.overdueActionCount > 0) alerts.push('Existem ações atrasadas.');
+  if (signals.invalidParticipantEmails > 0) alerts.push('Existem participantes com e-mail inválido.');
+  if (signals.completedActionWithoutEvidence) alerts.push('Ação concluída sem evidência vinculada.');
+  if (signals.indicatorStillOffTargetAfterActions) alerts.push('Indicador continua fora da meta após ação concluída.');
 
   return alerts;
 }

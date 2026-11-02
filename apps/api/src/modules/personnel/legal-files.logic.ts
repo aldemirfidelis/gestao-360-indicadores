@@ -219,12 +219,12 @@ export interface MirrorDay {
 
 const MIRROR_STATUS_LABEL: Record<string, string> = {
   OK: 'Normal',
-  OVERTIME: 'Credito',
-  UNDERTIME: 'Debito',
+  OVERTIME: 'Crédito',
+  UNDERTIME: 'Débito',
   ABSENT: 'Falta',
   DAY_OFF: 'Folga',
   HOLIDAY: 'Feriado',
-  VACATION: 'Ferias',
+  VACATION: 'Férias',
   LEAVE: 'Afastamento',
   JUSTIFIED: 'Abonado',
   INCOMPLETE: 'Inconsistente',
@@ -271,15 +271,15 @@ export function generateMirror(input: {
   const ascii = (value: string) => textField(value, MIRROR_WIDTH).trimEnd();
   const lines: string[] = [];
   lines.push(bar);
-  lines.push(ascii(`ESPELHO DE PONTO ELETRONICO`.padEnd(MIRROR_WIDTH - 20) + `Competencia ${periodRef}`));
+  lines.push(ascii(`ESPELHO DE PONTO ELETRÔNICO`.padEnd(MIRROR_WIDTH - 20) + `Competência ${periodRef}`));
   lines.push(bar);
   lines.push(ascii(`Empregador: ${employer.companyName}`));
-  lines.push(ascii(`${employer.idType === 2 ? 'CPF' : 'CNPJ'}: ${employer.idNumber || '- nao cadastrado -'}   CNO/CAEPF: ${employer.cnoCaepf ?? '-'}   INPI (REP-P): ${employer.inpiRegistry ?? '- pendente -'}`));
+  lines.push(ascii(`${employer.idType === 2 ? 'CPF' : 'CNPJ'}: ${employer.idNumber || '- não cadastrado -'}   CNO/CAEPF: ${employer.cnoCaepf ?? '-'}   INPI (REP-P): ${employer.inpiRegistry ?? '- pendente -'}`));
   lines.push(rule);
   lines.push(ascii(`Colaborador: ${employee.name}`));
-  lines.push(ascii(`CPF: ${employee.cpf ?? '- pendente -'}   PIS: ${employee.pisPasep ?? '-'}   Admissao: ${employee.admissionDate ?? '-'}   Funcao: ${employee.jobTitle ?? '-'}`));
+  lines.push(ascii(`CPF: ${employee.cpf ?? '- pendente -'}   PIS: ${employee.pisPasep ?? '-'}   Admissão: ${employee.admissionDate ?? '-'}   Função: ${employee.jobTitle ?? '-'}`));
   lines.push(rule);
-  lines.push(ascii('Dia'.padEnd(12) + 'Marcacoes (horario/NSR)'.padEnd(56) + 'Prev.'.padEnd(7) + 'Trab.'.padEnd(7) + 'Saldo'.padEnd(8) + 'Situacao'));
+  lines.push(ascii('Dia'.padEnd(12) + 'Marcações (horário/NSR)'.padEnd(56) + 'Prev.'.padEnd(7) + 'Trab.'.padEnd(7) + 'Saldo'.padEnd(8) + 'Situação'));
 
   const totals = { planned: 0, worked: 0, balance: 0, absences: 0 };
   for (const day of days) {
@@ -302,9 +302,9 @@ export function generateMirror(input: {
   lines.push(rule);
   lines.push(ascii(
     `Totais: Prevista ${minutesLabel(totals.planned)}  Trabalhada ${minutesLabel(totals.worked)}  ` +
-    `Saldo ${minutesLabel(totals.balance, true)}  Faltas ${totals.absences}  Inconsistencias ${inconsistent}`,
+    `Saldo ${minutesLabel(totals.balance, true)}  Faltas ${totals.absences}  Inconsistências ${inconsistent}`,
   ));
-  lines.push(ascii(`Gerado em ${afdDateTime(generatedAt)} por ${softwareVersion} - conferencia interna (Portaria 671).`));
+  lines.push(ascii(`Gerado em ${afdDateTime(generatedAt)} por ${softwareVersion} - conferência interna (Portaria 671).`));
   lines.push(ascii('Assinatura do colaborador: ____________________________  Data: ____/____/________'));
   lines.push(bar);
 

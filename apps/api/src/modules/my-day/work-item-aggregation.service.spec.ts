@@ -103,7 +103,7 @@ describe('WorkItemAggregationService', () => {
     prisma.userDelegation.findMany.mockResolvedValue([{
       id: 'del1',
       delegatorUserId: 'u2',
-      reason: 'Ferias',
+      reason: 'Férias',
       delegator: { id: 'u2', name: 'Delegante', email: 'd@x.com', role: UserRoleEnum.COLLABORATOR },
     }]);
     prisma.actionPlan.findMany.mockImplementation(({ where }: any) => {

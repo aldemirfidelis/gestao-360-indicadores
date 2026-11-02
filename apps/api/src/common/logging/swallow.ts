@@ -24,7 +24,7 @@ function describe(err: unknown): string {
  */
 export function swallow<T>(fallback: T, context: string, level: 'warn' | 'debug' = 'warn') {
   return (err: unknown): T => {
-    logger[level](`falha nao-critica em ${context}: ${describe(err)}`);
+    logger[level](`falha não crítica em ${context}: ${describe(err)}`);
     return fallback;
   };
 }
@@ -34,5 +34,5 @@ export function swallow<T>(fallback: T, context: string, level: 'warn' | 'debug'
  * Uso: `catch (err) { logSwallowed('modulo.acao', err); }`
  */
 export function logSwallowed(context: string, err: unknown, level: 'warn' | 'debug' = 'warn'): void {
-  logger[level](`falha nao-critica em ${context}: ${describe(err)}`);
+  logger[level](`falha não crítica em ${context}: ${describe(err)}`);
 }

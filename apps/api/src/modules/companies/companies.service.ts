@@ -16,7 +16,7 @@ export class CompaniesService {
       where: { id: companyId },
       select: { id: true, name: true, tradeName: true, logoUrl: true, brandColor: true, brandTextColor: true },
     });
-    if (!company) throw new NotFoundException('Empresa nao encontrada.');
+    if (!company) throw new NotFoundException('Empresa não encontrada.');
     return company;
   }
 

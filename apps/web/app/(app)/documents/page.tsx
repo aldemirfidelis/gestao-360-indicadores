@@ -633,7 +633,7 @@ export default function DocumentsPage() {
   const remove = useMutation({
     mutationFn: (id: string) => api<Doc>(`/documents/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Documento excluido');
+      toast.success('Documento excluído');
       invalidate(qc);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir o documento'),
@@ -1372,7 +1372,7 @@ export default function DocumentsPage() {
                     <NativeSelect value={typeForm.category} onChange={(e) => setTypeForm((f) => ({ ...f, category: e.target.value as DocType }))}>
                       {Object.entries(TYPE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </NativeSelect>
-                    <Input type="number" min={1} placeholder="Digitos" value={typeForm.digits} onChange={(e) => setTypeForm((f) => ({ ...f, digits: e.target.value }))} />
+                    <Input type="number" min={1} placeholder="Dígitos" value={typeForm.digits} onChange={(e) => setTypeForm((f) => ({ ...f, digits: e.target.value }))} />
                     <Input type="number" min={1} placeholder="Validade padrão" value={typeForm.defaultValidityDays} onChange={(e) => setTypeForm((f) => ({ ...f, defaultValidityDays: e.target.value }))} />
                   </div>
                   <Button size="sm" onClick={() => createType.mutate()} disabled={createType.isPending || !typeForm.name.trim()} className="bg-sky-500 hover:bg-sky-600 text-white font-semibold"><Plus className="mr-1.5 h-4 w-4" />Cadastrar tipo</Button>

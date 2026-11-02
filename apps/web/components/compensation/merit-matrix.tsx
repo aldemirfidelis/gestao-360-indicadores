@@ -102,7 +102,7 @@ export function MeritMatrix({
       <div>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Distribuicao de desempenho
+            Distribuição de desempenho
           </div>
           {real.rated > 0 && (
             <div className="flex items-center gap-1 rounded-md border p-0.5 text-xs">
@@ -160,7 +160,7 @@ export function MeritMatrix({
             </div>
             {Math.abs(distributionSum - 1) > 0.001 && (
               <p className="mt-2 text-xs text-status-yellow">
-                A distribuicao soma {formatNumber(distributionSum * 100, { maximumFractionDigits: 0 })}% (o ideal e 100%).
+                A distribuição soma {formatNumber(distributionSum * 100, { maximumFractionDigits: 0 })}% (o ideal e 100%).
               </p>
             )}
           </>
@@ -175,7 +175,7 @@ export function MeritMatrix({
         <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-3">
           <Kpi label="Colaboradores elegíveis" value={formatNumber(result.totalHeadcount)} />
           <Kpi
-            label="Aumento medio ponderado"
+            label="Aumento médio ponderado"
             value={`${formatNumber(result.weightedAvgIncreasePct, { maximumFractionDigits: 2 })}%`}
             tone={guidelinePercent != null && result.weightedAvgIncreasePct > guidelinePercent * 100 ? 'red' : 'green'}
             hint={guidelinePercent != null ? `Diretriz: ${formatNumber(guidelinePercent * 100, { maximumFractionDigits: 1 })}%` : undefined}
@@ -193,7 +193,7 @@ export function MeritMatrix({
               <tr>
                 <th className="py-2 pl-4 text-left">Faixa de compa-ratio</th>
                 <th className="py-2 text-right">Colaboradores</th>
-                <th className="py-2 text-right">% medio</th>
+                <th className="py-2 text-right">% médio</th>
                 <th className="py-2 pr-4 text-right">Custo anual</th>
               </tr>
             </thead>

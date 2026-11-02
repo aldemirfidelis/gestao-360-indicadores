@@ -79,7 +79,7 @@ export function NotificationsBell() {
   const generate = useMutation({
     mutationFn: () => api<{ generated: number }>('/notifications/generate', { method: 'POST' }),
     onSuccess: (out) => {
-      toast.success(`${out.generated} nova(s) notificação(oes) gerada(s)`);
+      toast.success(`Novas notificações geradas: ${out.generated}`);
       qc.invalidateQueries({ queryKey: ['notifications'] });
     },
   });

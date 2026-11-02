@@ -138,7 +138,7 @@ export function IntelligenceTab({ programId, canManage }: { programId: string; c
           <Brain className="h-5 w-5 text-primary" />
           <div className="mr-auto">
             <div className="text-sm font-semibold">Inteligência operacional</div>
-            <div className="text-xs text-muted-foreground">Painel calculado, score de fornecedores, recomendacoes e import/export.</div>
+            <div className="text-xs text-muted-foreground">Painel calculado, score de fornecedores, recomendações e import/export.</div>
           </div>
           <div>
             <Label>Dataset</Label>
@@ -162,7 +162,7 @@ export function IntelligenceTab({ programId, canManage }: { programId: string; c
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card>
           <CardContent className="p-0">
-            <div className="border-b p-3 text-sm font-semibold">Assistente de recomendacoes</div>
+            <div className="border-b p-3 text-sm font-semibold">Assistente de recomendações</div>
             <div className="space-y-2 p-3">
               {(assistant.data?.insights ?? []).map((item, index) => (
                 <div key={`${item.title}-${index}`} className="rounded-md border p-3">
@@ -180,7 +180,7 @@ export function IntelligenceTab({ programId, canManage }: { programId: string; c
                   </div>
                 </div>
               ))}
-              {assistant.isPending && <div className="p-3 text-sm text-muted-foreground">Calculando recomendacoes...</div>}
+              {assistant.isPending && <div className="p-3 text-sm text-muted-foreground">Calculando recomendações...</div>}
             </div>
           </CardContent>
         </Card>

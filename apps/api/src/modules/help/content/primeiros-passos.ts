@@ -11,7 +11,7 @@ export const primeirosPassos: HelpCatalogCategory = {
       slug: 'visao-geral-do-sistema',
       title: 'Visão geral do Gestão 360',
       summary: 'O que é a plataforma, como o menu está organizado e como navegar.',
-      tags: ['inicio', 'navegacao', 'menu', 'visao geral', 'plataforma', 'modulos'],
+      tags: ['inicio', 'navegacao', 'menu', 'visão geral', 'plataforma', 'modulos'],
       body: `O Gestão 360 é uma plataforma integrada de gestão empresarial. Tudo é conectado: o mesmo indicador que aparece no Painel Executivo alimenta desvios, reuniões, planos de ação e até a remuneração variável.
 
 ## Como o menu está organizado
@@ -58,7 +58,7 @@ As permissões do seu perfil definem o que aparece para você. Se sentir falta d
       slug: 'permissoes-e-acesso',
       title: 'Por que não vejo um módulo ou botão?',
       summary: 'Como funcionam permissões, perfis de acesso, plano e visibilidade por área.',
-      tags: ['permissao', 'acesso', 'perfil de acesso', 'bloqueado', 'nao vejo', 'rbac', 'plano'],
+      tags: ['permissao', 'acesso', 'perfil de acesso', 'bloqueado', 'não vejo', 'rbac', 'plano'],
       body: `O que aparece para cada pessoa no Gestão 360 depende de três camadas:
 
 1. **Plano da empresa** — cada empresa contrata um plano (Essencial, Profissional, Corporativo, Enterprise) que habilita grupos de módulos. Se o módulo não faz parte do plano, ele não aparece para ninguém da empresa.

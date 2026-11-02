@@ -11,7 +11,7 @@ export const gestaoPremio: HelpCatalogCategory = {
       slug: 'gestao-premio-visao-geral',
       title: 'Gestão de Prêmio: visão geral da remuneração variável',
       summary: 'O ciclo completo do PLR/bônus: das regras à folha de pagamento.',
-      tags: ['premio', 'plr', 'bonus', 'remuneracao variavel', 'apuracao'],
+      tags: ['premio', 'plr', 'bonus', 'remuneração variável', 'apuracao'],
       body: `O módulo **Gestão de Prêmio** faz toda a remuneração variável (PLR, bônus, prêmio por desempenho) de ponta a ponta, substituindo as planilhas de cálculo.
 
 ## O ciclo mensal
@@ -32,7 +32,7 @@ export const gestaoPremio: HelpCatalogCategory = {
       slug: 'premio-regras-anexos-competencias',
       title: 'Regras do prêmio: anexos, indicadores e matriz área × cargo',
       summary: 'Como desenhar e versionar as regras da remuneração variável.',
-      tags: ['anexo', 'regras', 'matriz', 'faixas', 'indicadores do premio', 'competencia'],
+      tags: ['anexo', 'regras', 'matriz', 'faixas', 'indicadores do prêmio', 'competencia'],
       body: `## Anexos (governança das regras)
 As regras vivem em **Anexos versionados**: cada mudança cria uma versão que passa por **submissão → aprovação → publicação**. Dá para **comparar versões** e ver quem aprovou o quê — a regra vigente nunca é ambígua.
 
@@ -52,7 +52,7 @@ A **competência** é o ciclo mensal: abertura → validação (checklist) → a
       slug: 'premio-apuracao-memoria-calculo',
       title: 'Apuração e memória de cálculo',
       summary: 'Rode o motor, entenda cada valor e trate ajustes e exceções.',
-      tags: ['apuracao', 'calculo', 'memoria de calculo', 'ajuste', 'excecao', 'aprovar apuracao'],
+      tags: ['apuracao', 'calculo', 'memória de cálculo', 'ajuste', 'excecao', 'aprovar apuração'],
       body: `## Rodar a apuração
 1. Com a base elegível e o realizado carregados, vá em **Apuração** e **rode o cálculo** da competência;
 2. O motor aplica as regras da matriz: para cada colaborador, os indicadores da sua célula (área × cargo), os pesos, as faixas de atingimento e os **moderadores** (fatores como frequência);

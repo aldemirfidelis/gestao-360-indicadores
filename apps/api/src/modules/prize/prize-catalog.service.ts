@@ -83,17 +83,17 @@ export class PrizeCatalogService {
   }
 
   async renameArea(me: AuthPayload, id: string, name: string) {
-    if (!name?.trim()) throw new BadRequestException('Nome obrigatorio');
+    if (!name?.trim()) throw new BadRequestException('Nome obrigatório');
     const cur = await this.prisma.prizeOrgRef.findFirst({ where: { id, companyId: me.companyId } });
-    if (!cur) throw new NotFoundException('Area nao encontrada');
+    if (!cur) throw new NotFoundException('Área não encontrada');
     const updated = await this.prisma.prizeOrgRef.update({ where: { id }, data: { name: name.trim(), normalizedKey: normalizeRuleKey(name) } });
     await this.audit.log(me, { action: 'RENAME', entityType: 'ORG_REF', entityId: id, before: cur, after: updated });
     return updated;
   }
   async renameCargo(me: AuthPayload, id: string, name: string) {
-    if (!name?.trim()) throw new BadRequestException('Nome obrigatorio');
+    if (!name?.trim()) throw new BadRequestException('Nome obrigatório');
     const cur = await this.prisma.prizeCargoRef.findFirst({ where: { id, companyId: me.companyId } });
-    if (!cur) throw new NotFoundException('Cargo nao encontrado');
+    if (!cur) throw new NotFoundException('Cargo não encontrado');
     const updated = await this.prisma.prizeCargoRef.update({ where: { id }, data: { name: name.trim(), normalizedKey: normalizeRuleKey(name) } });
     await this.audit.log(me, { action: 'RENAME', entityType: 'CARGO_REF', entityId: id, before: cur, after: updated });
     return updated;

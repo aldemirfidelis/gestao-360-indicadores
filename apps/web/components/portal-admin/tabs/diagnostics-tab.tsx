@@ -1,4 +1,5 @@
 'use client';
+import { formatQuantity } from '@g360/shared';
 
 import type { ReactElement } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -32,7 +33,7 @@ export function DiagnosticsTab() {
       </div>
       {q.isLoading && <LoadingState label="Analisando o portal..." />}
       {d && (
-        <SectionCard title="Achados" description={`${d.findings.length} item(ns) · gerado em ${formatDate(d.generatedAt)}`} contentClassName={d.findings.length ? 'p-0' : ''}>
+        <SectionCard title="Achados" description={`${formatQuantity(d.findings.length, 'item', 'itens')} · gerado em ${formatDate(d.generatedAt)}`} contentClassName={d.findings.length ? 'p-0' : ''}>
           {d.findings.length === 0 ? (
             <div className="flex items-center gap-2 rounded-lg border border-status-green/30 bg-status-green/10 p-4 text-sm"><CheckCircle2 className="h-4 w-4 text-status-green" />Nenhum problema detectado.</div>
           ) : (

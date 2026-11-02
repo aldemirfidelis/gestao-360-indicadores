@@ -986,3 +986,28 @@ portal em Configuracoes. A tela e a API de identidade visual continuam no codigo
   `/settings`, `/settings/identidade-visual` e Portal Admin com HTTP 200; leitura
   e gravacao da identidade visual sem token com 401; versao publica no login e
   nova rota, titulo e atalho confirmados nos arquivos compilados da imagem.
+
+## Revisão geral de português (2026-11-02, local)
+
+Pedido do usuário a partir da recomendação sem acentos no Meu Dia: corrigir
+português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`.
+
+- Corrigidos textos da interface, API, mensagens, ajuda, relatórios, notificações,
+  catálogos, site e fontes de dados fictícios, incluindo módulos suspensos.
+- Concordância de quantidades com `formatQuantity` no shared: Meu Dia, equipe,
+  atas, checklists e contagens administrativas; a frase do anexo está corrigida.
+- Migration nova `20261102210000_portuguese_catalog_copy`: 571 substituições
+  condicionadas à chave e ao texto padrão antigo, em oito catálogos. Preserva
+  personalizações e concessões de acesso. Sem alteração estrutural do banco.
+- Validação: API 127 arquivos / 903 testes, com reexecução aprovada dos sete
+  arquivos ajustados (123 testes); web 15 / 112; shared quatro / 21; tsc completo
+  da web; lint sem erros; builds de API/Web em cópia temporária na Vultr.
+- A migration passou em 1.080 cenários num Postgres 17 descartável e foi repetida
+  para confirmar idempotência. O container descartável foi encerrado; o Postgres
+  de produção e as imagens em execução não foram alterados.
+- Cópia de validação na Vultr: `/tmp/g360-portuguese-validation-20261102-b`,
+  imagens `g360-api:portuguese-copy-review-20261102` e Web equivalente.
+- Sem navegador nem tsc local da API, conforme a preferência anterior. Aliases,
+  rotas, chaves, eSocial e arquivos fiscais ASCII preservados e conferidos.
+- Publicação autorizada pelo usuário em 2026-11-02. Commit, push e deploy na
+  Vultr em andamento, com backup antes da migration de dados.

@@ -51,7 +51,7 @@ export class DeviationsService {
       where: { id, companyId, deletedAt: null },
       include: { indicator: { select: { ownerNodeId: true } } },
     });
-    if (!dev) throw new NotFoundException('Desvio nao encontrado');
+    if (!dev) throw new NotFoundException('Desvio não encontrado');
     return dev;
   }
 
@@ -121,7 +121,7 @@ export class DeviationsService {
         meetings: { select: { id: true, title: true, status: true }, orderBy: { createdAt: 'desc' } },
       },
     });
-    if (!d) throw new NotFoundException('Desvio nao encontrado');
+    if (!d) throw new NotFoundException('Desvio não encontrado');
 
     // Restrição por área: bloqueia acesso direto a desvio de área não permitida e
     // aplica projeção RESUMIDA quando o nível de visibilidade for SUMMARY.
@@ -141,7 +141,7 @@ export class DeviationsService {
       where: { id: input.indicatorId, companyId: input.companyId, deletedAt: null },
       select: { name: true, ownerNodeId: true, type: true },
     });
-    if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+    if (!indicator) throw new NotFoundException('Indicador não encontrado');
     // Apenas indicadores estratégicos têm tratativa de desvio/causa raiz. Operacionais (e demais
     // tipos) são apenas para visualização e pagamento de prêmio.
     if (indicator.type !== 'STRATEGIC') {
@@ -267,7 +267,7 @@ export class DeviationsService {
       where: { id: causeId, deviation: { companyId: me.companyId, deletedAt: null } },
       include: { deviation: { include: { indicator: { select: { ownerNodeId: true } } } } },
     });
-    if (!cause) throw new NotFoundException('Causa nao encontrada');
+    if (!cause) throw new NotFoundException('Causa não encontrada');
     await this.access.assertCanWrite(me.sub, cause.deviation.indicator?.ownerNodeId ?? null, MODULE, 'edit');
     return this.prisma.deviationCause.delete({ where: { id: causeId } });
   }
@@ -375,14 +375,14 @@ export class DeviationsService {
         actions: { select: { status: true } },
       },
     });
-    if (!dev) throw new NotFoundException('Desvio nao encontrado');
+    if (!dev) throw new NotFoundException('Desvio não encontrado');
     await this.access.assertCanWrite(me.sub, dev.indicator?.ownerNodeId ?? null, MODULE, 'edit');
 
     const completedStatuses = ['DONE', 'DONE_LATE', 'CANCELLED', 'EFFECTIVE', 'INEFFECTIVE'];
     const open = dev.actions.filter((a) => !completedStatuses.includes(a.status));
     if (open.length > 0) {
       throw new ForbiddenException(
-        `Existem ${open.length} ação(oes) abertas. Conclua-as antes de fechar o desvio.`,
+        `Ações abertas: ${open.length}. Conclua essas ações antes de fechar o desvio.`,
       );
     }
     const lateClose = dev.dueDate && dev.dueDate < new Date();
@@ -400,7 +400,7 @@ export class DeviationsService {
       eventType: TraceEventType.CLOSED,
       entityType: TraceEntityType.DEVIATION,
       entityId: closed.id,
-      title: `Desvio #${closed.number} concluido`,
+      title: `Desvio #${closed.number} concluído`,
       description: closed.title,
       statusFrom: dev.status,
       statusTo: closed.status,

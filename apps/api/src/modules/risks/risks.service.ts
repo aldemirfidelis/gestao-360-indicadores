@@ -84,7 +84,7 @@ export class RisksService {
     if (!area) return;
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     if (permitted && !permitted.includes(area)) {
-      throw new ForbiddenException('Voce nao tem acesso aos riscos desta area.');
+      throw new ForbiddenException('Você não tem acesso aos riscos desta área.');
     }
   }
 
@@ -122,7 +122,7 @@ export class RisksService {
   private parseStatus(value?: string): RiskStatus | undefined {
     if (!value) return undefined;
     if (!Object.values(RiskStatus).includes(value as RiskStatus)) {
-      throw new BadRequestException('Status de risco invalido.');
+      throw new BadRequestException('Status de risco inválido.');
     }
     return value as RiskStatus;
   }
@@ -130,14 +130,14 @@ export class RisksService {
   private parseCategory(value?: string): RiskCategory | undefined {
     if (!value) return undefined;
     if (!Object.values(RiskCategory).includes(value as RiskCategory)) {
-      throw new BadRequestException('Categoria de risco invalida.');
+      throw new BadRequestException('Categoria de risco inválida.');
     }
     return value as RiskCategory;
   }
 
   private requiredText(value: unknown, field: string) {
     const text = String(value ?? '').trim();
-    if (!text) throw new BadRequestException(`${field} e obrigatorio.`);
+    if (!text) throw new BadRequestException(`${field} é obrigatório.`);
     return text;
   }
 
@@ -155,7 +155,7 @@ export class RisksService {
   private scoreValue(value: unknown, fallback = 3) {
     if (value === undefined || value === null || value === '') return fallback;
     const n = Number(value);
-    if (!Number.isFinite(n)) throw new BadRequestException('Probabilidade e impacto devem ser numericos.');
+    if (!Number.isFinite(n)) throw new BadRequestException('Probabilidade e impacto devem ser numéricos.');
     return Math.min(5, Math.max(1, Math.round(n)));
   }
 
@@ -164,7 +164,7 @@ export class RisksService {
     if (value === undefined) return undefined;
     if (value === null || value === '') return null;
     const n = Number(value);
-    if (!Number.isFinite(n)) throw new BadRequestException('Probabilidade e impacto residuais devem ser numericos.');
+    if (!Number.isFinite(n)) throw new BadRequestException('Probabilidade e impacto residuais devem ser numéricos.');
     return Math.min(5, Math.max(1, Math.round(n)));
   }
 
@@ -172,7 +172,7 @@ export class RisksService {
     if (value === undefined) return undefined;
     if (value === null || value === '') return null;
     const d = new Date(String(value));
-    if (Number.isNaN(d.getTime())) throw new BadRequestException(`${field} invalido.`);
+    if (Number.isNaN(d.getTime())) throw new BadRequestException(`${field} inválido.`);
     return d;
   }
 
@@ -211,7 +211,7 @@ export class RisksService {
       where: { id, companyId, deletedAt: null },
       include: this.include(),
     });
-    if (!risk) throw new NotFoundException('Risco nao encontrado');
+    if (!risk) throw new NotFoundException('Risco não encontrado');
     return risk;
   }
 
@@ -403,7 +403,7 @@ export class RisksService {
   }
 
   async create(me: AuthPayload, body: any) {
-    const title = this.requiredText(body?.title, 'Titulo');
+    const title = this.requiredText(body?.title, 'Título');
     const category = this.parseCategory(body?.category) ?? RiskCategory.OPERATIONAL;
     const status = this.parseStatus(body?.status) ?? RiskStatus.IDENTIFIED;
     const links = await this.validateLinks(me.companyId, {
@@ -429,8 +429,8 @@ export class RisksService {
         residualImpact: this.optionalScale(body?.residualImpact) ?? null,
         mitigationPlan: this.nullableText(body?.mitigationPlan) ?? null,
         contingencyPlan: this.nullableText(body?.contingencyPlan) ?? null,
-        dueDate: this.optionalDate(body?.dueDate, 'Data de mitigacao') ?? null,
-        identifiedAt: this.optionalDate(body?.identifiedAt, 'Data de identificacao') ?? new Date(),
+        dueDate: this.optionalDate(body?.dueDate, 'Data de mitigação') ?? null,
+        identifiedAt: this.optionalDate(body?.identifiedAt, 'Data de identificação') ?? new Date(),
         closedAt: status === RiskStatus.CLOSED ? new Date() : null,
         createdById: me.sub,
         ...links.ids,
@@ -470,7 +470,7 @@ export class RisksService {
     await this.assertWriteArea(me, links.area, 'edit');
 
     const data: any = { ...links.ids };
-    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Titulo');
+    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Título');
     if ('description' in (patch ?? {})) data.description = this.nullableText(patch.description);
     if ('category' in (patch ?? {})) data.category = this.parseCategory(patch.category);
     const statusChanged = 'status' in (patch ?? {});
@@ -484,8 +484,8 @@ export class RisksService {
     if ('residualImpact' in (patch ?? {})) data.residualImpact = this.optionalScale(patch.residualImpact);
     if ('mitigationPlan' in (patch ?? {})) data.mitigationPlan = this.nullableText(patch.mitigationPlan);
     if ('contingencyPlan' in (patch ?? {})) data.contingencyPlan = this.nullableText(patch.contingencyPlan);
-    if ('dueDate' in (patch ?? {})) data.dueDate = this.optionalDate(patch.dueDate, 'Data de mitigacao');
-    if ('identifiedAt' in (patch ?? {})) data.identifiedAt = this.optionalDate(patch.identifiedAt, 'Data de identificacao') ?? before.identifiedAt;
+    if ('dueDate' in (patch ?? {})) data.dueDate = this.optionalDate(patch.dueDate, 'Data de mitigação');
+    if ('identifiedAt' in (patch ?? {})) data.identifiedAt = this.optionalDate(patch.identifiedAt, 'Data de identificação') ?? before.identifiedAt;
 
     const updated = await this.prisma.riskRegister.update({
       where: { id },
@@ -525,7 +525,7 @@ export class RisksService {
       eventType: TraceEventType.UPDATED,
       entityType: TraceEntityType.RISK,
       entityId: risk.id,
-      title: 'Risco excluido',
+      title: 'Risco excluído',
       description: risk.title,
       statusFrom: risk.status,
       statusTo: 'DELETED',
@@ -549,7 +549,7 @@ export class RisksService {
         where: { id: ids.orgNodeId, companyId, deletedAt: null },
         select: { id: true },
       });
-      if (!orgNode) throw new NotFoundException('Area ou processo nao encontrado');
+      if (!orgNode) throw new NotFoundException('Área ou processo não encontrado');
       areas.push(orgNode.id);
     }
 
@@ -558,7 +558,7 @@ export class RisksService {
         where: { id: ids.indicatorId, companyId, deletedAt: null },
         select: { ownerNodeId: true },
       });
-      if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+      if (!indicator) throw new NotFoundException('Indicador não encontrado');
       areas.push(indicator.ownerNodeId);
     }
 
@@ -567,7 +567,7 @@ export class RisksService {
         where: { id: ids.projectId, companyId, deletedAt: null },
         select: { indicator: { select: { ownerNodeId: true } } },
       });
-      if (!project) throw new NotFoundException('Projeto nao encontrado');
+      if (!project) throw new NotFoundException('Projeto não encontrado');
       if (project.indicator?.ownerNodeId) areas.push(project.indicator.ownerNodeId);
     }
 
@@ -576,7 +576,7 @@ export class RisksService {
         where: { id: ids.mitigationActionId, companyId, deletedAt: null },
         select: { ownerNodeId: true, indicator: { select: { ownerNodeId: true } } },
       });
-      if (!action) throw new NotFoundException('Plano de mitigacao nao encontrado');
+      if (!action) throw new NotFoundException('Plano de mitigação não encontrado');
       const area = action.ownerNodeId ?? action.indicator?.ownerNodeId ?? null;
       if (area) areas.push(area);
     }
@@ -586,12 +586,12 @@ export class RisksService {
         where: { id: ids.responsibleUserId, companyId, deletedAt: null, active: true },
         select: { id: true },
       });
-      if (!user) throw new NotFoundException('Responsavel nao encontrado');
+      if (!user) throw new NotFoundException('Responsável não encontrado');
     }
 
     const uniqueAreas = Array.from(new Set(areas.filter(Boolean)));
     if (uniqueAreas.length > 1) {
-      throw new ConflictException('Vinculos do risco pertencem a areas diferentes.');
+      throw new ConflictException('Vínculos do risco pertencem a áreas diferentes.');
     }
 
     return { ids, area: uniqueAreas[0] ?? null };

@@ -74,7 +74,7 @@ export class TreatmentsService {
         actions: { include: { responsibleUser: { select: { id: true, name: true, email: true } } } },
       },
     });
-    if (!treatment) throw new NotFoundException('Tratativa nao encontrada');
+    if (!treatment) throw new NotFoundException('Tratativa não encontrada');
     await this.assertReadArea(me, treatment.indicator?.ownerNodeId ?? null);
     return {
       ...treatment,
@@ -106,7 +106,7 @@ export class TreatmentsService {
       where: { id: resultId, indicator: { companyId } },
       include: { indicator: true },
     });
-    if (!result) throw new NotFoundException('Resultado nao encontrado');
+    if (!result) throw new NotFoundException('Resultado não encontrado');
     await this.assertWriteArea(me, result.indicator.ownerNodeId);
     const treatment = await this.prisma.treatmentCase.upsert({
       where: { indicatorId_periodRef: { indicatorId: result.indicatorId, periodRef: result.periodRef } },
@@ -190,7 +190,7 @@ export class TreatmentsService {
     const cause = await this.prisma.deviationCause.create({
       data: {
         deviationId: deviation.id,
-        category: 'Causa provavel',
+        category: 'Causa provável',
         description: body.probableCause || body.rootCause,
         weight: 1,
       },
@@ -202,10 +202,10 @@ export class TreatmentsService {
         method: body.method,
         content: [
           `Problema identificado: ${body.problem}`,
-          body.probableCause ? `Causa provavel: ${body.probableCause}` : null,
+          body.probableCause ? `Causa provável: ${body.probableCause}` : null,
           `Causa raiz: ${body.rootCause}`,
-          body.evidence ? `Evidencias: ${body.evidence}` : null,
-          body.observations ? `Observacoes: ${body.observations}` : null,
+          body.evidence ? `Evidências: ${body.evidence}` : null,
+          body.observations ? `Observações: ${body.observations}` : null,
         ].filter(Boolean).join('\n\n'),
       },
     });
@@ -436,8 +436,8 @@ export class TreatmentsService {
       eventType: resolved ? TraceEventType.INDICATOR_RESOLVED : TraceEventType.INDICATOR_REEVALUATED,
       entityType: TraceEntityType.INDICATOR,
       entityId: treatment.indicatorId,
-      title: resolved ? 'Indicador resolvido após reavaliacao' : 'Indicador reavaliado e ainda fora da meta',
-      description: lastResult ? `${lastResult.periodRef}: farol ${lastResult.light}` : 'Sem novo resultado lancado',
+      title: resolved ? 'Indicador resolvido após reavaliação' : 'Indicador reavaliado e ainda fora da meta',
+      description: lastResult ? `${lastResult.periodRef}: farol ${lastResult.light}` : 'Sem novo resultado lançado',
       statusFrom: treatment.status,
       statusTo: updated.status,
       metadata: { treatmentId: id, lastResultId: lastResult?.id, light: lastResult?.light },
@@ -455,7 +455,7 @@ export class TreatmentsService {
         analysis: true,
       },
     });
-    if (!treatment) throw new NotFoundException('Tratativa nao encontrada');
+    if (!treatment) throw new NotFoundException('Tratativa não encontrada');
     return treatment;
   }
 
@@ -490,9 +490,9 @@ export class TreatmentsService {
       `Indicador fora da meta: ${treatment.indicator.name}`,
       `Resultado atual: ${treatment.result?.value ?? '-'} | Meta esperada: ${target ?? '-'}`,
       'Desvio identificado e impacto no processo',
-      treatment.analysis ? 'Análise de causa e causa raiz' : 'Definicao da análise de causa',
-      'Discussão das ações necessarias',
-      'Definicao de responsáveis e prazos',
+      treatment.analysis ? 'Análise de causa e causa raiz' : 'Definição da análise de causa',
+      'Discussão das ações necessárias',
+      'Definição de responsáveis e prazos',
       'Criação do plano de ação',
       'Próximos passos e forma de acompanhamento',
     ];
@@ -500,7 +500,7 @@ export class TreatmentsService {
 
   private alertsFor(treatment: any) {
     const alerts: string[] = [];
-    if (!treatment.analysisId) alerts.push('Indicador fora da meta sem análise de causa concluida.');
+    if (!treatment.analysisId) alerts.push('Indicador fora da meta sem análise de causa concluída.');
     if (treatment.analysisId && !treatment.meetingId) alerts.push('Análise criada sem reunião de tratativa.');
     if (treatment.meetingId && treatment.actions.length === 0 && (treatment.meeting?.actions?.length ?? 0) === 0) {
       alerts.push('Reunião agendada sem plano de ação.');

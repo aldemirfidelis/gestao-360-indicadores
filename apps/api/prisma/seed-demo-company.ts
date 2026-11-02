@@ -918,13 +918,13 @@ async function main() {
     { label: 'Observações', type: 'TEXTAREA' },
   ];
   const formTypeConfigs = await Promise.all([
-    prisma.formTypeConfig.create({ data: { companyId, code: 'FORM', name: 'Formulario', category: 'FORM', color: '#2563eb', icon: 'FileText', purpose: 'Coleta estruturada de dados.', createdById: pick(userIds) } }),
-    prisma.formTypeConfig.create({ data: { companyId, code: 'CHECKLIST', name: 'Checklist', category: 'CHECKLIST', color: '#16a34a', icon: 'ClipboardCheck', purpose: 'Verificacao operacional.', createdById: pick(userIds) } }),
-    prisma.formTypeConfig.create({ data: { companyId, code: 'OP_RECORD', name: 'Registro operacional', category: 'OPERATIONAL_RECORD', color: '#f59e0b', icon: 'NotebookTabs', purpose: 'Registro recorrente rastreavel.', createdById: pick(userIds) } }),
+    prisma.formTypeConfig.create({ data: { companyId, code: 'FORM', name: 'Formulário', category: 'FORM', color: '#2563eb', icon: 'FileText', purpose: 'Coleta estruturada de dados.', createdById: pick(userIds) } }),
+    prisma.formTypeConfig.create({ data: { companyId, code: 'CHECKLIST', name: 'Checklist', category: 'CHECKLIST', color: '#16a34a', icon: 'ClipboardCheck', purpose: 'Verificação operacional.', createdById: pick(userIds) } }),
+    prisma.formTypeConfig.create({ data: { companyId, code: 'OP_RECORD', name: 'Registro operacional', category: 'OPERATIONAL_RECORD', color: '#f59e0b', icon: 'NotebookTabs', purpose: 'Registro recorrente rastreável.', createdById: pick(userIds) } }),
   ]);
-  const formCategories = await Promise.all(['Operacoes', 'Qualidade', 'Seguranca'].map((name) => prisma.formCategory.create({ data: { companyId, name, active: true } })));
+  const formCategories = await Promise.all(['Operações', 'Qualidade', 'Segurança'].map((name) => prisma.formCategory.create({ data: { companyId, name, active: true } })));
   const formFolder = await prisma.formFolder.create({ data: { companyId, name: 'Biblioteca corporativa', createdById: pick(userIds) } });
-  await prisma.formTag.createMany({ data: ['Critico', 'Recorrente', 'Offline'].map((name) => ({ companyId, name })) });
+  await prisma.formTag.createMany({ data: ['Crítico', 'Recorrente', 'Offline'].map((name) => ({ companyId, name })) });
   for (let i = 0; i < 5; i++) {
     const status = pick([...FORM_STATUS]);
     const type = pick([...FORM_TYPE]);
@@ -938,7 +938,7 @@ async function main() {
         ownerUserId: pick(userIds), createdById: pick(userIds),
         title: formTitle(), description: 'Modelo de formulário/checklist fictício.',
         purpose: 'Padronizar registros operacionais e manter rastreabilidade.',
-        instructions: 'Preencher todos os campos obrigatorios e anexar evidencias quando aplicavel.',
+        instructions: 'Preencher todos os campos obrigatórios e anexar evidências quando aplicável.',
         type, status, version: templateVersion,
         confidentiality: 'INTERNAL', reusable: true, estimatedMinutes: rint(5, 25), tags: chance(0.5) ? ['Recorrente'] : [],
       },
@@ -971,7 +971,7 @@ async function main() {
       data: {
         companyId, templateId: template.id, versionNumber: 1, versionLabel: templateVersion,
         code: template.code, status: template.status === 'ACTIVE' ? 'PUBLISHED' : template.status,
-        changeReason: 'Versao inicial do seed demo',
+        changeReason: 'Versão inicial do seed demo',
         builderSnapshot: { template, fields },
         fieldsSnapshot: fields,
         createdById: pick(userIds),
@@ -987,7 +987,7 @@ async function main() {
       ? await prisma.formExecution.create({
           data: {
             companyId, templateId: template.id, templateVersionId: version.id,
-            code: `FEX-${String(i + 1).padStart(4, '0')}`, title: `Execucao - ${template.title}`,
+            code: `FEX-${String(i + 1).padStart(4, '0')}`, title: `Execução - ${template.title}`,
             status: 'IN_PROGRESS', orgNodeId: template.orgNodeId, indicatorId: template.indicatorId,
             assignedToId: pick(userIds), dueDate: new Date(Date.now() + rint(2, 20) * 86_400_000),
             startedAt: new Date(), progress: rint(20, 80), snapshot: { template, fields }, createdById: pick(userIds),
@@ -1051,8 +1051,8 @@ async function main() {
     const ishikawa = await prisma.actionAnalysisSession.create({
       data: {
         actionId, method: 'ISHIKAWA', status: 'VALIDATED',
-        problem: 'Resultado do indicador abaixo da meta no periodo (demonstracao).',
-        rootCause: 'Falta de padronizacao na operacao somada a desgaste de equipamento critico.',
+        problem: 'Resultado do indicador abaixo da meta no período (demonstração).',
+        rootCause: 'Falta de padronização na operação somada a desgaste de equipamento crítico.',
         responsibleUserId: pick(userIds),
       },
       select: { id: true },
@@ -1061,35 +1061,35 @@ async function main() {
       await prisma.actionIshikawaCause.create({
         data: {
           sessionId: ishikawa.id, category: cat, title: `Causa de ${cat}`,
-          description: `Causa potencial relacionada a ${cat.toLowerCase()} identificada no brainstorming (ficticia).`,
+          description: `Causa potencial relacionada a ${cat.toLowerCase()} identificada no brainstorming (fictícia).`,
           priority: pick(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const), impact: rint(2, 5), probability: rint(2, 5),
           status: pick(['DRAFT', 'CONFIRMED', 'DISCARDED'] as const), likelyRootCause: chance(0.3), responsibleUserId: pick(userIds),
         },
       });
     }
     const whys = await prisma.actionAnalysisSession.create({
-      data: { actionId, method: 'FIVE_WHYS', status: 'READY', problem: 'Por que o indicador ficou abaixo da meta no periodo?', responsibleUserId: pick(userIds) },
+      data: { actionId, method: 'FIVE_WHYS', status: 'READY', problem: 'Por que o indicador ficou abaixo da meta no período?', responsibleUserId: pick(userIds) },
       select: { id: true },
     });
     const whyQuestions = [
       'Por que o resultado ficou abaixo da meta?',
-      'Por que houve parada nao programada no equipamento?',
-      'Por que o equipamento falhou durante a operacao?',
-      'Por que a manutencao preventiva nao detectou o desgaste?',
-      'Por que o plano de manutencao estava desatualizado?',
+      'Por que houve parada não programada no equipamento?',
+      'Por que o equipamento falhou durante a operação?',
+      'Por que a manutenção preventiva não detectou o desgaste?',
+      'Por que o plano de manutenção estava desatualizado?',
     ];
     for (let p = 0; p < whyQuestions.length; p++) {
       await prisma.actionFiveWhy.create({
-        data: { sessionId: whys.id, position: p + 1, question: whyQuestions[p], answer: 'Resposta investigada com a equipe (ficticia para demonstracao).', isRootCause: p === whyQuestions.length - 1 },
+        data: { sessionId: whys.id, position: p + 1, question: whyQuestions[p], answer: 'Resposta investigada com a equipe (fictícia para demonstração).', isRootCause: p === whyQuestions.length - 1 },
       });
     }
     const pdca = await prisma.actionAnalysisSession.create({
-      data: { actionId, method: 'PDCA', status: 'IN_PROGRESS', problem: 'Ciclo de melhoria continua para recuperar o indicador.', responsibleUserId: pick(userIds) },
+      data: { actionId, method: 'PDCA', status: 'IN_PROGRESS', problem: 'Ciclo de melhoria contínua para recuperar o indicador.', responsibleUserId: pick(userIds) },
       select: { id: true },
     });
     const phases: [string, string, string][] = [
-      ['PLAN', 'Planejar', 'Definir metas, analisar causas e elaborar o plano de acao'],
-      ['DO', 'Executar', 'Implementar as acoes planejadas e treinar a equipe'],
+      ['PLAN', 'Planejar', 'Definir metas, analisar causas e elaborar o plano de ação'],
+      ['DO', 'Executar', 'Implementar as ações planejadas e treinar a equipe'],
       ['CHECK', 'Verificar', 'Avaliar os resultados versus as metas estabelecidas'],
       ['ACT', 'Agir', 'Padronizar o que funcionou ou corrigir o que desviou'],
     ];
@@ -1097,7 +1097,7 @@ async function main() {
       const [phase, title, objective] = phases[pi];
       await prisma.actionPdcaStep.create({
         data: {
-          sessionId: pdca.id, phase, title, objective, description: 'Etapa do ciclo PDCA (ficticia para demonstracao).',
+          sessionId: pdca.id, phase, title, objective, description: 'Etapa do ciclo PDCA (fictícia para demonstração).',
           priority: 'MEDIUM', progress: pi === 0 ? 100 : pi === 1 ? 60 : 0,
           status: pi === 0 ? 'DONE' : pi === 1 ? 'IN_PROGRESS' : 'PENDING', responsibleUserId: pick(userIds),
         },
@@ -1109,8 +1109,8 @@ async function main() {
   const allChannels = { platform: true, homeCard: true, myDay: true, qrCode: true, topBanner: false, mandatoryPopup: false, digitalBoard: false, corporateTv: false, email: false, push: false };
   const commCampaign = await prisma.communicationCampaign.create({
     data: {
-      companyId, name: 'Campanha Seguranca em Primeiro Lugar', objective: 'Reforcar a cultura de seguranca no dia a dia.',
-      category: 'Seguranca', status: 'ACTIVE', ownerId: pick(userIds),
+      companyId, name: 'Campanha Segurança em Primeiro Lugar', objective: 'Reforcar a cultura de segurança no dia a dia.',
+      category: 'Segurança', status: 'ACTIVE', ownerId: pick(userIds),
       startsAt: new Date(Date.now() - 20 * 86_400_000), endsAt: new Date(Date.now() + 40 * 86_400_000),
       targetAudience: { scope: 'ALL_COMPANY' }, indicatorIds: allIndIds.slice(0, 2), actionIds: actionIds.slice(0, 2), createdById: pick(userIds),
     },
@@ -1121,13 +1121,13 @@ async function main() {
     priority: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL' | 'URGENT'; status: 'PUBLISHED' | 'SCHEDULED' | 'DRAFT' | 'PENDING_APPROVAL';
     mandatory?: boolean; campaign?: boolean; poll?: any; linkedModule?: string; linkedEntityId?: string;
   }> = [
-    { title: 'Atualizacao da Politica de Seguranca do Trabalho', subtitle: 'Leitura obrigatoria para todos os colaboradores', content: 'Prezados(as),\n\nInformamos a atualizacao da Politica de Seguranca do Trabalho, com novas diretrizes para uso de EPIs e bloqueio de equipamentos.\n\nApos a leitura, confirme sua ciencia.', type: 'SIMPLE', category: 'Conformidade', priority: 'HIGH', status: 'PUBLISHED', mandatory: true, campaign: true },
-    { title: 'Resultados de Producao do Mes', subtitle: 'Destaques de eficiencia e produtividade', content: 'Confira os destaques do mes:\n\n- Eficiencia produtiva acima da meta\n- Reducao de paradas nao programadas\n- Volume produzido dentro do planejado\n\nParabens a todas as equipes!', type: 'BANNER', category: 'Resultados', priority: 'NORMAL', status: 'PUBLISHED', linkedModule: 'INDICATOR', linkedEntityId: allIndIds[0] },
-    { title: 'Treinamento: Boas Praticas de Fabricacao', content: 'Assista ao video de treinamento sobre boas praticas de fabricacao e higiene industrial. A conclusao e obrigatoria para as areas industriais.', type: 'VIDEO', category: 'Treinamento', priority: 'NORMAL', status: 'PUBLISHED' },
-    { title: 'Enquete: Clima Organizacional', content: 'Sua opiniao importa! Como voce avalia o ambiente de trabalho na sua area?', type: 'POLL', category: 'Pessoas', priority: 'NORMAL', status: 'PUBLISHED', campaign: true, poll: { question: 'Como voce avalia o ambiente de trabalho na sua area?', type: 'SINGLE', options: [{ id: 'otimo', label: 'Otimo' }, { id: 'bom', label: 'Bom' }, { id: 'regular', label: 'Regular' }, { id: 'ruim', label: 'Ruim' }], anonymous: true, allowMultiple: false, showResults: true } },
-    { title: 'Pesquisa de Satisfacao com o Refeitorio', content: 'Ajude-nos a melhorar! Responda a pesquisa sobre a qualidade das refeicoes.', type: 'SURVEY', category: 'Pessoas', priority: 'LOW', status: 'PUBLISHED', poll: { question: 'Qual seu nivel de satisfacao com o refeitorio?', type: 'SINGLE', options: [{ id: 'muito_satisfeito', label: 'Muito satisfeito' }, { id: 'satisfeito', label: 'Satisfeito' }, { id: 'insatisfeito', label: 'Insatisfeito' }], anonymous: false, allowMultiple: false, showResults: true } },
-    { title: 'Manutencao Programada da Linha de Producao', subtitle: 'Parada prevista para o proximo fim de semana', content: 'Comunicamos a parada programada da linha de producao para manutencao preventiva. Planejem as atividades das areas dependentes.', type: 'SIMPLE', category: 'Operacional', priority: 'HIGH', status: 'SCHEDULED' },
-    { title: 'Rascunho: Programa de Reconhecimento', content: 'Em elaboracao: novo programa de reconhecimento de colaboradores destaque.', type: 'SIMPLE', category: 'Institucional', priority: 'LOW', status: 'DRAFT' },
+    { title: 'Atualização da Política de Segurança do Trabalho', subtitle: 'Leitura obrigatória para todos os colaboradores', content: 'Prezados(as),\n\nInformamos a atualização da Política de Segurança do Trabalho, com novas diretrizes para uso de EPIs e bloqueio de equipamentos.\n\nApós a leitura, confirme sua ciência.', type: 'SIMPLE', category: 'Conformidade', priority: 'HIGH', status: 'PUBLISHED', mandatory: true, campaign: true },
+    { title: 'Resultados de Produção do Mês', subtitle: 'Destaques de eficiência e produtividade', content: 'Confira os destaques do mês:\n\n- Eficiência produtiva acima da meta\n- Redução de paradas não programadas\n- Volume produzido dentro do planejado\n\nParabéns a todas as equipes!', type: 'BANNER', category: 'Resultados', priority: 'NORMAL', status: 'PUBLISHED', linkedModule: 'INDICATOR', linkedEntityId: allIndIds[0] },
+    { title: 'Treinamento: Boas Práticas de Fabricação', content: 'Assista ao vídeo de treinamento sobre boas práticas de fabricação e higiene industrial. A conclusão é obrigatória para as áreas industriais.', type: 'VIDEO', category: 'Treinamento', priority: 'NORMAL', status: 'PUBLISHED' },
+    { title: 'Enquete: Clima Organizacional', content: 'Sua opinião importa! Como você avalia o ambiente de trabalho na sua área?', type: 'POLL', category: 'Pessoas', priority: 'NORMAL', status: 'PUBLISHED', campaign: true, poll: { question: 'Como você avalia o ambiente de trabalho na sua área?', type: 'SINGLE', options: [{ id: 'otimo', label: 'Ótimo' }, { id: 'bom', label: 'Bom' }, { id: 'regular', label: 'Regular' }, { id: 'ruim', label: 'Ruim' }], anonymous: true, allowMultiple: false, showResults: true } },
+    { title: 'Pesquisa de Satisfação com o Refeitório', content: 'Ajude-nos a melhorar! Responda a pesquisa sobre a qualidade das refeições.', type: 'SURVEY', category: 'Pessoas', priority: 'LOW', status: 'PUBLISHED', poll: { question: 'Qual seu nível de satisfação com o refeitório?', type: 'SINGLE', options: [{ id: 'muito_satisfeito', label: 'Muito satisfeito' }, { id: 'satisfeito', label: 'Satisfeito' }, { id: 'insatisfeito', label: 'Insatisfeito' }], anonymous: false, allowMultiple: false, showResults: true } },
+    { title: 'Manutenção Programada da Linha de Produção', subtitle: 'Parada prevista para o próximo fim de semana', content: 'Comunicamos a parada programada da linha de produção para manutenção preventiva. Planejem as atividades das áreas dependentes.', type: 'SIMPLE', category: 'Operacional', priority: 'HIGH', status: 'SCHEDULED' },
+    { title: 'Rascunho: Programa de Reconhecimento', content: 'Em elaboração: novo programa de reconhecimento de colaboradores destaque.', type: 'SIMPLE', category: 'Institucional', priority: 'LOW', status: 'DRAFT' },
   ];
   let commSeq = 0;
   for (const def of postDefs) {
@@ -1160,7 +1160,7 @@ async function main() {
         await prisma.communicationPostReaction.create({ data: { postId: post.id, userId: uid, type: pick(['LIKE', 'UNDERSTOOD', 'IMPORTANT', 'QUESTION'] as const) } }).catch(() => undefined);
       }
       if (chance(0.7)) {
-        await prisma.communicationPostComment.create({ data: { postId: post.id, userId: pick(userIds), body: pick(['Obrigado pela informacao!', 'Ja repassei para a equipe.', 'Otima iniciativa.', 'Tenho uma duvida sobre o prazo.']) } });
+        await prisma.communicationPostComment.create({ data: { postId: post.id, userId: pick(userIds), body: pick(['Obrigado pela informação!', 'Já repassei para a equipe.', 'Ótima iniciativa.', 'Tenho uma dúvida sobre o prazo.']) } });
       }
       if (def.poll) {
         const optionIds = (def.poll.options as Array<{ id: string }>).map((o) => o.id);
@@ -1172,10 +1172,10 @@ async function main() {
   }
   const mediaDefs: Array<{ name: string; type: 'IMAGE' | 'BANNER' | 'VIDEO' | 'PDF'; category: string }> = [
     { name: 'Banner Institucional 2026', type: 'BANNER', category: 'Campanhas' },
-    { name: 'Foto Linha de Producao', type: 'IMAGE', category: 'Institucional' },
-    { name: 'Video Treinamento BPF', type: 'VIDEO', category: 'Treinamento' },
-    { name: 'Cartilha de Seguranca (PDF)', type: 'PDF', category: 'Seguranca' },
-    { name: 'Icone Indicadores', type: 'IMAGE', category: 'Geral' },
+    { name: 'Foto Linha de Produção', type: 'IMAGE', category: 'Institucional' },
+    { name: 'Vídeo Treinamento BPF', type: 'VIDEO', category: 'Treinamento' },
+    { name: 'Cartilha de Segurança (PDF)', type: 'PDF', category: 'Segurança' },
+    { name: 'Ícone Indicadores', type: 'IMAGE', category: 'Geral' },
   ];
   for (let i = 0; i < mediaDefs.length; i++) {
     const md = mediaDefs[i];
@@ -1195,7 +1195,7 @@ async function main() {
         select: { id: true },
       });
       await prisma.conversationParticipant.createMany({ data: [{ conversationId: conv.id, userId: a, role: 'MEMBER' as const }, { conversationId: conv.id, userId: b, role: 'MEMBER' as const }], skipDuplicates: true });
-      const chat = ['Oi, conseguiu ver os resultados do mes?', 'Vi sim, a producao ficou acima da meta.', 'Otimo! Vamos levar isso para a reuniao mensal.', 'Combinado, vamos acompanhar.'];
+      const chat = ['Oi, conseguiu ver os resultados do mês?', 'Vi sim, a produção ficou acima da meta.', 'Ótimo! Vamos levar isso para a reunião mensal.', 'Combinado, vamos acompanhar.'];
       for (let m = 0; m < chat.length; m++) {
         await prisma.message.create({ data: { conversationId: conv.id, senderId: m % 2 === 0 ? a : b, body: chat[m], createdAt: new Date(Date.now() - (chat.length - m) * 3_600_000) } });
       }
@@ -1212,18 +1212,18 @@ async function main() {
   meetingStart.setHours(9, 0, 0, 0);
   const closedMeeting = await prisma.monthlyMeeting.create({
     data: {
-      companyId, title: `Reuniao Mensal de Resultados - ${meetingPeriod.periodRef}`, periodRef: meetingPeriod.periodRef,
+      companyId, title: `Reunião Mensal de Resultados - ${meetingPeriod.periodRef}`, periodRef: meetingPeriod.periodRef,
       cropSeason: `Exercício ${year}`, cycleName: 'Ciclo Mensal de Resultados', status: 'CLOSED', format: 'HYBRID',
-      startsAt: meetingStart, endsAt: new Date(meetingStart.getTime() + 3 * 3_600_000), location: 'Auditorio Central',
+      startsAt: meetingStart, endsAt: new Date(meetingStart.getTime() + 3 * 3_600_000), location: 'Auditório Central',
       responsibleUserId: demoUsers.find((u) => u.role === UserRoleEnum.DIRECTOR)?.id ?? pick(userIds),
       secretaryUserId: demoUsers.find((u) => u.role === UserRoleEnum.ANALYST)?.id ?? pick(userIds),
       followUpUserId: demoUsers.find((u) => u.role === UserRoleEnum.MANAGER)?.id ?? pick(userIds),
-      objective: 'Analisar criticamente os resultados do mes, tratar desvios e alinhar diretrizes com a diretoria.',
-      assumptions: 'Dados consolidados ate o fechamento do periodo. Metas conforme planejamento do exercicio.',
-      criticalRisks: 'Risco de parada nao programada na linha de producao; atraso de fornecedores afetando a producao.',
-      boardDirections: 'Priorizar disponibilidade de ativos e seguranca; manter investimento em manutencao preventiva.',
-      generalNotes: 'Reuniao conduzida com presenca da diretoria e gestores das areas industriais.',
-      keyMessage: 'Mes positivo em producao, com atencao redobrada para paradas nao programadas.',
+      objective: 'Analisar criticamente os resultados do mês, tratar desvios e alinhar diretrizes com a diretoria.',
+      assumptions: 'Dados consolidados até o fechamento do período. Metas conforme planejamento do exercício.',
+      criticalRisks: 'Risco de parada não programada na linha de produção; atraso de fornecedores afetando a produção.',
+      boardDirections: 'Priorizar disponibilidade de ativos e segurança; manter investimento em manutenção preventiva.',
+      generalNotes: 'Reunião conduzida com presença da diretoria e gestores das áreas industriais.',
+      keyMessage: 'Mês positivo em produção, com atenção redobrada para paradas não programadas.',
       nextMonthlyAt: new Date(meetingStart.getTime() + 30 * 86_400_000), nextWeeklyAt: new Date(meetingStart.getTime() + 7 * 86_400_000),
       closedAt: new Date(meetingStart.getTime() + 3 * 3_600_000), createdById: pick(userIds),
     },
@@ -1236,7 +1236,7 @@ async function main() {
     const area = await prisma.monthlyMeetingArea.create({
       data: {
         meetingId: closedMeeting.id, orgNodeId, position: areaPos, readiness: 'VALIDATED', presenterUserId: pick(userIds),
-        areaKeyMessage: pick(['Area dentro das metas com pontos de atencao.', 'Resultados estaveis e plano de acao em curso.', 'Desvio tratado com acao corretiva definida.']),
+        areaKeyMessage: pick(['Área dentro das metas com pontos de atenção.', 'Resultados estáveis e plano de ação em curso.', 'Desvio tratado com ação corretiva definida.']),
         validatedById: pick(userIds), validatedAt: new Date(meetingStart.getTime() - rint(1, 5) * 86_400_000),
       },
       select: { id: true },
@@ -1252,8 +1252,8 @@ async function main() {
           meetingId: closedMeeting.id, meetingAreaId: area.id, indicatorId: indId,
           target: targetByInd.get(indId) ?? null, current: r?.value ?? null, attainment: r?.attainment ?? null,
           deviationPct: r?.deviationPct ?? null, light, trend: pick(['UP', 'DOWN', 'STABLE']),
-          managerComment: critical ? 'Resultado abaixo da meta; desvio aberto e plano de acao em andamento.' : 'Resultado dentro do esperado para o periodo.',
-          executiveStatus: critical ? 'Requer atencao da diretoria' : 'Sob controle', isCritical: critical, showInPresentation: true,
+          managerComment: critical ? 'Resultado abaixo da meta; desvio aberto e plano de ação em andamento.' : 'Resultado dentro do esperado para o período.',
+          executiveStatus: critical ? 'Requer atenção da diretoria' : 'Sob controle', isCritical: critical, showInPresentation: true,
           financialImpact: critical ? round2(rfloat(10_000, 200_000)) : null, position: indPos,
           deviationId: critical && deviationIds.length ? pick(deviationIds) : null, actionPlanId: critical && actionIds.length ? pick(actionIds) : null,
         },
@@ -1262,35 +1262,35 @@ async function main() {
     }
     areaPos += 1;
   }
-  const agendaTopics = ['Abertura e leitura da ata anterior', 'Resultados por area', 'Desvios criticos e planos de acao', 'Riscos e diretrizes da diretoria', 'Padronizacao e licoes aprendidas', 'Encerramento e proximos passos'];
+  const agendaTopics = ['Abertura e leitura da ata anterior', 'Resultados por área', 'Desvios críticos e planos de ação', 'Riscos e diretrizes da diretoria', 'Padronização e lições aprendidas', 'Encerramento e próximos passos'];
   for (let a = 0; a < agendaTopics.length; a++) {
     await prisma.monthlyMeetingAgendaItem.create({
-      data: { meetingId: closedMeeting.id, topic: agendaTopics[a], position: a, plannedMinutes: rint(10, 30), actualMinutes: rint(8, 35), presentationStatus: 'DISCUSSED', presenterUserId: pick(userIds), notes: chance(0.4) ? 'Discussao registrada em ata (ficticia).' : null },
+      data: { meetingId: closedMeeting.id, topic: agendaTopics[a], position: a, plannedMinutes: rint(10, 30), actualMinutes: rint(8, 35), presentationStatus: 'DISCUSSED', presenterUserId: pick(userIds), notes: chance(0.4) ? 'Discussão registrada em ata (fictícia).' : null },
     });
   }
   const decisionDefs: Array<{ kind: 'DECISION' | 'RISK' | 'ESCALATION' | 'PENDING'; description: string }> = [
-    { kind: 'DECISION', description: 'Aprovar a antecipacao da manutencao preventiva da linha de producao para reduzir paradas.' },
-    { kind: 'RISK', description: 'Monitorar risco de atraso de fornecedores que pode impactar a producao.' },
-    { kind: 'ESCALATION', description: 'Escalar para a diretoria a necessidade de contratacao de tecnicos de manutencao.' },
+    { kind: 'DECISION', description: 'Aprovar a antecipação da manutenção preventiva da linha de produção para reduzir paradas.' },
+    { kind: 'RISK', description: 'Monitorar risco de atraso de fornecedores que pode impactar a produção.' },
+    { kind: 'ESCALATION', description: 'Escalar para a diretoria a necessidade de contratação de técnicos de manutenção.' },
   ];
   for (const d of decisionDefs) {
     await prisma.monthlyMeetingDecision.create({
-      data: { meetingId: closedMeeting.id, kind: d.kind, topic: 'Resultados e riscos do mes', description: d.description, ownerName: randomName(), ownerUserId: pick(userIds), dueDate: new Date(meetingStart.getTime() + rint(7, 30) * 86_400_000), status: pick(['OPEN', 'IN_PROGRESS'] as const), actionPlanId: chance(0.5) && actionIds.length ? pick(actionIds) : null, createdById: pick(userIds) },
+      data: { meetingId: closedMeeting.id, kind: d.kind, topic: 'Resultados e riscos do mês', description: d.description, ownerName: randomName(), ownerUserId: pick(userIds), dueDate: new Date(meetingStart.getTime() + rint(7, 30) * 86_400_000), status: pick(['OPEN', 'IN_PROGRESS'] as const), actionPlanId: chance(0.5) && actionIds.length ? pick(actionIds) : null, createdById: pick(userIds) },
     });
   }
   for (let f = 0; f < 3; f++) {
     await prisma.monthlyMeetingFollowUp.create({
-      data: { meetingId: closedMeeting.id, level: pick(['WEEKLY', 'MONTHLY'] as const), title: pick(['Acompanhar plano de reducao de paradas', 'Verificar evolucao da eficiencia produtiva', 'Revisar indicadores de seguranca']), dueDate: new Date(meetingStart.getTime() + rint(7, 30) * 86_400_000), ownerUserId: pick(userIds), indicatorId: chance(0.7) ? pick(allIndIds) : null, actionPlanId: chance(0.5) ? pick(actionIds) : null, status: pick(['OPEN', 'IN_PROGRESS'] as const) },
+      data: { meetingId: closedMeeting.id, level: pick(['WEEKLY', 'MONTHLY'] as const), title: pick(['Acompanhar plano de redução de paradas', 'Verificar evolução da eficiência produtiva', 'Revisar indicadores de segurança']), dueDate: new Date(meetingStart.getTime() + rint(7, 30) * 86_400_000), ownerUserId: pick(userIds), indicatorId: chance(0.7) ? pick(allIndIds) : null, actionPlanId: chance(0.5) ? pick(actionIds) : null, status: pick(['OPEN', 'IN_PROGRESS'] as const) },
     });
   }
   for (let l = 0; l < 2; l++) {
     await prisma.monthlyMeetingLearning.create({
-      data: { meetingId: closedMeeting.id, orgNodeId: pick(meetingAreaIds), indicatorId: chance(0.6) ? pick(allIndIds) : null, learning: pick(['A inspecao preditiva reduziu paradas na linha de producao.', 'O checklist de partida da linha evitou retrabalho.']), treatedCause: 'Falha de manutencao preventiva', effectiveAction: 'Revisao do plano de manutencao com periodicidade ajustada', replicateToNodeId: chance(0.5) ? pick(meetingAreaIds) : null, ownerUserId: pick(userIds), status: 'OPEN' },
+      data: { meetingId: closedMeeting.id, orgNodeId: pick(meetingAreaIds), indicatorId: chance(0.6) ? pick(allIndIds) : null, learning: pick(['A inspeção preditiva reduziu paradas na linha de produção.', 'O checklist de partida da linha evitou retrabalho.']), treatedCause: 'Falha de manutenção preventiva', effectiveAction: 'Revisão do plano de manutenção com periodicidade ajustada', replicateToNodeId: chance(0.5) ? pick(meetingAreaIds) : null, ownerUserId: pick(userIds), status: 'OPEN' },
     });
   }
   const stdDefs: Array<{ type: 'POP' | 'CHECKLIST' | 'TRAINING'; description: string }> = [
-    { type: 'POP', description: 'Padronizar o procedimento de partida da linha de producao (POP) com base na licao aprendida.' },
-    { type: 'CHECKLIST', description: 'Criar checklist de inspecao preditiva dos equipamentos para todas as unidades.' },
+    { type: 'POP', description: 'Padronizar o procedimento de partida da linha de produção (POP) com base na lição aprendida.' },
+    { type: 'CHECKLIST', description: 'Criar checklist de inspeção preditiva dos equipamentos para todas as unidades.' },
   ];
   for (const s of stdDefs) {
     await prisma.monthlyMeetingStandardization.create({
@@ -1302,7 +1302,7 @@ async function main() {
       data: { meetingId: closedMeeting.id, userId: u.id, role: u.role === UserRoleEnum.DIRECTOR ? 'RESPONSIBLE' : u.role === UserRoleEnum.ANALYST ? 'EXECUTOR' : 'PARTICIPANT', attended: chance(0.9) },
     }).catch(() => undefined);
   }
-  const checklistItems = ['Resultados consolidados e validados', 'Desvios criticos com plano de acao', 'Atas anteriores revisadas', 'Apresentacoes das areas prontas', 'Diretrizes da diretoria registradas'];
+  const checklistItems = ['Resultados consolidados e validados', 'Desvios críticos com plano de ação', 'Atas anteriores revisadas', 'Apresentações das áreas prontas', 'Diretrizes da diretoria registradas'];
   for (const label of checklistItems) {
     await prisma.monthlyMeetingChecklistItem.create({ data: { meetingId: closedMeeting.id, label, done: chance(0.8), severity: pick(['INFO', 'WARNING']) } });
   }
@@ -1310,11 +1310,11 @@ async function main() {
   const currentPeriod = months[months.length - 1];
   const preparingMeeting = await prisma.monthlyMeeting.create({
     data: {
-      companyId, title: `Reuniao Mensal de Resultados - ${currentPeriod.periodRef}`, periodRef: currentPeriod.periodRef,
+      companyId, title: `Reunião Mensal de Resultados - ${currentPeriod.periodRef}`, periodRef: currentPeriod.periodRef,
       cropSeason: `Exercício ${year}`, cycleName: 'Ciclo Mensal de Resultados', status: 'PREPARING', format: 'HYBRID',
-      startsAt: new Date(Date.now() + rint(3, 12) * 86_400_000), location: 'Auditorio Central',
+      startsAt: new Date(Date.now() + rint(3, 12) * 86_400_000), location: 'Auditório Central',
       responsibleUserId: pick(userIds), secretaryUserId: pick(userIds),
-      objective: 'Preparar a analise critica dos resultados do mes corrente.', createdById: pick(userIds),
+      objective: 'Preparar a análise crítica dos resultados do mês corrente.', createdById: pick(userIds),
     },
     select: { id: true },
   });
@@ -1328,30 +1328,30 @@ async function main() {
 
   // 25) Seguranca do Alimento (APPCC + cadeia + compliance)
   const fsProgram = await prisma.foodSafetyProgram.create({
-    data: { companyId, orgNodeId: pick(areaIds), ownerUserId: pick(userIds), createdById: pick(userIds), code: 'FS-001', name: 'Programa de Seguranca de Alimentos (APPCC)', description: 'Sistema de gestao de seguranca de alimentos da unidade.', scope: 'Producao de alimentos processados.', status: 'ACTIVE' },
+    data: { companyId, orgNodeId: pick(areaIds), ownerUserId: pick(userIds), createdById: pick(userIds), code: 'FS-001', name: 'Programa de Segurança de Alimentos (APPCC)', description: 'Sistema de gestão de segurança de alimentos da unidade.', scope: 'Producao de alimentos processados.', status: 'ACTIVE' },
     select: { id: true },
   });
-  await prisma.foodSafetyRiskMatrix.create({ data: { companyId, name: 'Matriz padrao APPCC', severityScale: 5, probabilityScale: 5, active: true } });
+  await prisma.foodSafetyRiskMatrix.create({ data: { companyId, name: 'Matriz padrão APPCC', severityScale: 5, probabilityScale: 5, active: true } });
   const fsStepTemplate: Array<{ name: string; type: 'RECEIVING' | 'STORAGE' | 'PROCESSING' | 'PACKAGING' | 'TRANSPORT' | 'DISTRIBUTION'; ccp?: boolean }> = [
-    { name: 'Recebimento de materia-prima', type: 'RECEIVING' },
+    { name: 'Recebimento de matéria-prima', type: 'RECEIVING' },
     { name: 'Armazenamento e preparo', type: 'STORAGE' },
     { name: 'Processamento e tratamento', type: 'PROCESSING', ccp: true },
     { name: 'Envase e empacotamento', type: 'PACKAGING', ccp: true },
-    { name: 'Expedicao e distribuicao', type: 'DISTRIBUTION' },
+    { name: 'Expedição e distribuição', type: 'DISTRIBUTION' },
   ];
   const fsHazardDefs: Array<{ name: string; category: 'BIOLOGICAL' | 'CHEMICAL' | 'PHYSICAL' | 'ALLERGENIC'; control: 'PRP' | 'OPRP' | 'CCP' }> = [
-    { name: 'Contaminacao microbiologica no produto', category: 'BIOLOGICAL', control: 'CCP' },
-    { name: 'Residuo quimico de limpeza', category: 'CHEMICAL', control: 'OPRP' },
-    { name: 'Particula fisica (metal) no produto', category: 'PHYSICAL', control: 'CCP' },
-    { name: 'Contaminacao cruzada de alergenicos', category: 'ALLERGENIC', control: 'PRP' },
+    { name: 'Contaminação microbiológica no produto', category: 'BIOLOGICAL', control: 'CCP' },
+    { name: 'Residuo químico de limpeza', category: 'CHEMICAL', control: 'OPRP' },
+    { name: 'Particula física (metal) no produto', category: 'PHYSICAL', control: 'CCP' },
+    { name: 'Contaminação cruzada de alergênicos', category: 'ALLERGENIC', control: 'PRP' },
   ];
   let fsProcNum = 0;
   let fsHazardNum = 0;
   const fsCcpHazardIds: string[] = [];
-  for (const prodName of ['Producao de Bebida Pronta', 'Producao de Alimento Processado']) {
+  for (const prodName of ['Produção de Bebida Pronta', 'Produção de Alimento Processado']) {
     fsProcNum += 1;
     const proc = await prisma.foodSafetyProcess.create({
-      data: { companyId, programId: fsProgram.id, orgNodeId: pick(areaIds), ownerUserId: pick(userIds), createdById: pick(userIds), number: fsProcNum, code: `FSP-${String(fsProcNum).padStart(3, '0')}`, name: prodName, objective: 'Garantir a seguranca do alimento ao longo da producao.', productName: prodName, productionLine: pick(['Linha 1', 'Linha 2']), version: '1.0', status: 'APPROVED' },
+      data: { companyId, programId: fsProgram.id, orgNodeId: pick(areaIds), ownerUserId: pick(userIds), createdById: pick(userIds), number: fsProcNum, code: `FSP-${String(fsProcNum).padStart(3, '0')}`, name: prodName, objective: 'Garantir a segurança do alimento ao longo da produção.', productName: prodName, productionLine: pick(['Linha 1', 'Linha 2']), version: '1.0', status: 'APPROVED' },
       select: { id: true },
     });
     const stepIds: string[] = [];
@@ -1371,7 +1371,7 @@ async function main() {
       const riskIndex = severity * probability;
       const riskLevel = riskIndex <= 4 ? 'LOW' : riskIndex <= 9 ? 'MODERATE' : riskIndex <= 15 ? 'HIGH' : 'CRITICAL';
       const hazard = await prisma.foodSafetyHazard.create({
-        data: { companyId, processId: proc.id, stepId: pick(stepIds), responsibleUserId: pick(userIds), number: fsHazardNum, code: `H${String(fsHazardNum).padStart(3, '0')}`, category: hz.category, name: hz.name, description: 'Perigo avaliado na analise APPCC (ficticio).', source: 'Identificado na analise de perigos.', consequence: 'Risco a seguranca do alimento.', severity, probability, riskIndex, riskLevel: riskLevel as any, controlType: hz.control, existingControls: 'Controles operacionais e PPRs aplicados.', status: 'ASSESSED' },
+        data: { companyId, processId: proc.id, stepId: pick(stepIds), responsibleUserId: pick(userIds), number: fsHazardNum, code: `H${String(fsHazardNum).padStart(3, '0')}`, category: hz.category, name: hz.name, description: 'Perigo avaliado na análise APPCC (fictício).', source: 'Identificado na analise de perigos.', consequence: 'Risco a segurança do alimento.', severity, probability, riskIndex, riskLevel: riskLevel as any, controlType: hz.control, existingControls: 'Controles operacionais e PPRs aplicados.', status: 'ASSESSED' },
         select: { id: true, controlType: true },
       });
       if (hz.control === 'CCP') fsCcpHazardIds.push(hazard.id);
@@ -1379,31 +1379,31 @@ async function main() {
   }
   for (const hazardId of fsCcpHazardIds.slice(0, 4)) {
     const plan = await prisma.foodSafetyControlPlan.create({
-      data: { companyId, hazardId, responsibleUserId: pick(userIds), controlType: 'CCP', parameter: pick(['Temperatura', 'pH', 'Tempo de retencao', 'Deteccao de metais']), unit: pick(['C', 'pH', 'min', 'ppm']), criticalMin: 60, criticalMax: 85, alertMin: 65, alertMax: 80, method: 'Medicao automatica em linha', instrument: pick(['Termometro digital', 'Detector de metais', 'pHmetro']), frequency: pick(['A cada lote', 'A cada 1h', 'Continuo']), correctiveAction: 'Bloquear lote e abrir nao conformidade.', requiresLotBlock: true, requiresNonConformity: true, status: 'ACTIVE' },
+      data: { companyId, hazardId, responsibleUserId: pick(userIds), controlType: 'CCP', parameter: pick(['Temperatura', 'pH', 'Tempo de retenção', 'Detecção de metais']), unit: pick(['C', 'pH', 'min', 'ppm']), criticalMin: 60, criticalMax: 85, alertMin: 65, alertMax: 80, method: 'Medição automática em linha', instrument: pick(['Termometro digital', 'Detector de metais', 'pHmetro']), frequency: pick(['A cada lote', 'A cada 1h', 'Contínuo']), correctiveAction: 'Bloquear lote e abrir não conformidade.', requiresLotBlock: true, requiresNonConformity: true, status: 'ACTIVE' },
       select: { id: true },
     });
     for (let r = 0; r < rint(3, 5); r++) {
       const result = pick(['OK', 'OK', 'OK', 'ALERT', 'OUT'] as const);
       await prisma.foodSafetyMonitoringRecord.create({
-        data: { companyId, controlPlanId: plan.id, recordedById: pick(userIds), measuredAt: new Date(Date.now() - rint(0, 25) * 86_400_000), valueNum: round2(rfloat(58, 88)), result, notes: result === 'OUT' ? 'Valor fora do limite critico; lote bloqueado.' : null, lotBlocked: result === 'OUT' },
+        data: { companyId, controlPlanId: plan.id, recordedById: pick(userIds), measuredAt: new Date(Date.now() - rint(0, 25) * 86_400_000), valueNum: round2(rfloat(58, 88)), result, notes: result === 'OUT' ? 'Valor fora do limite crítico; lote bloqueado.' : null, lotBlocked: result === 'OUT' },
       });
     }
   }
-  const fsStandard = await prisma.foodSafetyStandard.create({ data: { companyId, code: 'ISO22000', name: 'ISO 22000 - Sistemas de Gestao de Seguranca de Alimentos', origin: 'ISO', active: true }, select: { id: true } });
+  const fsStandard = await prisma.foodSafetyStandard.create({ data: { companyId, code: 'ISO22000', name: 'ISO 22000 - Sistemas de Gestão de Segurança de Alimentos', origin: 'ISO', active: true }, select: { id: true } });
   const fsStdVersion = await prisma.foodSafetyStandardVersion.create({ data: { companyId, standardId: fsStandard.id, versionLabel: '2018', effectiveDate: new Date(year - 1, 0, 1), status: 'ACTIVE' }, select: { id: true } });
   const fsReqDefs = [
-    { chapter: '7', title: 'Programas de pre-requisito (PPR)' },
+    { chapter: '7', title: 'Programas de pré-requisito (PPR)' },
     { chapter: '8', title: 'Controle operacional e plano APPCC' },
-    { chapter: '9', title: 'Avaliacao de desempenho e monitoramento' },
+    { chapter: '9', title: 'Avaliação de desempenho e monitoramento' },
   ];
   let fsReqNum = 0;
   for (const rq of fsReqDefs) {
     fsReqNum += 1;
     const req = await prisma.foodSafetyRequirement.create({
-      data: { companyId, standardVersionId: fsStdVersion.id, responsibleUserId: pick(userIds), code: `REQ-${fsReqNum}`, chapter: rq.chapter, item: `${rq.chapter}.${rint(1, 4)}`, title: rq.title, description: 'Requisito normativo aplicavel (ficticio).', criticality: pick(['LOW', 'MEDIUM', 'HIGH'] as const), active: true },
+      data: { companyId, standardVersionId: fsStdVersion.id, responsibleUserId: pick(userIds), code: `REQ-${fsReqNum}`, chapter: rq.chapter, item: `${rq.chapter}.${rint(1, 4)}`, title: rq.title, description: 'Requisito normativo aplicável (fictício).', criticality: pick(['LOW', 'MEDIUM', 'HIGH'] as const), active: true },
       select: { id: true },
     });
-    await prisma.foodSafetyRequirementAssessment.create({ data: { companyId, requirementId: req.id, responsibleUserId: pick(userIds), result: pick(['MET', 'MET', 'PARTIAL', 'NOT_MET'] as const), evidence: 'Evidencia documental anexada (ficticia).', assessedAt: new Date(Date.now() - rint(5, 60) * 86_400_000), nextAssessmentAt: new Date(Date.now() + rint(60, 180) * 86_400_000) } });
+    await prisma.foodSafetyRequirementAssessment.create({ data: { companyId, requirementId: req.id, responsibleUserId: pick(userIds), result: pick(['MET', 'MET', 'PARTIAL', 'NOT_MET'] as const), evidence: 'Evidência documental anexada (fictícia).', assessedAt: new Date(Date.now() - rint(5, 60) * 86_400_000), nextAssessmentAt: new Date(Date.now() + rint(60, 180) * 86_400_000) } });
   }
   const fsSupplierIds: string[] = [];
   for (let i = 0; i < 2; i++) {
@@ -1424,7 +1424,7 @@ async function main() {
   const fsLotIds: string[] = [];
   for (let i = 0; i < 4; i++) {
     const lot = await prisma.foodSafetyLot.create({
-      data: { companyId, programId: fsProgram.id, materialId: pick(fsMaterialIds), supplierId: pick(fsSupplierIds), code: `LOTE-${year}-${String(i + 1).padStart(4, '0')}`, type: pick(['RECEIVED', 'PRODUCED'] as const), status: pick(['RELEASED', 'QUARANTINED', 'RELEASED'] as const), quantity: round2(rfloat(100, 5000)), unit: pick(['t', 'kg', 'L']), receivedAt: new Date(Date.now() - rint(5, 60) * 86_400_000), storageLocation: pick(['Silo 1', 'Tanque A', 'Armazem 3']) },
+      data: { companyId, programId: fsProgram.id, materialId: pick(fsMaterialIds), supplierId: pick(fsSupplierIds), code: `LOTE-${year}-${String(i + 1).padStart(4, '0')}`, type: pick(['RECEIVED', 'PRODUCED'] as const), status: pick(['RELEASED', 'QUARANTINED', 'RELEASED'] as const), quantity: round2(rfloat(100, 5000)), unit: pick(['t', 'kg', 'L']), receivedAt: new Date(Date.now() - rint(5, 60) * 86_400_000), storageLocation: pick(['Silo 1', 'Tanque A', 'Armazém 3']) },
       select: { id: true },
     });
     fsLotIds.push(lot.id);
@@ -1446,7 +1446,7 @@ async function main() {
   const secPostIds: string[] = [];
   for (let i = 0; i < 3; i++) {
     const post = await prisma.securityPost.create({
-      data: { companyId, gateId: pick(secGateIds), code: `PV-${String(i + 1).padStart(2, '0')}`, name: `Posto de Vigilancia ${i + 1}`, location: pick(['Portaria', 'Perimetro', 'Area industrial']), type: pick(['FIXED', 'MOBILE']), criticality: pick(['MEDIUM', 'HIGH']), responsibleUserId: pick(userIds), status: 'ACTIVE' },
+      data: { companyId, gateId: pick(secGateIds), code: `PV-${String(i + 1).padStart(2, '0')}`, name: `Posto de Vigilância ${i + 1}`, location: pick(['Portaria', 'Perimetro', 'Área industrial']), type: pick(['FIXED', 'MOBILE']), criticality: pick(['MEDIUM', 'HIGH']), responsibleUserId: pick(userIds), status: 'ACTIVE' },
       select: { id: true },
     });
     secPostIds.push(post.id);
@@ -1454,7 +1454,7 @@ async function main() {
   const contractorIds: string[] = [];
   for (let i = 0; i < 2; i++) {
     const cc = await prisma.securityContractorCompany.create({
-      data: { companyId, legalName: pick(['Manutencao Industrial Beta Ltda', 'Construtora Industrial Alfa SA', 'Transportes Rapidos ME']), tradeName: pick(['Beta Manutencao', 'Construir Alfa', 'Trans Rapido']), cnpj: `${rint(10, 99)}.${rint(100, 999)}.${rint(100, 999)}/000${i + 1}-${rint(10, 99)}`, contractCode: `CTR-${year}-${i + 1}`, serviceTypes: ['Manutencao', 'Transporte'], documentStatus: pick(['VALID', 'EXPIRING'] as const), status: 'ACTIVE' },
+      data: { companyId, legalName: pick(['Manutenção Industrial Beta Ltda', 'Construtora Industrial Alfa SA', 'Transportes Rápidos ME']), tradeName: pick(['Beta Manutenção', 'Construir Alfa', 'Trans Rápido']), cnpj: `${rint(10, 99)}.${rint(100, 999)}.${rint(100, 999)}/000${i + 1}-${rint(10, 99)}`, contractCode: `CTR-${year}-${i + 1}`, serviceTypes: ['Manutenção', 'Transporte'], documentStatus: pick(['VALID', 'EXPIRING'] as const), status: 'ACTIVE' },
       select: { id: true },
     });
     contractorIds.push(cc.id);
@@ -1471,12 +1471,12 @@ async function main() {
   const vehicleIds: string[] = [];
   for (let i = 0; i < 3; i++) {
     const v = await prisma.securityVehicle.create({
-      data: { companyId, type: pick(['CAR', 'TRUCK', 'MOTORCYCLE']), plate: `${pick(['ABC', 'XYZ', 'QRS', 'JKL'])}${rint(1, 9)}${pick(['A', 'B', 'C', 'D'])}${rint(10, 99)}`, model: pick(['Caminhao Truck', 'Utilitario', 'Carro de passeio']), brand: pick(['Scania', 'Volvo', 'Fiat', 'VW']), color: pick(['Branco', 'Prata', 'Vermelho']), companyName: pick(['Beta Manutencao', 'Trans Rapido']), defaultDriverPersonId: pick(personIds), documentStatus: pick(['VALID', 'EXPIRING'] as const), status: 'ACTIVE' },
+      data: { companyId, type: pick(['CAR', 'TRUCK', 'MOTORCYCLE']), plate: `${pick(['ABC', 'XYZ', 'QRS', 'JKL'])}${rint(1, 9)}${pick(['A', 'B', 'C', 'D'])}${rint(10, 99)}`, model: pick(['Caminhão Truck', 'Utilitário', 'Carro de passeio']), brand: pick(['Scania', 'Volvo', 'Fiat', 'VW']), color: pick(['Branco', 'Prata', 'Vermelho']), companyName: pick(['Beta Manutenção', 'Trans Rápido']), defaultDriverPersonId: pick(personIds), documentStatus: pick(['VALID', 'EXPIRING'] as const), status: 'ACTIVE' },
       select: { id: true },
     });
     vehicleIds.push(v.id);
   }
-  await prisma.securityDocumentRequirement.create({ data: { companyId, scopeType: 'PERSON_TYPE', personType: 'CONTRACTOR', name: 'ASO valido', documentKind: 'ASO', required: true, blockOnMissing: true, warningDays: 30, status: 'ACTIVE' } });
+  await prisma.securityDocumentRequirement.create({ data: { companyId, scopeType: 'PERSON_TYPE', personType: 'CONTRACTOR', name: 'ASO válido', documentKind: 'ASO', required: true, blockOnMissing: true, warningDays: 30, status: 'ACTIVE' } });
   await prisma.securityDocumentRequirement.create({ data: { companyId, scopeType: 'VEHICLE_TYPE', vehicleType: 'TRUCK', name: 'CRLV atualizado', documentKind: 'CRLV', required: true, blockOnMissing: false, warningDays: 30, status: 'ACTIVE' } });
   let secAuthSeq = 0;
   const authIds: string[] = [];
@@ -1484,7 +1484,7 @@ async function main() {
     secAuthSeq += 1;
     const status = pick(['APPROVED', 'WAITING_APPROVAL', 'USED'] as const);
     const auth = await prisma.securityAuthorization.create({
-      data: { companyId, code: `AUT-${year}-${String(secAuthSeq).padStart(4, '0')}`, personId: pick(personIds), contractorCompanyId: pick(contractorIds), gateId: pick(secGateIds), vehicleId: chance(0.5) ? pick(vehicleIds) : null, status, reason: pick(['Manutencao programada', 'Entrega de insumos', 'Visita tecnica', 'Coleta de residuos']), scheduledStartAt: new Date(Date.now() + rint(-5, 5) * 86_400_000), scheduledEndAt: new Date(Date.now() + rint(6, 12) * 86_400_000), maxStayMinutes: rint(60, 480), approverId: status !== 'WAITING_APPROVAL' ? pick(userIds) : null, approvedAt: status !== 'WAITING_APPROVAL' ? new Date(Date.now() - rint(1, 5) * 86_400_000) : null },
+      data: { companyId, code: `AUT-${year}-${String(secAuthSeq).padStart(4, '0')}`, personId: pick(personIds), contractorCompanyId: pick(contractorIds), gateId: pick(secGateIds), vehicleId: chance(0.5) ? pick(vehicleIds) : null, status, reason: pick(['Manutenção programada', 'Entrega de insumos', 'Visita técnica', 'Coleta de resíduos']), scheduledStartAt: new Date(Date.now() + rint(-5, 5) * 86_400_000), scheduledEndAt: new Date(Date.now() + rint(6, 12) * 86_400_000), maxStayMinutes: rint(60, 480), approverId: status !== 'WAITING_APPROVAL' ? pick(userIds) : null, approvedAt: status !== 'WAITING_APPROVAL' ? new Date(Date.now() - rint(1, 5) * 86_400_000) : null },
       select: { id: true },
     });
     authIds.push(auth.id);
@@ -1496,7 +1496,7 @@ async function main() {
     const closed = chance(0.6);
     const entryAt = new Date(Date.now() - rint(0, 10) * 86_400_000 - rint(0, 8) * 3_600_000);
     await prisma.securityAccessMovement.create({
-      data: { companyId, gateId: pick(secGateIds), postId: pick(secPostIds), authorizationId: chance(0.6) ? pick(authIds) : null, personId: pick(personIds), vehicleId: movementType.startsWith('VEHICLE') ? pick(vehicleIds) : null, code: `MOV-${year}-${String(secMovSeq).padStart(4, '0')}`, movementType, reason: pick(['Manutencao', 'Entrega', 'Visita', 'Coleta']), entryAt, exitAt: closed ? new Date(entryAt.getTime() + rint(30, 300) * 60_000) : null, status: closed ? 'CLOSED' : 'OPEN', registeredById: pick(userIds) },
+      data: { companyId, gateId: pick(secGateIds), postId: pick(secPostIds), authorizationId: chance(0.6) ? pick(authIds) : null, personId: pick(personIds), vehicleId: movementType.startsWith('VEHICLE') ? pick(vehicleIds) : null, code: `MOV-${year}-${String(secMovSeq).padStart(4, '0')}`, movementType, reason: pick(['Manutenção', 'Entrega', 'Visita', 'Coleta']), entryAt, exitAt: closed ? new Date(entryAt.getTime() + rint(30, 300) * 60_000) : null, status: closed ? 'CLOSED' : 'OPEN', registeredById: pick(userIds) },
     });
   }
   let secIncSeq = 0;
@@ -1504,13 +1504,13 @@ async function main() {
     secIncSeq += 1;
     const status = pick(['OPEN', 'IN_PROGRESS', 'CLOSED'] as const);
     await prisma.securityIncident.create({
-      data: { companyId, gateId: pick(secGateIds), postId: pick(secPostIds), actionPlanId: chance(0.4) && actionIds.length ? pick(actionIds) : null, code: `OCO-${year}-${String(secIncSeq).padStart(4, '0')}`, title: pick(['Tentativa de acesso nao autorizado', 'Avaria em cerca do perimetro', 'Veiculo sem documentacao', 'Alarme de intrusao acionado']), type: pick(['ACCESS', 'PERIMETER', 'THEFT', 'SAFETY']), severity: pick(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const), status, description: 'Ocorrencia registrada pela equipe de seguranca (ficticia).', immediateAction: 'Acionamento da supervisao e isolamento da area.', responsibleUserId: pick(userIds), dueAt: new Date(Date.now() + rint(2, 15) * 86_400_000), closedAt: status === 'CLOSED' ? new Date(Date.now() - rint(1, 10) * 86_400_000) : null, createdById: pick(userIds) },
+      data: { companyId, gateId: pick(secGateIds), postId: pick(secPostIds), actionPlanId: chance(0.4) && actionIds.length ? pick(actionIds) : null, code: `OCO-${year}-${String(secIncSeq).padStart(4, '0')}`, title: pick(['Tentativa de acesso não autorizado', 'Avaria em cerca do perimetro', 'Veículo sem documentação', 'Alarme de intrusão acionado']), type: pick(['ACCESS', 'PERIMETER', 'THEFT', 'SAFETY']), severity: pick(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const), status, description: 'Ocorrência registrada pela equipe de segurança (fictícia).', immediateAction: 'Acionamento da supervisão e isolamento da área.', responsibleUserId: pick(userIds), dueAt: new Date(Date.now() + rint(2, 15) * 86_400_000), closedAt: status === 'CLOSED' ? new Date(Date.now() - rint(1, 10) * 86_400_000) : null, createdById: pick(userIds) },
     });
   }
-  const route = await prisma.securityRoundRoute.create({ data: { companyId, gateId: pick(secGateIds), code: 'RND-001', name: 'Ronda do Perimetro Industrial', description: 'Ronda noturna pelo perimetro e areas criticas.', frequencyMinutes: 120, toleranceMinutes: 15, responsibleUserId: pick(userIds), status: 'ACTIVE' }, select: { id: true } });
+  const route = await prisma.securityRoundRoute.create({ data: { companyId, gateId: pick(secGateIds), code: 'RND-001', name: 'Ronda do Perimetro Industrial', description: 'Ronda noturna pelo perimetro e áreas críticas.', frequencyMinutes: 120, toleranceMinutes: 15, responsibleUserId: pick(userIds), status: 'ACTIVE' }, select: { id: true } });
   const checkpointIds: string[] = [];
   for (let i = 0; i < 4; i++) {
-    const cp = await prisma.securityRoundCheckpoint.create({ data: { companyId, routeId: route.id, postId: pick(secPostIds), code: `CHK-${i + 1}`, name: pick(['Portao Norte', 'Patio de Tanques', 'Subestacao', 'Almoxarifado', 'Doca de Cargas']), position: i, requiredEvidence: chance(0.5), status: 'ACTIVE' }, select: { id: true } });
+    const cp = await prisma.securityRoundCheckpoint.create({ data: { companyId, routeId: route.id, postId: pick(secPostIds), code: `CHK-${i + 1}`, name: pick(['Portão Norte', 'Pátio de Tanques', 'Subestação', 'Almoxarifado', 'Doca de Cargas']), position: i, requiredEvidence: chance(0.5), status: 'ACTIVE' }, select: { id: true } });
     checkpointIds.push(cp.id);
   }
   for (let i = 0; i < 3; i++) {
@@ -1524,21 +1524,21 @@ async function main() {
   for (let i = 0; i < 2; i++) {
     const startedAt = new Date(Date.now() - rint(0, 5) * 86_400_000);
     await prisma.securityShiftHandover.create({
-      data: { companyId, gateId: pick(secGateIds), postId: pick(secPostIds), outgoingUserId: pick(userIds), incomingUserId: pick(userIds), shiftName: pick(['Turno A', 'Turno B', 'Turno C']), startedAt, finishedAt: new Date(startedAt.getTime() + 30 * 60_000), status: pick(['COMPLETED', 'COMPLETED_WITH_PENDING'] as const), summary: 'Passagem de turno sem ocorrencias graves; pendencias registradas no livro.', acceptedAt: new Date(startedAt.getTime() + 35 * 60_000), acceptedById: pick(userIds) },
+      data: { companyId, gateId: pick(secGateIds), postId: pick(secPostIds), outgoingUserId: pick(userIds), incomingUserId: pick(userIds), shiftName: pick(['Turno A', 'Turno B', 'Turno C']), startedAt, finishedAt: new Date(startedAt.getTime() + 30 * 60_000), status: pick(['COMPLETED', 'COMPLETED_WITH_PENDING'] as const), summary: 'Passagem de turno sem ocorrências graves; pendências registradas no livro.', acceptedAt: new Date(startedAt.getTime() + 35 * 60_000), acceptedById: pick(userIds) },
     });
   }
   for (let i = 0; i < 4; i++) {
     await prisma.securityLogBookEntry.create({
-      data: { companyId, gateId: pick(secGateIds), postId: pick(secPostIds), occurredAt: new Date(Date.now() - rint(0, 10) * 86_400_000), title: pick(['Inspecao de rotina', 'Visita da supervisao', 'Teste de alarme', 'Registro de pendencia de turno']), entryType: pick(['ROUTINE', 'INSPECTION', 'INCIDENT', 'NOTE']), description: 'Registro do livro de ocorrencias da seguranca (ficticio).', status: 'ACTIVE', createdById: pick(userIds) },
+      data: { companyId, gateId: pick(secGateIds), postId: pick(secPostIds), occurredAt: new Date(Date.now() - rint(0, 10) * 86_400_000), title: pick(['Inspeção de rotina', 'Visita da supervisão', 'Teste de alarme', 'Registro de pendência de turno']), entryType: pick(['ROUTINE', 'INSPECTION', 'INCIDENT', 'NOTE']), description: 'Registro do livro de ocorrências da segurança (fictício).', status: 'ACTIVE', createdById: pick(userIds) },
     });
   }
 
-  console.log('\n=== MODULOS NOVOS (Empresa Demonstracao) ===');
-  console.log(`Comunicacao: ${postDefs.length} comunicados, ${mediaDefs.length} midias, 1 campanha, 2 conversas`);
-  console.log(`Reuniao mensal: 2 reunioes (1 fechada completa + 1 em preparacao)`);
+  console.log('\n=== MÓDULOS NOVOS (Empresa Demonstração) ===');
+  console.log(`Comunicação: ${postDefs.length} comunicados, ${mediaDefs.length} mídias, 1 campanha, 2 conversas`);
+  console.log(`Reunião mensal: 2 reuniões (1 fechada completa + 1 em preparação)`);
   console.log(`Food safety: 1 programa, ${fsProcNum} processos, ${fsHazardNum} perigos, ${fsLotIds.length} lotes`);
-  console.log(`Seg. patrimonial: ${secGateIds.length} portarias, ${personIds.length} pessoas, ${vehicleIds.length} veiculos, rondas e ocorrencias`);
-  console.log(`Analises de causa: ${analysisActions.length} planos com Ishikawa/5 Porques/PDCA`);
+  console.log(`Seg. patrimonial: ${secGateIds.length} portarias, ${personIds.length} pessoas, ${vehicleIds.length} veículos, rondas e ocorrências`);
+  console.log(`Análises de causa: ${analysisActions.length} planos com Ishikawa/5 Porquês/PDCA`);
 
   // =====================================================
   // 20.5) INBOX GARANTIDO DO APRESENTADOR (demo@demo.com)

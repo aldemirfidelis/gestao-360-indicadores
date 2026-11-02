@@ -94,7 +94,7 @@ Preencha CPF, data de admissão e os campos do eSocial e clique em **Autorizar a
       slug: 'aso-onde-registrar',
       title: 'ASO: onde registrar cada tipo de exame',
       summary: 'Admissional de candidato fica no Recrutamento; exames do quadro ativo ficam em Admissão e Desligamento.',
-      tags: ['aso', 'exame ocupacional', 'admissional', 'periodico', 'demissional', 'saude ocupacional'],
+      tags: ['aso', 'exame ocupacional', 'admissional', 'periodico', 'demissional', 'saúde ocupacional'],
       body: `Existem **dois lugares** para exames ocupacionais — cada um com um propósito:
 
 ## Recrutamento (candidatos em contratação)

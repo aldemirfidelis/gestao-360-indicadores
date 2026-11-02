@@ -162,7 +162,7 @@ const STATUS_LABEL: Record<string, string> = {
   ON_TRACK: 'No prazo',
   AT_RISK: 'Em risco',
   OFF_TRACK: 'Atrasado',
-  DONE: 'Concluido',
+  DONE: 'Concluído',
   CANCELLED: 'Cancelado',
 };
 
@@ -284,7 +284,7 @@ export default function OkrsPage() {
 
   const createAction = useMutation({
     mutationFn: () => {
-      if (!actionObj) throw new Error('Objetivo OKR nao selecionado');
+      if (!actionObj) throw new Error('Objetivo OKR não selecionado');
       return api('/actions', {
         method: 'POST',
         json: {
@@ -602,7 +602,7 @@ export default function OkrsPage() {
               <div className="mb-4 rounded-lg border bg-muted/20 p-3 text-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold uppercase text-muted-foreground">Conexão estrategica</div>
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">Conexão estratégica</div>
                     <div className="mt-1 font-medium">
                       {o.strategicObj.name}
                     </div>
@@ -945,7 +945,7 @@ export default function OkrsPage() {
             <div className="space-y-4">
               <p className="text-sm font-medium">{checkinObj.name}</p>
               <div>
-                <Label>Confianca ({Math.round(checkin.confidence * 100)}%)</Label>
+                <Label>Confiança ({Math.round(checkin.confidence * 100)}%)</Label>
                 <input type="range" min={0} max={1} step={0.05} value={checkin.confidence} onChange={(e) => setCheckin({ ...checkin, confidence: Number(e.target.value) })} className="w-full" />
               </div>
               <div>
@@ -953,7 +953,7 @@ export default function OkrsPage() {
                 <input type="range" min={0} max={1} step={0.05} value={checkin.progress} onChange={(e) => setCheckin({ ...checkin, progress: Number(e.target.value) })} className="w-full" />
               </div>
               <div>
-                <Label>Comentario</Label>
+                <Label>Comentário</Label>
                 <Textarea value={checkin.note} onChange={(e) => setCheckin({ ...checkin, note: e.target.value })} rows={3} />
               </div>
             </div>

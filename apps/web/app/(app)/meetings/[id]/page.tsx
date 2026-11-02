@@ -557,7 +557,7 @@ export default function MeetingDetailPage() {
           {canGenerateMinutes && (
             <SectionCard
               title="Minuta por IA"
-              description="Gere um rascunho revisavel da ata com decisões, pendências e proximos passos."
+              description="Gere um rascunho revisável da ata com decisões, pendências e próximos passos."
               actions={
                 <Button variant="outline" size="sm" onClick={() => generateMinutes.mutate()} disabled={generateMinutes.isPending}>
                   <Sparkles className="mr-2 h-4 w-4" />
@@ -588,7 +588,7 @@ export default function MeetingDetailPage() {
                 </div>
               ) : (
                 <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                  Nenhuma minuta gerada nesta sessão. Use o botao acima para criar um rascunho com base em pauta,
+                  Nenhuma minuta gerada nesta sessão. Use o botão acima para criar um rascunho com base em pauta,
                   participantes, decisões e tarefas vinculadas.
                 </div>
               )}

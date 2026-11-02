@@ -14,7 +14,7 @@ describe('traceabilityNextSteps', () => {
         hasEvidence: false,
         indicatorBackInGoal: false,
       }),
-    ).toContain('Criar analise de causa para o indicador fora da meta.');
+    ).toContain('Criar análise de causa para o indicador fora da meta.');
   });
 
   it('orienta plano de acao depois de analise sem acao', () => {
@@ -29,7 +29,7 @@ describe('traceabilityNextSteps', () => {
         hasEvidence: false,
         indicatorBackInGoal: false,
       }),
-    ).toContain('Criar plano de acao com responsavel, prazo e resultado esperado.');
+    ).toContain('Criar plano de ação com responsável, prazo e resultado esperado.');
   });
 
   it('fecha o ciclo quando acao resolveu o indicador', () => {
@@ -44,7 +44,7 @@ describe('traceabilityNextSteps', () => {
         hasEvidence: true,
         indicatorBackInGoal: true,
       }),
-    ).toContain('Concluir o caso e manter o historico para auditoria.');
+    ).toContain('Concluir o caso e manter o histórico para auditoria.');
   });
 });
 
@@ -62,7 +62,7 @@ describe('treatmentFlowAlerts', () => {
         completedActionWithoutEvidence: false,
         indicatorStillOffTargetAfterActions: false,
       }),
-    ).toContain('Indicador fora da meta sem analise de causa.');
+    ).toContain('Indicador fora da meta sem análise de causa.');
   });
 
   it('alerta reuniao sem plano de acao e convites invalidos', () => {
@@ -78,7 +78,7 @@ describe('treatmentFlowAlerts', () => {
         completedActionWithoutEvidence: false,
         indicatorStillOffTargetAfterActions: false,
       }),
-    ).toEqual(['Reuniao agendada sem plano de acao.', 'Existem participantes com e-mail invalido.']);
+    ).toEqual(['Reunião agendada sem plano de ação.', 'Existem participantes com e-mail inválido.']);
   });
 
   it('alerta reavaliacao nao resolvida depois de acoes', () => {
@@ -94,6 +94,6 @@ describe('treatmentFlowAlerts', () => {
         completedActionWithoutEvidence: false,
         indicatorStillOffTargetAfterActions: true,
       }),
-    ).toContain('Indicador continua fora da meta apos acao concluida.');
+    ).toContain('Indicador continua fora da meta após ação concluída.');
   });
 });

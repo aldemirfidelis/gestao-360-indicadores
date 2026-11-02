@@ -1,3 +1,4 @@
+import { formatQuantity } from '@g360/shared';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuthPayload } from '../../auth/auth.types';
@@ -44,7 +45,7 @@ export class PortalDiagnosticsService {
 
     // Nav overrides para itens ocultos
     const hiddenNav = navOverrides.filter((n) => n.hidden);
-    if (hiddenNav.length > 0) findings.push({ id: 'nav-hidden', level: 'info', category: 'Menus', title: 'Itens de menu ocultos', description: `${hiddenNav.length} item(ns) ocultos por override.` });
+    if (hiddenNav.length > 0) findings.push({ id: 'nav-hidden', level: 'info', category: 'Menus', title: 'Itens de menu ocultos', description: `${formatQuantity(hiddenNav.length, 'item oculto', 'itens ocultos')} por override.` });
 
     // Integrações com falha
     const failing = integrations.filter((i) => i.recentFailures > 0);

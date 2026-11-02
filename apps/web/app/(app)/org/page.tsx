@@ -337,7 +337,7 @@ export default function OrgPage() {
 
   const saveActivity = useMutation({
     mutationFn: () => {
-      if (!selectedNodeId) throw new Error('Selecione um item da arvore.');
+      if (!selectedNodeId) throw new Error('Selecione um item da árvore.');
       const payload = {
         title: activityForm.title,
         description: activityForm.description || null,
@@ -358,7 +358,7 @@ export default function OrgPage() {
 
   const updateActivity = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Partial<OrgActivity> }) => {
-      if (!selectedNodeId) throw new Error('Selecione um item da arvore.');
+      if (!selectedNodeId) throw new Error('Selecione um item da árvore.');
       return api(`/orgnodes/${selectedNodeId}/activities/${id}`, { method: 'PATCH', json: body });
     },
     onSuccess: () => invalidateDetail(),
@@ -367,7 +367,7 @@ export default function OrgPage() {
 
   const removeActivity = useMutation({
     mutationFn: (id: string) => {
-      if (!selectedNodeId) throw new Error('Selecione um item da arvore.');
+      if (!selectedNodeId) throw new Error('Selecione um item da árvore.');
       return api(`/orgnodes/${selectedNodeId}/activities/${id}`, { method: 'DELETE' });
     },
     onSuccess: () => {
@@ -379,7 +379,7 @@ export default function OrgPage() {
 
   const saveItem = useMutation({
     mutationFn: () => {
-      if (!selectedNodeId) throw new Error('Selecione um item da arvore.');
+      if (!selectedNodeId) throw new Error('Selecione um item da árvore.');
       const payload = {
         description: itemForm.description,
         orderIndex: Number(itemForm.orderIndex) || 1,
@@ -390,32 +390,32 @@ export default function OrgPage() {
         : api(`/orgnodes/${selectedNodeId}/activities/${itemForm.activityId}/items`, { method: 'POST', json: payload });
     },
     onSuccess: () => {
-      toast.success('Topico salvo');
+      toast.success('Tópico salvo');
       setItemDialogOpen(false);
       invalidateDetail();
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar topico'),
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar tópico'),
   });
 
   const updateItem = useMutation({
     mutationFn: ({ activityId, itemId, body }: { activityId: string; itemId: string; body: Partial<ActivityItem> }) => {
-      if (!selectedNodeId) throw new Error('Selecione um item da arvore.');
+      if (!selectedNodeId) throw new Error('Selecione um item da árvore.');
       return api(`/orgnodes/${selectedNodeId}/activities/${activityId}/items/${itemId}`, { method: 'PATCH', json: body });
     },
     onSuccess: () => invalidateDetail(),
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao atualizar topico'),
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao atualizar tópico'),
   });
 
   const removeItem = useMutation({
     mutationFn: ({ activityId, itemId }: { activityId: string; itemId: string }) => {
-      if (!selectedNodeId) throw new Error('Selecione um item da arvore.');
+      if (!selectedNodeId) throw new Error('Selecione um item da árvore.');
       return api(`/orgnodes/${selectedNodeId}/activities/${activityId}/items/${itemId}`, { method: 'DELETE' });
     },
     onSuccess: () => {
-      toast.success('Topico inativado');
+      toast.success('Tópico inativado');
       invalidateDetail();
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao inativar topico'),
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao inativar tópico'),
   });
 
   const openNode = (node?: TreeNode | OrgNodeDetail, parentId?: string) => {
@@ -517,7 +517,7 @@ export default function OrgPage() {
         tone="view"
         title="Estrutura de gestão, Empresa, Áreas e setores"
         description="Modelo livre para organizar Áreas e os indicadores vinculados a cada pilar."
-        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'Arvore de gestão' }]}
+        breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'Árvore de gestão' }]}
         actions={
           canViewAllOrg || canManageOrg ? (
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
@@ -525,7 +525,7 @@ export default function OrgPage() {
                 <div className="flex items-center gap-2">
                   <Eye className="h-4 w-4 text-muted-foreground" />
                   <NativeSelect
-                    aria-label="Visibilidade da arvore"
+                    aria-label="Visibilidade da árvore"
                     className="h-9 min-w-[180px] sm:w-[190px]"
                     value={treeScope}
                     onChange={(event) => setManualTreeScope(event.target.value as OrgTreeScope)}
@@ -549,7 +549,7 @@ export default function OrgPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard compact title="Nos da estrutura" value={formatNumber(stats.total)} description="Valores, áreas e pilares" icon={<Network className="h-4 w-4" />} tone="blue" />
         <MetricCard compact title="Ativos" value={formatNumber(stats.active)} description="Liberados para uso" icon={<BadgeCheck className="h-4 w-4" />} tone="green" />
-        <MetricCard compact title="Indicadores vinculados" value={formatNumber(stats.indicators)} description="Distribuidos por pilar" icon={<Target className="h-4 w-4" />} tone="purple" />
+        <MetricCard compact title="Indicadores vinculados" value={formatNumber(stats.indicators)} description="Distribuídos por pilar" icon={<Target className="h-4 w-4" />} tone="purple" />
         <MetricCard compact title="Com responsável" value={formatNumber(stats.responsible)} description="Governança atribuída" icon={<UserRound className="h-4 w-4" />} tone="yellow" />
       </div>
 
@@ -595,7 +595,7 @@ export default function OrgPage() {
           onToggleItem={(activityId, item) => updateItem.mutate({ activityId, itemId: item.id, body: { isActive: !item.isActive } })}
           onMoveItem={(activityId, item, direction) => updateItem.mutate({ activityId, itemId: item.id, body: { orderIndex: Math.max(1, item.orderIndex + direction) } })}
           onRemoveItem={(activityId, item) => {
-            if (window.confirm('Inativar este topico?')) removeItem.mutate({ activityId, itemId: item.id });
+            if (window.confirm('Inativar este tópico?')) removeItem.mutate({ activityId, itemId: item.id });
           }}
         />
       )}
@@ -734,7 +734,7 @@ export default function OrgPage() {
       <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{itemForm.id ? 'Editar topico' : 'Novo topico'}</DialogTitle>
+            <DialogTitle>{itemForm.id ? 'Editar tópico' : 'Novo tópico'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr,140px]">
             <div>
@@ -952,7 +952,7 @@ function OrgDetailPanel({
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2 bg-muted/10">
                   <div>
                     <div className="text-sm font-semibold">Principais responsabilidades</div>
-                    <div className="text-xs text-muted-foreground">Blocos e topicos vinculados somente a este item organizacional.</div>
+                    <div className="text-xs text-muted-foreground">Blocos e tópicos vinculados somente a este item organizacional.</div>
                   </div>
                   {canManage && isEditing && (
                     <Button size="sm" variant="outline" onClick={onAddActivity}>

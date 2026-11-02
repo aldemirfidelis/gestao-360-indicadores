@@ -19,9 +19,9 @@ const COMPANY_CORE_MODULES = new Set<string>(alwaysOnModuleCodes());
 const NON_BLOCKABLE_MODULES = new Set<string>(nonBlockableModuleCodes());
 const SEO_GROUP = 'SEO_PRESENCE';
 const SEO_DEFAULTS: Record<string, string> = {
-  defaultTitle: 'Gestao 360 | Plataforma de gestao corporativa integrada',
-  defaultDescription: 'Plataforma SaaS B2B para indicadores, estrategia, planos de acao, documentos, auditorias, riscos e melhoria continua.',
-  productName: 'Gestao 360',
+  defaultTitle: 'Gestão 360 | Plataforma de gestão corporativa integrada',
+  defaultDescription: 'Plataforma SaaS B2B para indicadores, estratégia, planos de ação, documentos, auditorias, riscos e melhoria contínua.',
+  productName: 'Gestão 360',
   primaryDomain: 'https://gestao360.org',
   defaultSocialImage: '/brand/social-preview.svg',
   googleVerification: '',
@@ -31,7 +31,7 @@ const SEO_DEFAULTS: Record<string, string> = {
   indexNowEnabled: 'false',
   indexNowKey: '',
   whatsappNumber: '5564981009108',
-  whatsappMessage: 'Ola, tenho interesse em conhecer melhor o Gestao 360.',
+  whatsappMessage: 'Ola, tenho interesse em conhecer melhor o Gestão 360.',
   floatingWhatsappEnabled: 'true',
   oaiSearchBotPolicy: 'allow_public',
   gptBotPolicy: 'disallow_training_by_default',
@@ -239,7 +239,7 @@ export class PlatformAdminService {
             key,
             value,
             valueType: key.toLowerCase().includes('enabled') ? 'boolean' : 'text',
-            description: `SEO e Presenca Digital: ${key}`,
+            description: `SEO e Presença Digital: ${key}`,
             active: true,
           },
         });
@@ -275,7 +275,7 @@ export class PlatformAdminService {
 
   async getCompany(id: string) {
     const company = await this.prisma.company.findFirst({ where: { id, deletedAt: null } });
-    if (!company) throw new NotFoundException('Empresa nao encontrada.');
+    if (!company) throw new NotFoundException('Empresa não encontrada.');
 
     const [profile, users, branches, orgNodes, indicators, actions, documents, audits, forms, modules, logs, integrations, support] =
       await Promise.all([
@@ -323,11 +323,11 @@ export class PlatformAdminService {
   }
 
   async createCompany(user: PlatformAdminIdentity, input: CompanyInput) {
-    if (!input.name) throw new ConflictException('Nome da empresa e obrigatorio.');
+    if (!input.name) throw new ConflictException('Nome da empresa é obrigatório.');
     await this.assertValidPlanCode(input.planCode ?? 'ESSENCIAL');
     if (input.cnpj) {
       const dup = await this.prisma.company.findFirst({ where: { cnpj: input.cnpj, deletedAt: null } });
-      if (dup) throw new ConflictException('Ja existe empresa com este CNPJ.');
+      if (dup) throw new ConflictException('Já existe empresa com este CNPJ.');
     }
 
     const companyStatus = parseCompanyStatus(input.status ?? input.lifecycleStatus);
@@ -369,11 +369,11 @@ export class PlatformAdminService {
 
   async updateCompany(user: PlatformAdminIdentity, id: string, input: CompanyInput) {
     const before = await this.prisma.company.findFirst({ where: { id, deletedAt: null } });
-    if (!before) throw new NotFoundException('Empresa nao encontrada.');
+    if (!before) throw new NotFoundException('Empresa não encontrada.');
     if (input.planCode) await this.assertValidPlanCode(input.planCode);
     if (input.cnpj && input.cnpj !== before.cnpj) {
       const dup = await this.prisma.company.findFirst({ where: { cnpj: input.cnpj, deletedAt: null, NOT: { id } } });
-      if (dup) throw new ConflictException('Ja existe empresa com este CNPJ.');
+      if (dup) throw new ConflictException('Já existe empresa com este CNPJ.');
     }
 
     const data: Prisma.CompanyUpdateInput = {};
@@ -417,7 +417,7 @@ export class PlatformAdminService {
 
   async setCompanyStatus(user: PlatformAdminIdentity, id: string, status: string, reason?: string | null) {
     const before = await this.prisma.company.findFirst({ where: { id, deletedAt: null } });
-    if (!before) throw new NotFoundException('Empresa nao encontrada.');
+    if (!before) throw new NotFoundException('Empresa não encontrada.');
     const companyStatus = status === 'SUSPENDED' ? CompanyStatus.SUSPENDED : status === 'INACTIVE' ? CompanyStatus.INACTIVE : CompanyStatus.ACTIVE;
     const company = await this.prisma.company.update({
       where: { id },
@@ -548,7 +548,7 @@ export class PlatformAdminService {
       where: { id: companyId, deletedAt: null },
       select: { id: true, name: true, tradeName: true },
     });
-    if (!company) throw new NotFoundException('Empresa nao encontrada.');
+    if (!company) throw new NotFoundException('Empresa não encontrada.');
     const [pages, overrides] = await Promise.all([
       this.prisma.portalPage.findMany({ orderBy: [{ menuOrder: 'asc' }, { name: 'asc' }] }),
       this.prisma.platformCompanyPage.findMany({ where: { companyId } }),
@@ -575,14 +575,14 @@ export class PlatformAdminService {
     input: { status: string; reason?: string; note?: string },
   ) {
     const company = await this.prisma.company.findFirst({ where: { id: companyId, deletedAt: null } });
-    if (!company) throw new NotFoundException('Empresa nao encontrada.');
+    if (!company) throw new NotFoundException('Empresa não encontrada.');
     const page = await this.prisma.portalPage.findUnique({ where: { code: pageCode } });
-    if (!page) throw new NotFoundException('Tela nao encontrada no catalogo do portal.');
+    if (!page) throw new NotFoundException('Tela não encontrada no catálogo do portal.');
     const status = String(input.status ?? '').toUpperCase();
     // SOMENTE_LEITURA não é suportado por tela (o overlay do frontend só sabe
     // esconder/liberar) — melhor recusar do que prometer o que não se cumpre.
     if (!['HERDADO_DO_MODULO', 'ATIVO', 'BLOQUEADO'].includes(status)) {
-      throw new BadRequestException('Status de tela invalido. Use HERDADO_DO_MODULO, ATIVO ou BLOQUEADO.');
+      throw new BadRequestException('Status de tela inválido. Use HERDADO_DO_MODULO, ATIVO ou BLOQUEADO.');
     }
 
     const before = await this.prisma.platformCompanyPage.findUnique({ where: { companyId_pageCode: { companyId, pageCode } } });
@@ -608,12 +608,12 @@ export class PlatformAdminService {
 
   async setCompanyModule(user: PlatformAdminIdentity, companyId: string, moduleCode: string, input: ModuleUpdateInput) {
     const company = await this.prisma.company.findFirst({ where: { id: companyId, deletedAt: null } });
-    if (!company) throw new NotFoundException('Empresa nao encontrada.');
+    if (!company) throw new NotFoundException('Empresa não encontrada.');
     await this.ensureModuleCatalog();
     const module = await this.prisma.platformModuleCatalog.findUnique({ where: { code: moduleCode } });
-    if (!module) throw new NotFoundException('Modulo nao encontrado.');
+    if (!module) throw new NotFoundException('Módulo não encontrado.');
     if (NON_BLOCKABLE_MODULES.has(moduleCode) && BLOCKED_MODULE_STATUSES.includes(input.status)) {
-      throw new ConflictException('Modulo de infraestrutura do portal (login, permissoes, configuracoes) nao pode ser bloqueado.');
+      throw new ConflictException('Módulo de infraestrutura do portal (login, permissões, configurações) não pode ser bloqueado.');
     }
 
     const before = await this.prisma.platformCompanyModule.findUnique({ where: { companyId_moduleCode: { companyId, moduleCode } } });
@@ -684,7 +684,7 @@ export class PlatformAdminService {
     await this.ensureModuleCatalog();
     await this.ensurePlans();
     const plan = await this.prisma.platformPlan.findUnique({ where: { code: planCode }, select: { id: true } });
-    if (!plan) throw new NotFoundException('Plano nao encontrado.');
+    if (!plan) throw new NotFoundException('Plano não encontrado.');
     await this.prisma.platformCompanyProfile.upsert({
       where: { companyId },
       create: { companyId, internalCode: await this.nextCompanyCode(), lifecycleStatus: 'ACTIVE', planCode },
@@ -721,7 +721,7 @@ export class PlatformAdminService {
       permissionKey: 'platform.modules.manage',
       companyId,
       targetType: 'PlatformCompanyModule',
-      targetLabel: `Plano ${planCode} aplicado aos modulos da empresa`,
+      targetLabel: `Plano ${planCode} aplicado aos módulos da empresa`,
       afterValue: { planCode, modules: catalogModules.length },
     });
     return { planCode, applied: catalogModules.length };
@@ -736,7 +736,7 @@ export class PlatformAdminService {
     await this.ensureModuleCatalog();
     const code = String(input.code ?? '').trim().toUpperCase();
     const name = String(input.name ?? '').trim();
-    if (!code || !name) throw new ConflictException('Codigo e nome do plano sao obrigatorios.');
+    if (!code || !name) throw new ConflictException('Código e nome do plano são obrigatórios.');
     const before = await this.prisma.platformPlan.findUnique({ where: { code }, include: { modules: true } });
     const hasModuleInput = 'moduleCodes' in input || 'modules' in input;
     const selectedModuleCodes = moduleCodeArray(input.moduleCodes ?? input.modules);
@@ -819,7 +819,7 @@ export class PlatformAdminService {
 
   async setUserStatus(user: PlatformAdminIdentity, id: string, status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED' | 'PENDING') {
     const before = await this.prisma.user.findUnique({ where: { id } });
-    if (!before || before.deletedAt) throw new NotFoundException('Usuario nao encontrado.');
+    if (!before || before.deletedAt) throw new NotFoundException('Usuário não encontrado.');
     const updated = await this.prisma.user.update({
       where: { id },
       data: {
@@ -844,7 +844,7 @@ export class PlatformAdminService {
 
   async revokeUserSessions(user: PlatformAdminIdentity, id: string) {
     const target = await this.prisma.user.findUnique({ where: { id } });
-    if (!target || target.deletedAt) throw new NotFoundException('Usuario nao encontrado.');
+    if (!target || target.deletedAt) throw new NotFoundException('Usuário não encontrado.');
     const updated = await this.prisma.refreshToken.updateMany({
       where: { userId: id, revokedAt: null },
       data: { revokedAt: new Date() },
@@ -885,10 +885,10 @@ export class PlatformAdminService {
     input: { companyId?: string; reason?: string; justification?: string; minutes?: number; readOnly?: boolean },
   ) {
     if (!input.companyId || !input.reason || !input.justification) {
-      throw new ConflictException('Empresa, motivo e justificativa sao obrigatorios para o modo de suporte.');
+      throw new ConflictException('Empresa, motivo e justificativa são obrigatórios para o modo de suporte.');
     }
     const company = await this.prisma.company.findFirst({ where: { id: input.companyId, deletedAt: null } });
-    if (!company) throw new NotFoundException('Empresa nao encontrada.');
+    if (!company) throw new NotFoundException('Empresa não encontrada.');
     const minutes = Math.min(Math.max(input.minutes ?? 60, 5), 240);
     const session = await this.prisma.platformSupportSession.create({
       data: {
@@ -917,7 +917,7 @@ export class PlatformAdminService {
 
   async endSupportSession(user: PlatformAdminIdentity, id: string) {
     const before = await this.prisma.platformSupportSession.findUnique({ where: { id } });
-    if (!before) throw new NotFoundException('Sessao de suporte nao encontrada.');
+    if (!before) throw new NotFoundException('Sessão de suporte não encontrada.');
     const updated = await this.prisma.platformSupportSession.update({ where: { id }, data: { endedAt: new Date() } });
     await this.audit.record({
       user,
@@ -951,7 +951,7 @@ export class PlatformAdminService {
 
   async upsertFeatureFlag(user: PlatformAdminIdentity, input: Record<string, unknown>) {
     const key = String(input.key ?? '').trim();
-    if (!key) throw new ConflictException('Chave da flag e obrigatoria.');
+    if (!key) throw new ConflictException('Chave da flag é obrigatória.');
     const before = await this.prisma.portalFeatureFlag.findUnique({ where: { key } });
     const flag = await this.prisma.portalFeatureFlag.upsert({
       where: { key },
@@ -1395,7 +1395,7 @@ Equipe Gestão 360
   private async assertValidPlanCode(planCode: string) {
     await this.ensurePlans();
     const plan = await this.prisma.platformPlan.findUnique({ where: { code: planCode }, select: { id: true } });
-    if (!plan) throw new BadRequestException(`Plano "${planCode}" nao existe.`);
+    if (!plan) throw new BadRequestException(`Plano "${planCode}" não existe.`);
   }
 
   /** Valida/normaliza slug e customDomain reusando a regra compartilhada. */
@@ -1456,11 +1456,11 @@ Equipe Gestão 360
       this.companiesWithoutAdmin(),
     ]);
     return [
-      { code: 'contracts.expiring', label: 'Contratos proximos do vencimento', count: contracts },
-      { code: 'modules.blocked', label: 'Empresas com modulos bloqueados', count: blockedModules },
+      { code: 'contracts.expiring', label: 'Contratos próximos do vencimento', count: contracts },
+      { code: 'modules.blocked', label: 'Empresas com módulos bloqueados', count: blockedModules },
       { code: 'backups.failed', label: 'Backups com falha', count: failedBackups },
-      { code: 'integrations.disconnected', label: 'Integracoes desconectadas', count: disconnectedIntegrations },
-      { code: 'migrations.pending', label: 'Migracoes pendentes', count: pendingMigrations },
+      { code: 'integrations.disconnected', label: 'Integrações desconectadas', count: disconnectedIntegrations },
+      { code: 'migrations.pending', label: 'Migrações pendentes', count: pendingMigrations },
       { code: 'security.denied', label: 'Tentativas suspeitas de acesso', count: suspiciousLogins },
       { code: 'companies.no_admin', label: 'Empresas sem administrador principal', count: noAdmin },
     ];
@@ -1625,8 +1625,8 @@ Equipe Gestão 360
   private async ensureEnvironments() {
     const envs = [
       { code: 'development', name: 'Desenvolvimento' },
-      { code: 'staging', name: 'Homologacao' },
-      { code: 'production', name: 'Producao' },
+      { code: 'staging', name: 'Homologação' },
+      { code: 'production', name: 'Produção' },
     ];
     for (const env of envs) {
       await this.prisma.platformEnvironment.upsert({

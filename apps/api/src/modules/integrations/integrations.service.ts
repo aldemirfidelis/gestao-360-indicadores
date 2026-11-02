@@ -35,7 +35,7 @@ export class IntegrationsService {
   async setPreference(userId: string, code: string, input: { enabled?: boolean; config?: Record<string, unknown> }) {
     await this.ensureDefaults();
     const integration = await this.prisma.portalIntegration.findUnique({ where: { code } });
-    if (!integration) throw new NotFoundException('Integracao nao encontrada.');
+    if (!integration) throw new NotFoundException('Integração não encontrada.');
     const config = JSON.stringify(input.config ?? {});
     return this.prisma.userIntegrationPreference.upsert({
       where: { userId_code: { userId, code } },
@@ -73,5 +73,5 @@ function parseJson(value: string) {
 function maskEnv(env: string | null): Record<string, string> {
   if (!env) return { configured: 'n/a' };
   const value = process.env[env];
-  return { [env]: value ? '******' : '(nao definido)', configured: value ? 'sim' : 'nao' };
+  return { [env]: value ? '******' : '(não definido)', configured: value ? 'sim' : 'nao' };
 }

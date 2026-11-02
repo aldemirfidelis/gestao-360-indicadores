@@ -248,10 +248,10 @@ const SECTIONS: SectionItem[] = [
   { key: 'companies', label: 'Empresas', icon: Building2, group: 'Plataforma' },
   { key: 'modules', label: 'Matriz de Módulos', icon: PackageCheck, group: 'Plataforma' },
   { key: 'plans', label: 'Planos', icon: ListChecks, group: 'Plataforma' },
-  { key: 'seoPresence', label: 'SEO e Presenca Digital', icon: Globe2, group: 'Plataforma' },
+  { key: 'seoPresence', label: 'SEO e Presença Digital', icon: Globe2, group: 'Plataforma' },
   { key: 'siteVisitors', label: 'Visitantes do Site', icon: MousePointerClick, group: 'Plataforma' },
   { key: 'inbox', label: 'HelpDesk e Caixa de Entrada', icon: Inbox, group: 'Plataforma' },
-  { key: 'security', label: 'Seguranca e Suporte', icon: ShieldCheck, group: 'Plataforma' },
+  { key: 'security', label: 'Segurança e Suporte', icon: ShieldCheck, group: 'Plataforma' },
   // Operam sobre a empresa selecionada no seletor do topo.
   { key: 'users', label: 'Usuários e Permissões', icon: Users, group: 'Empresa selecionada' },
   { key: 'generalSettings', label: 'Config. Gerais', icon: Settings2, group: 'Empresa selecionada' },
@@ -348,14 +348,14 @@ const SETTINGS_AREAS: Array<{
   },
   {
     title: 'Matriz de visibilidade',
-    description: 'Controle de acesso entre áreas, excecoes por usuário e simulação por empresa.',
+    description: 'Controle de acesso entre áreas, exceções por usuário e simulação por empresa.',
     action: 'Abrir visibilidade',
     target: 'visibilityAdmin',
     icon: Eye,
   },
   {
     title: 'Áreas e Setores',
-    description: 'Arvore hierarquica da empresa, responsáveis, códigos, cores e status dos nos.',
+    description: 'Árvore hierarquica da empresa, responsáveis, códigos, cores e status dos nos.',
     action: 'Abrir estrutura',
     target: 'orgStructure',
     icon: Network,
@@ -369,7 +369,7 @@ const SETTINGS_AREAS: Array<{
   },
   {
     title: 'Banco de dados',
-    description: 'Menu completo com tabelas, registros, SQL, estrutura, índices, importação, backup e diagnostico.',
+    description: 'Menu completo com tabelas, registros, SQL, estrutura, índices, importação, backup e diagnóstico.',
     action: 'Abrir banco',
     target: 'databaseAdmin',
     icon: Database,
@@ -984,7 +984,7 @@ function ExternalIntegrationsSection({ initialTab }: { initialTab: ExternalInteg
               tab === 'prize' ? 'border-[#101820] bg-[#101820] text-white' : 'border-border bg-white text-muted-foreground hover:text-foreground',
             )}
           >
-            Integracoes do Premio
+            Integrações do Prêmio
           </button>
         )}
       </div>
@@ -1256,7 +1256,7 @@ function SeoPresenceSection() {
   const save = useMutation({
     mutationFn: () => platformAdminApi<SeoPresencePayload>('/seo-presence', { method: 'PATCH', json: form }),
     onSuccess: () => {
-      toast.success('SEO e presenca digital atualizados');
+      toast.success('SEO e presença digital atualizados');
       void qc.invalidateQueries({ queryKey: ['platform-admin', 'seo-presence'] });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Falha ao salvar SEO'),
@@ -1268,14 +1268,14 @@ function SeoPresenceSection() {
   return (
     <div className="space-y-4">
       <Panel
-        title="SEO e Presenca Digital"
+        title="SEO e Presença Digital"
         icon={Globe2}
         actions={<Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}><Save className="mr-2 h-4 w-4" />Salvar</Button>}
       >
         <div className="grid gap-4 lg:grid-cols-2">
           <SeoField label="Título padrão" value={form.defaultTitle} onChange={(value) => setForm({ ...form, defaultTitle: value })} />
           <SeoField label="Nome do produto" value={form.productName} onChange={(value) => setForm({ ...form, productName: value })} />
-          <SeoField label="Dominio principal" value={form.primaryDomain} onChange={(value) => setForm({ ...form, primaryDomain: value })} />
+          <SeoField label="Domínio principal" value={form.primaryDomain} onChange={(value) => setForm({ ...form, primaryDomain: value })} />
           <SeoField label="Imagem social padrão" value={form.defaultSocialImage} onChange={(value) => setForm({ ...form, defaultSocialImage: value })} />
           <SeoField label="Google Analytics 4" value={form.gaMeasurementId} onChange={(value) => setForm({ ...form, gaMeasurementId: value })} />
           <SeoField label="Google Tag Manager" value={form.gtmId} onChange={(value) => setForm({ ...form, gtmId: value })} />
@@ -1299,7 +1299,7 @@ function SeoPresenceSection() {
             </NativeSelect>
           </label>
           <label className="grid gap-1.5 text-sm">
-            <span className="font-medium">Botao flutuante WhatsApp</span>
+            <span className="font-medium">Botão flutuante WhatsApp</span>
             <NativeSelect value={form.floatingWhatsappEnabled ?? 'true'} onChange={(event) => setForm({ ...form, floatingWhatsappEnabled: event.target.value })}>
               <option value="true">Ativado</option>
               <option value="false">Desativado</option>
@@ -1375,7 +1375,7 @@ function DashboardSection() {
     ['activeUsers30d', 'Ativos 30d'],
     ['onlineUsers', 'Conectados agora'],
     ['accessesToday', 'Acessos hoje'],
-    ['accessesMonth', 'Acessos mes'],
+    ['accessesMonth', 'Acessos mês'],
     ['recentErrors', 'Erros recentes'],
   ] as const;
 
@@ -2336,7 +2336,7 @@ function UsersSection() {
 
 function SecuritySection() {
   const queryClient = useQueryClient();
-  const [support, setSupport] = useState({ companyId: '', reason: 'Diagnostico técnico', justification: '', minutes: '60' });
+  const [support, setSupport] = useState({ companyId: '', reason: 'Diagnóstico técnico', justification: '', minutes: '60' });
   const sessions = useQuery({
     queryKey: ['platform-admin', 'sessions'],
     queryFn: () => platformAdminApi<{ companySessions: unknown[]; adminSessions: unknown[] }>('/sessions'),
@@ -3048,7 +3048,7 @@ function TechnicalSection() {
         <div className="space-y-2 text-sm">
           {Object.entries(database.data?.health ?? {}).map(([key, value]) => <Row key={key} label={key} value={String(value)} />)}
           <Row label="Backups registrados" value={database.data?.backups.length ?? 0} />
-          <Row label="Migracoes rastreadas" value={database.data?.migrations.length ?? 0} />
+          <Row label="Migrações rastreadas" value={database.data?.migrations.length ?? 0} />
         </div>
       </Panel>
       <Panel title="Ambientes e versões" icon={ServerCog}>

@@ -347,7 +347,7 @@ export class InventoryService {
 
   async importTemplate(): Promise<Buffer> {
     const workbook = new Workbook();
-    const sheet = workbook.addWorksheet('Catalogo');
+    const sheet = workbook.addWorksheet('Catálogo');
     sheet.addRow(['codigo', 'nome', 'tipo', 'unidade', 'grupo', 'estoque_minimo', 'estoque_maximo', 'saldo_inicial', 'custo_unitario']);
     sheet.addRow(['MAT-001', 'Luva nitrílica', 'MATERIAL', 'CX', 'EPI', 10, 100, 25, 42.5]);
     sheet.addRow(['SRV-001', 'Manutenção preventiva', 'SERVICO', 'UN', 'Serviços', '', '', '', '']);

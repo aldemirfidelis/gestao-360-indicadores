@@ -143,17 +143,17 @@ export class ImportsService {
   private async validateRow(companyId: string, target: ImportTargetKind, data: any) {
     if (target === ImportTargetKind.INDICATORS) {
       const d = data as IndicatorRow;
-      if (!d.code || !d.name) throw new Error('code e name sao obrigatorios');
+      if (!d.code || !d.name) throw new Error('code e name são obrigatórios');
     }
     if (target === ImportTargetKind.TARGETS || target === ImportTargetKind.RESULTS) {
       const d = data as TargetRow | ResultRow;
-      if (!d.code || !d.periodRef) throw new Error('code e periodRef sao obrigatorios');
+      if (!d.code || !d.periodRef) throw new Error('code e periodRef são obrigatórios');
       const ind = await this.prisma.indicator.findUnique({
         where: { companyId_code: { companyId, code: d.code } },
       });
-      if (!ind) throw new Error(`Indicador "${d.code}" nao encontrado nesta empresa`);
+      if (!ind) throw new Error(`Indicador "${d.code}" não encontrado nesta empresa`);
       const val = target === ImportTargetKind.TARGETS ? (d as TargetRow).target : (d as ResultRow).value;
-      if (typeof val !== 'number' || Number.isNaN(val)) throw new Error('valor numerico inválido');
+      if (typeof val !== 'number' || Number.isNaN(val)) throw new Error('valor numérico inválido');
     }
   }
 
@@ -163,7 +163,7 @@ export class ImportsService {
       const ownerNode = d.ownerCode
         ? await this.prisma.orgNode.findFirst({ where: { companyId, code: d.ownerCode } })
         : null;
-      if (!ownerNode) throw new Error('ownerCode inválido (area nao encontrada)');
+      if (!ownerNode) throw new Error('ownerCode inválido (área não encontrada)');
       await this.prisma.indicator.upsert({
         where: { companyId_code: { companyId, code: d.code } },
         create: {

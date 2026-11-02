@@ -207,7 +207,7 @@ const EMPTY_AUDIT = {
 const EMPTY_PROGRAM = { name: '', status: 'DRAFT', startsAt: '', endsAt: '', ownerUserId: '', approverUserId: '', estimatedHours: '', budget: '', description: '' };
 const EMPTY_UNIVERSE = { name: '', kind: 'AREA', orgNodeId: '', ownerUserId: '', impact: '3', probability: '3', recurrence: '2', regulatory_requirement: '2', strategic_relevance: '3', description: '' };
 const EMPTY_AUDITOR = { userId: '', name: '', kind: 'INTERNAL', status: 'ACTIVE', competenceLevel: '3', standards: '', notes: '' };
-const EMPTY_CHECKLIST = { name: '', auditType: 'INTERNAL', status: 'DRAFT', standardId: '', questions: 'O requisito foi atendido?\nHa evidência objetiva registrada?' };
+const EMPTY_CHECKLIST = { name: '', auditType: 'INTERNAL', status: 'DRAFT', standardId: '', questions: 'O requisito foi atendido?\nHá evidência objetiva registrada?' };
 const EMPTY_FINDING = { classificationId: '', type: 'OBSERVATION', severity: '', description: '', conditionFound: '', expectedCriteria: '', evidence: '', recommendation: '', dueDate: '' };
 const EMPTY_EVIDENCE = { description: '', type: 'TEXT', fileName: '', content: '' };
 const EMPTY_REPORT = { title: '', summary: '', executiveSummary: '', issue: false };
@@ -267,7 +267,7 @@ export default function AuditsPage() {
   });
   const deleteAudit = useMutation({
     mutationFn: (id: string) => api<Audit>(`/audits/${id}`, { method: 'DELETE' }),
-    onSuccess: () => { toast.success('Auditoria excluida logicamente'); invalidate(); },
+    onSuccess: () => { toast.success('Auditoria excluída logicamente'); invalidate(); },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir'),
   });
   const transitionAudit = useMutation({
@@ -282,8 +282,8 @@ export default function AuditsPage() {
   });
   const saveUniverse = useMutation({
     mutationFn: () => api('/audits/universe', { method: 'POST', json: universePayload(universeForm) }),
-    onSuccess: () => { toast.success('Item auditavel criado'); setUniverseOpen(false); setUniverseForm(EMPTY_UNIVERSE); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar o item auditavel'),
+    onSuccess: () => { toast.success('Item auditável criado'); setUniverseOpen(false); setUniverseForm(EMPTY_UNIVERSE); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar o item auditável'),
   });
   const saveAuditor = useMutation({
     mutationFn: () => api('/audits/auditors', { method: 'POST', json: auditorPayload(auditorForm) }),
@@ -373,7 +373,7 @@ export default function AuditsPage() {
                       <Tooltip />
                       <Bar dataKey="total" name="Total" fill="#2563eb" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="open" name="Abertas" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="critical" name="Criticas" fill="#dc2626" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="critical" name="Críticas" fill="#dc2626" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -385,7 +385,7 @@ export default function AuditsPage() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <div className="text-sm font-semibold">Fila por risco</div>
-                    <div className="text-xs text-muted-foreground">Prioridades do universo auditavel.</div>
+                    <div className="text-xs text-muted-foreground">Prioridades do universo auditável.</div>
                   </div>
                   <ShieldCheck className="h-4 w-4 text-muted-foreground" />
                 </div>
@@ -414,7 +414,7 @@ export default function AuditsPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <PanelList title="Proximas auditorias" icon={<CalendarClock className="h-4 w-4" />}>
+            <PanelList title="Próximas auditorias" icon={<CalendarClock className="h-4 w-4" />}>
               {(dashboard?.summary.upcoming ?? []).length === 0 && <EmptyLine text="Nenhuma auditoria em aberto." />}
               {(dashboard?.summary.upcoming ?? []).map((audit) => (
                 <AuditLine key={audit.id} audit={audit as Audit} onClick={() => setSelectedId(audit.id)} />
@@ -523,7 +523,7 @@ export default function AuditsPage() {
         </TabsContent>
 
         <TabsContent value="universe" className="space-y-4">
-          <SectionHeader title="Universo auditavel e risco" action={canManage ? <Button onClick={() => setUniverseOpen(true)}><Plus className="mr-2 h-4 w-4" />Novo item</Button> : null} />
+          <SectionHeader title="Universo auditável e risco" action={canManage ? <Button onClick={() => setUniverseOpen(true)}><Plus className="mr-2 h-4 w-4" />Novo item</Button> : null} />
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             {(universeQuery.data ?? []).map((item: any) => (
               <Card key={item.id}>
@@ -574,7 +574,7 @@ export default function AuditsPage() {
                   </div>
                   <h3 className="mt-3 text-base font-semibold">{auditor.name}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{auditor.email || auditor.companyName || 'Sem contato.'}</p>
-                  <div className="mt-3 text-xs text-muted-foreground">{auditor.competencies?.length ?? 0} competências - {auditor.certifications?.length ?? 0} certificacoes</div>
+                  <div className="mt-3 text-xs text-muted-foreground">{auditor.competencies?.length ?? 0} competências - {auditor.certifications?.length ?? 0} certificações</div>
                 </CardContent>
               </Card>
             ))}
@@ -629,10 +629,10 @@ export default function AuditsPage() {
                 <InfoBox label="Área" value={selected.orgNode?.name ?? '-'} />
                 <InfoBox label="Auditor líder" value={selected.leadAuditor?.name ?? '-'} />
                 <InfoBox label="Programa" value={selectedDetail?.program?.name ?? '-'} />
-                <InfoBox label="Item auditavel" value={selectedDetail?.universeItem?.name ?? '-'} />
+                <InfoBox label="Item auditável" value={selectedDetail?.universeItem?.name ?? '-'} />
                 <InfoBox label="Data planejada" value={formatDate(selected.plannedDate)} />
                 <div className="rounded-md border p-3 md:col-span-3">
-                  <div className="text-xs text-muted-foreground">Escopo e criterio</div>
+                  <div className="text-xs text-muted-foreground">Escopo e critério</div>
                   <p className="mt-1 text-sm">{selected.scope || selected.objective || 'Sem escopo registrado.'}</p>
                   {selected.criteria && <p className="mt-2 text-sm text-muted-foreground">{selected.criteria}</p>}
                 </div>
@@ -781,14 +781,14 @@ function AuditDialog({ open, onOpenChange, form, setForm, options, onSave, savin
           <Field label="Tipo"><NativeSelect value={form.type} onChange={(e) => setForm((f: any) => ({ ...f, type: e.target.value }))}>{(options?.types ?? ['INTERNAL']).map((v: string) => <option key={v} value={v}>{label(v)}</option>)}</NativeSelect></Field>
           <Field label="Modalidade"><NativeSelect value={form.modality} onChange={(e) => setForm((f: any) => ({ ...f, modality: e.target.value }))}>{(options?.modalities ?? ['PRESENTIAL']).map((v: string) => <option key={v} value={v}>{label(v)}</option>)}</NativeSelect></Field>
           <Field label="Programa"><NativeSelect value={form.programId} onChange={(e) => setForm((f: any) => ({ ...f, programId: e.target.value }))}><option value="">Sem programa</option>{(options?.programs ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.code ? `${i.code} - ` : ''}{i.name}</option>)}</NativeSelect></Field>
-          <Field label="Item auditavel"><NativeSelect value={form.universeItemId} onChange={(e) => setForm((f: any) => ({ ...f, universeItemId: e.target.value }))}><option value="">Sem item</option>{(options?.universeItems ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
+          <Field label="Item auditável"><NativeSelect value={form.universeItemId} onChange={(e) => setForm((f: any) => ({ ...f, universeItemId: e.target.value }))}><option value="">Sem item</option>{(options?.universeItems ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
           <Field label="Area/processo"><NativeSelect value={form.orgNodeId} onChange={(e) => setForm((f: any) => ({ ...f, orgNodeId: e.target.value }))}><option value="">Sem área direta</option>{(options?.orgNodes ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
           <Field label="Auditor líder"><NativeSelect value={form.leadAuditorUserId} onChange={(e) => setForm((f: any) => ({ ...f, leadAuditorUserId: e.target.value }))}><option value="">Sem auditor</option>{(options?.users ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
           <Field label="Data planejada"><Input type="date" value={form.plannedDate} onChange={(e) => setForm((f: any) => ({ ...f, plannedDate: e.target.value }))} /></Field>
           <Field label="Horas estimadas"><Input type="number" min="0" step="0.5" value={form.estimatedHours} onChange={(e) => setForm((f: any) => ({ ...f, estimatedHours: e.target.value }))} /></Field>
           <Field label="Objetivo" className="md:col-span-2"><Textarea rows={2} value={form.objective} onChange={(e) => setForm((f: any) => ({ ...f, objective: e.target.value }))} /></Field>
           <Field label="Escopo" className="md:col-span-2"><Textarea rows={2} value={form.scope} onChange={(e) => setForm((f: any) => ({ ...f, scope: e.target.value }))} /></Field>
-          <Field label="Criterios" className="md:col-span-2"><Textarea rows={2} value={form.criteria} onChange={(e) => setForm((f: any) => ({ ...f, criteria: e.target.value }))} /></Field>
+          <Field label="Critérios" className="md:col-span-2"><Textarea rows={2} value={form.criteria} onChange={(e) => setForm((f: any) => ({ ...f, criteria: e.target.value }))} /></Field>
         </div>
         <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={onSave} disabled={saving || !form.title.trim()}>{saving ? 'Salvando...' : 'Salvar'}</Button></DialogFooter>
       </DialogContent>
@@ -805,7 +805,7 @@ function ProgramDialog({ open, onOpenChange, form, setForm, options, onSave, sav
           <Field label="Nome" className="md:col-span-2"><Input value={form.name} onChange={(e) => setForm((f: any) => ({ ...f, name: e.target.value }))} /></Field>
           <Field label="Responsável"><NativeSelect value={form.ownerUserId} onChange={(e) => setForm((f: any) => ({ ...f, ownerUserId: e.target.value }))}><option value="">Usuário atual</option>{(options?.users ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
           <Field label="Aprovador"><NativeSelect value={form.approverUserId} onChange={(e) => setForm((f: any) => ({ ...f, approverUserId: e.target.value }))}><option value="">Sem aprovador</option>{(options?.users ?? []).map((i: OptionItem) => <option key={i.id} value={i.id}>{i.name}</option>)}</NativeSelect></Field>
-          <Field label="Inicio"><Input type="date" value={form.startsAt} onChange={(e) => setForm((f: any) => ({ ...f, startsAt: e.target.value }))} /></Field>
+          <Field label="Início"><Input type="date" value={form.startsAt} onChange={(e) => setForm((f: any) => ({ ...f, startsAt: e.target.value }))} /></Field>
           <Field label="Fim"><Input type="date" value={form.endsAt} onChange={(e) => setForm((f: any) => ({ ...f, endsAt: e.target.value }))} /></Field>
           <Field label="Horas estimadas"><Input type="number" value={form.estimatedHours} onChange={(e) => setForm((f: any) => ({ ...f, estimatedHours: e.target.value }))} /></Field>
           <Field label="Orçamento"><Input type="number" value={form.budget} onChange={(e) => setForm((f: any) => ({ ...f, budget: e.target.value }))} /></Field>
@@ -821,7 +821,7 @@ function UniverseDialog({ open, onOpenChange, form, setForm, options, onSave, sa
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Novo item auditavel</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Novo item auditável</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Nome" className="md:col-span-2"><Input value={form.name} onChange={(e) => setForm((f: any) => ({ ...f, name: e.target.value }))} /></Field>
           <Field label="Tipo"><NativeSelect value={form.kind} onChange={(e) => setForm((f: any) => ({ ...f, kind: e.target.value }))}>{(options?.universeKinds ?? ['AREA']).map((v: string) => <option key={v} value={v}>{label(v)}</option>)}</NativeSelect></Field>

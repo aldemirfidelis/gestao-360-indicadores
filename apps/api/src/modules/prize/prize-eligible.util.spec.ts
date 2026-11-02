@@ -14,13 +14,13 @@ describe('maskCpf', () => {
 
 describe('reconcile', () => {
   const prev = [
-    { registration: '1', positionRef: 'Operador I', areaRef: 'Producao', costCenterRef: 'CC-1', situation: 'ACTIVE', baseSalary: 3000 },
-    { registration: '2', positionRef: 'Tecnico', areaRef: 'Manutencao', costCenterRef: 'CC-2', situation: 'ACTIVE', baseSalary: 4000 },
+    { registration: '1', positionRef: 'Operador I', areaRef: 'Produção', costCenterRef: 'CC-1', situation: 'ACTIVE', baseSalary: 3000 },
+    { registration: '2', positionRef: 'Técnico', areaRef: 'Manutenção', costCenterRef: 'CC-2', situation: 'ACTIVE', baseSalary: 4000 },
   ];
 
   it('detecta inclusão, exclusão e alteração', () => {
     const incoming = [
-      { registration: '1', positionRef: 'Operador II', areaRef: 'Producao', costCenterRef: 'CC-1', situation: 'ACTIVE', baseSalary: 3000 }, // mudou cargo
+      { registration: '1', positionRef: 'Operador II', areaRef: 'Produção', costCenterRef: 'CC-1', situation: 'ACTIVE', baseSalary: 3000 }, // mudou cargo
       { registration: '3', positionRef: 'Analista', areaRef: 'Qualidade', costCenterRef: 'CC-3', situation: 'ACTIVE', baseSalary: 5000 }, // novo
     ];
     const r = reconcile(prev, incoming);
@@ -31,7 +31,7 @@ describe('reconcile', () => {
 
   it('sinaliza pendências (sem salário, sem cargo, desligado)', () => {
     const incoming = [
-      { registration: '1', positionRef: null, areaRef: 'Producao', costCenterRef: 'CC-1', situation: 'TERMINATED', baseSalary: null },
+      { registration: '1', positionRef: null, areaRef: 'Produção', costCenterRef: 'CC-1', situation: 'TERMINATED', baseSalary: null },
     ];
     const r = reconcile(prev, incoming);
     expect(r.flags.missingSalary).toContain('1');

@@ -84,7 +84,7 @@ export class NonConformitiesService {
     if (!area) return;
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     if (permitted && !permitted.includes(area)) {
-      throw new ForbiddenException('Voce nao tem acesso as nao conformidades desta area.');
+      throw new ForbiddenException('Você não tem acesso as não conformidades desta área.');
     }
   }
 
@@ -98,7 +98,7 @@ export class NonConformitiesService {
   private parseStatus(value?: string): NonConformityStatus | undefined {
     if (!value) return undefined;
     if (!Object.values(NonConformityStatus).includes(value as NonConformityStatus)) {
-      throw new BadRequestException('Status de nao conformidade invalido.');
+      throw new BadRequestException('Status de não conformidade inválido.');
     }
     return value as NonConformityStatus;
   }
@@ -106,7 +106,7 @@ export class NonConformitiesService {
   private parseSource(value?: string): NonConformitySource | undefined {
     if (!value) return undefined;
     if (!Object.values(NonConformitySource).includes(value as NonConformitySource)) {
-      throw new BadRequestException('Origem de nao conformidade invalida.');
+      throw new BadRequestException('Origem de não conformidade inválida.');
     }
     return value as NonConformitySource;
   }
@@ -114,14 +114,14 @@ export class NonConformitiesService {
   private parseSeverity(value?: string): NonConformitySeverity | undefined {
     if (!value) return undefined;
     if (!Object.values(NonConformitySeverity).includes(value as NonConformitySeverity)) {
-      throw new BadRequestException('Severidade de nao conformidade invalida.');
+      throw new BadRequestException('Severidade de não conformidade inválida.');
     }
     return value as NonConformitySeverity;
   }
 
   private requiredText(value: unknown, field: string) {
     const text = String(value ?? '').trim();
-    if (!text) throw new BadRequestException(`${field} e obrigatorio.`);
+    if (!text) throw new BadRequestException(`${field} é obrigatório.`);
     return text;
   }
 
@@ -140,7 +140,7 @@ export class NonConformitiesService {
     if (value === undefined) return undefined;
     if (value === null || value === '') return null;
     const d = new Date(String(value));
-    if (Number.isNaN(d.getTime())) throw new BadRequestException(`${field} invalido.`);
+    if (Number.isNaN(d.getTime())) throw new BadRequestException(`${field} inválido.`);
     return d;
   }
 
@@ -170,7 +170,7 @@ export class NonConformitiesService {
       where: { id, companyId, deletedAt: null },
       include: this.include(),
     });
-    if (!nc) throw new NotFoundException('Nao conformidade nao encontrada');
+    if (!nc) throw new NotFoundException('Não conformidade não encontrada');
     return nc;
   }
 
@@ -325,7 +325,7 @@ export class NonConformitiesService {
   }
 
   async create(me: AuthPayload, body: any) {
-    const title = this.requiredText(body?.title, 'Titulo');
+    const title = this.requiredText(body?.title, 'Título');
     const source = this.parseSource(body?.source) ?? NonConformitySource.INDICATOR;
     const severity = this.parseSeverity(body?.severity) ?? NonConformitySeverity.MAJOR;
     const status = this.parseStatus(body?.status) ?? NonConformityStatus.OPEN;
@@ -360,7 +360,7 @@ export class NonConformitiesService {
           effectivenessCheck: this.nullableText(body?.effectivenessCheck) ?? null,
           effectivenessOk: this.optionalBool(body?.effectivenessOk) ?? null,
           dueDate: this.optionalDate(body?.dueDate, 'Prazo') ?? null,
-          identifiedAt: this.optionalDate(body?.identifiedAt, 'Data de identificacao') ?? new Date(),
+          identifiedAt: this.optionalDate(body?.identifiedAt, 'Data de identificação') ?? new Date(),
           closedAt: CLOSED_STATUSES.has(status) ? new Date() : null,
           createdById: me.sub,
           ...links.ids,
@@ -376,7 +376,7 @@ export class NonConformitiesService {
       eventType: TraceEventType.CREATED,
       entityType: TraceEntityType.NON_CONFORMITY,
       entityId: nc.id,
-      title: `Nao conformidade #${nc.number} registrada`,
+      title: `Não conformidade #${nc.number} registrada`,
       description: nc.title,
       statusTo: nc.status,
       metadata: { source: nc.source, severity: nc.severity },
@@ -448,7 +448,7 @@ export class NonConformitiesService {
       eventType: TraceEventType.CREATED,
       entityType: TraceEntityType.NON_CONFORMITY,
       entityId: nc.id,
-      title: `Nao conformidade #${nc.number} gerada por checklist`,
+      title: `Não conformidade #${nc.number} gerada por checklist`,
       description: nc.title,
       statusTo: nc.status,
       metadata: { source: nc.source, severity: nc.severity, origin: payload.sourceLabel ?? 'checklist' },
@@ -474,7 +474,7 @@ export class NonConformitiesService {
     await this.assertWriteArea(me, links.area, 'edit');
 
     const data: any = { ...links.ids };
-    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Titulo');
+    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Título');
     if ('description' in (patch ?? {})) data.description = this.nullableText(patch.description);
     if ('source' in (patch ?? {})) data.source = this.parseSource(patch.source) ?? before.source;
     if ('severity' in (patch ?? {})) data.severity = this.parseSeverity(patch.severity) ?? before.severity;
@@ -489,7 +489,7 @@ export class NonConformitiesService {
     if ('effectivenessCheck' in (patch ?? {})) data.effectivenessCheck = this.nullableText(patch.effectivenessCheck);
     if ('effectivenessOk' in (patch ?? {})) data.effectivenessOk = this.optionalBool(patch.effectivenessOk);
     if ('dueDate' in (patch ?? {})) data.dueDate = this.optionalDate(patch.dueDate, 'Prazo');
-    if ('identifiedAt' in (patch ?? {})) data.identifiedAt = this.optionalDate(patch.identifiedAt, 'Data de identificacao') ?? before.identifiedAt;
+    if ('identifiedAt' in (patch ?? {})) data.identifiedAt = this.optionalDate(patch.identifiedAt, 'Data de identificação') ?? before.identifiedAt;
 
     const updated = await this.prisma.nonConformity.update({ where: { id }, data, include: this.include() });
 
@@ -525,7 +525,7 @@ export class NonConformitiesService {
       eventType: TraceEventType.UPDATED,
       entityType: TraceEntityType.NON_CONFORMITY,
       entityId: nc.id,
-      title: `Nao conformidade #${nc.number} excluida`,
+      title: `Não conformidade #${nc.number} excluída`,
       description: nc.title,
       statusFrom: nc.status,
       statusTo: 'DELETED',
@@ -546,12 +546,12 @@ export class NonConformitiesService {
 
     if (ids.orgNodeId) {
       const orgNode = await this.prisma.orgNode.findFirst({ where: { id: ids.orgNodeId, companyId, deletedAt: null }, select: { id: true } });
-      if (!orgNode) throw new NotFoundException('Area ou processo nao encontrado');
+      if (!orgNode) throw new NotFoundException('Área ou processo não encontrado');
       areas.push(orgNode.id);
     }
     if (ids.indicatorId) {
       const indicator = await this.prisma.indicator.findFirst({ where: { id: ids.indicatorId, companyId, deletedAt: null }, select: { ownerNodeId: true } });
-      if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+      if (!indicator) throw new NotFoundException('Indicador não encontrado');
       if (indicator.ownerNodeId) areas.push(indicator.ownerNodeId);
     }
     if (ids.deviationId) {
@@ -559,7 +559,7 @@ export class NonConformitiesService {
         where: { id: ids.deviationId, companyId, deletedAt: null },
         select: { indicator: { select: { ownerNodeId: true } } },
       });
-      if (!deviation) throw new NotFoundException('Desvio nao encontrado');
+      if (!deviation) throw new NotFoundException('Desvio não encontrado');
       if (deviation.indicator?.ownerNodeId) areas.push(deviation.indicator.ownerNodeId);
     }
     if (ids.correctiveActionId) {
@@ -567,18 +567,18 @@ export class NonConformitiesService {
         where: { id: ids.correctiveActionId, companyId, deletedAt: null },
         select: { ownerNodeId: true, indicator: { select: { ownerNodeId: true } } },
       });
-      if (!action) throw new NotFoundException('Acao corretiva nao encontrada');
+      if (!action) throw new NotFoundException('Ação corretiva não encontrada');
       const area = action.ownerNodeId ?? action.indicator?.ownerNodeId ?? null;
       if (area) areas.push(area);
     }
     if (ids.responsibleUserId) {
       const user = await this.prisma.user.findFirst({ where: { id: ids.responsibleUserId, companyId, deletedAt: null, active: true }, select: { id: true } });
-      if (!user) throw new NotFoundException('Responsavel nao encontrado');
+      if (!user) throw new NotFoundException('Responsável não encontrado');
     }
 
     const uniqueAreas = Array.from(new Set(areas.filter(Boolean)));
     if (uniqueAreas.length > 1) {
-      throw new ConflictException('Vinculos da nao conformidade pertencem a areas diferentes.');
+      throw new ConflictException('Vínculos da não conformidade pertencem a áreas diferentes.');
     }
     return { ids, area: uniqueAreas[0] ?? null };
   }

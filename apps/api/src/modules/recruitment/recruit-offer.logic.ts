@@ -19,7 +19,7 @@ export function evaluateSalaryBand(input: SalaryBandInput): SalaryBandResult {
   const min = input.salaryMinCents == null ? null : Math.round(Number(input.salaryMinCents));
   const max = input.salaryMaxCents == null ? null : Math.round(Number(input.salaryMaxCents));
   if (!Number.isFinite(amount) || amount <= 0) {
-    return { within: false, approvalRequired: true, reason: 'Valor da proposta invalido.' };
+    return { within: false, approvalRequired: true, reason: 'Valor da proposta inválido.' };
   }
   if (min !== null && Number.isFinite(min) && amount < min) {
     return { within: false, approvalRequired: true, reason: 'Valor abaixo da faixa salarial aprovada.' };
@@ -49,7 +49,7 @@ export function preAdmissionIsReady(documents: Array<{ required?: boolean | null
 export const DEFAULT_PRE_ADMISSION_DOCUMENTS = [
   { kind: 'IDENTITY', title: 'Documento de identidade', required: true },
   { kind: 'CPF', title: 'CPF', required: true },
-  { kind: 'PROOF_OF_ADDRESS', title: 'Comprovante de endereco', required: true },
-  { kind: 'BANK', title: 'Dados bancarios', required: true },
+  { kind: 'PROOF_OF_ADDRESS', title: 'Comprovante de endereço', required: true },
+  { kind: 'BANK', title: 'Dados bancários', required: true },
   { kind: 'EDUCATION', title: 'Comprovante de escolaridade', required: false },
 ];

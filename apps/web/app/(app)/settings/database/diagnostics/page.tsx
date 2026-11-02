@@ -1,4 +1,5 @@
 'use client';
+import { formatQuantity } from '@g360/shared';
 
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Info, RefreshCcw, ShieldAlert } from 'lucide-react';
@@ -56,7 +57,7 @@ export default function DiagnosticsPage() {
 
           <SectionCard
             title="Achados"
-            description={`${data.findings.length} item(ns). Gerado em ${formatDate(data.generatedAt)}.`}
+            description={`${formatQuantity(data.findings.length, 'item', 'itens')}. Gerado em ${formatDate(data.generatedAt)}.`}
             contentClassName={data.findings.length === 0 ? '' : 'p-0'}
           >
             {data.findings.length === 0 ? (

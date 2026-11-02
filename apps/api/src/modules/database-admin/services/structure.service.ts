@@ -224,5 +224,5 @@ export class StructureService {
 }
 
 function blockStructuralChanges(): void {
-  throw new ForbiddenException('Alteracoes estruturais desativadas no escopo empresarial.');
+  throw new ForbiddenException('Alterações estruturais desativadas no escopo empresarial.');
 }

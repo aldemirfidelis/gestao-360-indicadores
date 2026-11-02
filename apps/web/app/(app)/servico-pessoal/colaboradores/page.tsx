@@ -1068,7 +1068,7 @@ export default function EmployeesPage() {
           </DialogHeader>
           <div className="space-y-4 text-xs">
             <div className="rounded-md border bg-muted/30 p-3 text-muted-foreground">
-              Cabeçalhos reconhecidos: <span className="font-mono">nome</span> (obrigatório), <span className="font-mono">matricula, cpf, email, cargo, area, admissao, nascimento, telefone, contrato</span>.
+              Cabeçalhos reconhecidos: <span className="font-mono">nome</span> (obrigatório), <span className="font-mono">matrícula, cpf, email, cargo, área, admissão, nascimento, telefone, contrato</span>.
               Colaboradores existentes (mesmo CPF, matrícula ou nome) são <strong>atualizados</strong>; novos são criados com evento de admissão.
             </div>
             <div className="flex gap-2">

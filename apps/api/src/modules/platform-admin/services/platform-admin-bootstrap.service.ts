@@ -106,7 +106,7 @@ export class PlatformAdminBootstrapService implements OnApplicationBootstrap {
 
     const ownerRole = await this.prisma.platformAdminRole.findUnique({ where: { code: 'PLATFORM_OWNER' } });
     if (!ownerRole) {
-      this.logger.error('Papel PLATFORM_OWNER ausente; usuario inicial nao foi criado.');
+      this.logger.error('Papel PLATFORM_OWNER ausente; usuário inicial não foi criado.');
       return;
     }
 
@@ -127,11 +127,11 @@ export class PlatformAdminBootstrapService implements OnApplicationBootstrap {
 
     if (generated) {
       this.logger.warn(
-        `[Portal Admin Global] Usuario inicial criado: ${email} | senha temporaria: ${password} ` +
-          '(defina PLATFORM_ADMIN_BOOTSTRAP_PASSWORD e troque apos o primeiro acesso)',
+        `[Portal Admin Global] Usuário inicial criado: ${email} | senha temporária: ${password} ` +
+          '(defina PLATFORM_ADMIN_BOOTSTRAP_PASSWORD e troque após o primeiro acesso)',
       );
     } else {
-      this.logger.log(`[Portal Admin Global] Usuario inicial criado: ${email}`);
+      this.logger.log(`[Portal Admin Global] Usuário inicial criado: ${email}`);
     }
   }
 
@@ -169,6 +169,6 @@ export class PlatformAdminBootstrapService implements OnApplicationBootstrap {
       create: { userId: demoOwner.id, roleId: params.ownerRoleId },
       update: {},
     });
-    this.logger.warn(`[Portal Admin Global] Usuario demo promovido para credencial bootstrap configurada: ${params.email}`);
+    this.logger.warn(`[Portal Admin Global] Usuário demo promovido para credencial bootstrap configurada: ${params.email}`);
   }
 }

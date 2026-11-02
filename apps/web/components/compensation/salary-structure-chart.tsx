@@ -26,7 +26,7 @@ export function SalaryStructureChart({
     return <EmptyState title="Valores restritos" description="Você não possui permissão para visualizar valores salariais." />;
   }
   if (structure.length === 0) {
-    return <EmptyState title="Sem faixas cadastradas" description="Adicione faixas com mínimo, ponto medio e maximo para ver a estrutura." />;
+    return <EmptyState title="Sem faixas cadastradas" description="Adicione faixas com mínimo, ponto médio e máximo para ver a estrutura." />;
   }
 
   const data = structure.map((row) => ({
@@ -57,9 +57,9 @@ export function SalaryStructureChart({
                   <div className="mt-1 grid grid-cols-[auto_auto] gap-x-3">
                     <span className="text-muted-foreground">Mínimo</span>
                     <span className="text-right tabular-nums">{formatMoney(row.min, { currency })}</span>
-                    <span className="text-muted-foreground">Ponto medio</span>
+                    <span className="text-muted-foreground">Ponto médio</span>
                     <span className="text-right tabular-nums">{formatMoney(row.mid, { currency })}</span>
-                    <span className="text-muted-foreground">Maximo</span>
+                    <span className="text-muted-foreground">Máximo</span>
                     <span className="text-right tabular-nums">{formatMoney(row.max, { currency })}</span>
                   </div>
                 </div>
@@ -84,10 +84,10 @@ export function SalaryStructureChart({
           <thead className="border-b text-xs uppercase text-muted-foreground">
             <tr>
               <th className="py-2 text-left">Faixa</th>
-              <th className="py-2 text-right">Min / Medio / Max</th>
+              <th className="py-2 text-right">Min / Médio / Max</th>
               <th className="py-2 text-right">Amplitude</th>
-              <th className="py-2 text-right">Progressao do medio</th>
-              <th className="py-2 text-right">Sobreposicao</th>
+              <th className="py-2 text-right">Progressão do médio</th>
+              <th className="py-2 text-right">Sobreposição</th>
             </tr>
           </thead>
           <tbody>

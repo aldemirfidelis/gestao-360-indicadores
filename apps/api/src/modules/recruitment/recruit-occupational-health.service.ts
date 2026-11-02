@@ -37,14 +37,14 @@ export class RecruitOccupationalHealthService {
     const app = await this.applicationOrFail(me.companyId, applicationId);
     const pre = await this.pickPreAdmission(me.companyId, applicationId, text(body?.preAdmissionId));
     if (!canRequestAso(pre.status)) {
-      throw new ConflictException('A pre-admissao precisa estar pronta para ASO antes da solicitacao.');
+      throw new ConflictException('A pré-admissão precisa estar pronta para ASO antes da solicitação.');
     }
     const active = await this.prisma.recruitOccupationalExamRequest.findFirst({
       where: { companyId: me.companyId, preAdmissionId: pre.id, status: { in: ['REQUESTED', 'SCHEDULED'] } },
     });
-    if (active) throw new ConflictException('Ja existe ASO admissional em aberto para esta pre-admissao.');
+    if (active) throw new ConflictException('Já existe ASO admissional em aberto para esta pré-admissão.');
 
-    const dueAt = body?.dueAt ? parseDate(body.dueAt, 'Prazo do ASO invalido.') : null;
+    const dueAt = body?.dueAt ? parseDate(body.dueAt, 'Prazo do ASO inválido.') : null;
     const saved = await this.prisma.$transaction(async (tx) => {
       const request = await tx.recruitOccupationalExamRequest.create({
         data: {
@@ -70,7 +70,7 @@ export class RecruitOccupationalHealthService {
 
   async cancelAso(me: AuthPayload, id: string, body: any = {}) {
     const request = await this.requestOrFail(me.companyId, id, true);
-    if (request.status === 'COMPLETED') throw new ConflictException('ASO ja concluido nao pode ser cancelado.');
+    if (request.status === 'COMPLETED') throw new ConflictException('ASO já concluído não pode ser cancelado.');
     if (request.status === 'CANCELLED') return toRecruitmentView(request);
     const reason = text(body?.reason);
     const saved = await this.prisma.$transaction(async (tx) => {
@@ -111,8 +111,8 @@ export class RecruitOccupationalHealthService {
 
   async scheduleAso(me: AuthPayload, id: string, body: any = {}) {
     const request = await this.requestOrFail(me.companyId, id, true);
-    if (!canScheduleAso(request.status)) throw new ConflictException('Este ASO nao pode ser agendado.');
-    const scheduledAt = parseDate(body?.scheduledAt, 'Data/hora do agendamento e obrigatoria.');
+    if (!canScheduleAso(request.status)) throw new ConflictException('Este ASO não pode ser agendado.');
+    const scheduledAt = parseDate(body?.scheduledAt, 'Data/hora do agendamento é obrigatória.');
     const saved = await this.prisma.$transaction(async (tx) => {
       await tx.recruitOccupationalAppointment.upsert({
         where: { requestId: id },
@@ -146,11 +146,11 @@ export class RecruitOccupationalHealthService {
 
   async recordAsoResult(me: AuthPayload, id: string, body: any = {}) {
     const request = await this.requestOrFail(me.companyId, id, true);
-    if (!canRecordAso(request.status)) throw new ConflictException('Este ASO nao pode receber resultado.');
+    if (!canRecordAso(request.status)) throw new ConflictException('Este ASO não pode receber resultado.');
     const result = normalizeAsoResult(body?.result);
-    if (!result) throw new BadRequestException('Resultado invalido (APTO/APTO_COM_RESTRICAO/INAPTO).');
-    const examDate = parseDate(body?.examDate, 'Data do exame e obrigatoria.');
-    const validUntil = body?.validUntil ? parseDate(body.validUntil, 'Validade invalida.') : null;
+    if (!result) throw new BadRequestException('Resultado inválido (APTO/APTO_COM_RESTRICAO/INAPTO).');
+    const examDate = parseDate(body?.examDate, 'Data do exame é obrigatória.');
+    const validUntil = body?.validUntil ? parseDate(body.validUntil, 'Validade inválida.') : null;
     if (validUntil && validUntil.getTime() < examDate.getTime()) throw new BadRequestException('Validade anterior a data do exame.');
     const nextPreAdmissionStatus = preAdmissionStatusAfterAso(result);
 
@@ -203,7 +203,7 @@ export class RecruitOccupationalHealthService {
 
   private async applicationOrFail(companyId: string, id: string) {
     const app = await this.prisma.recruitApplication.findFirst({ where: { id, companyId }, select: { id: true, status: true } });
-    if (!app) throw new NotFoundException('Candidatura nao encontrada.');
+    if (!app) throw new NotFoundException('Candidatura não encontrada.');
     return app;
   }
 
@@ -215,7 +215,7 @@ export class RecruitOccupationalHealthService {
       where,
       orderBy: [{ createdAt: 'desc' }],
     });
-    if (!pre) throw new NotFoundException('Pre-admissao nao encontrada para solicitar ASO.');
+    if (!pre) throw new NotFoundException('Pré-admissão não encontrada para solicitar ASO.');
     return pre;
   }
 
@@ -224,7 +224,7 @@ export class RecruitOccupationalHealthService {
       where: { id, companyId },
       include: includeSensitive ? healthAsoInclude() : includeSafe ? safeAsoInclude() : undefined,
     });
-    if (!request) throw new NotFoundException('ASO admissional nao encontrado.');
+    if (!request) throw new NotFoundException('ASO admissional não encontrado.');
     return request as typeof request & {
       appointment?: { id: string } | null;
       preAdmission?: { status: string } | null;
@@ -237,7 +237,7 @@ export class RecruitOccupationalHealthService {
       where: { id, companyId },
       include: safeAsoInclude(),
     });
-    if (!request) throw new NotFoundException('ASO admissional nao encontrado.');
+    if (!request) throw new NotFoundException('ASO admissional não encontrado.');
     return toRecruitmentView(request);
   }
 }

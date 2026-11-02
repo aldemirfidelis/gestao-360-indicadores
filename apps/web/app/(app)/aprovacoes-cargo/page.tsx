@@ -280,7 +280,7 @@ function CareerApprovalsContent() {
 
       labelValue('Status', APPROVAL_STATUS_LABEL[detail.status] ?? detail.status);
       labelValue('Colaborador', detail.employee.name);
-      if (detail.employee.registrationId) labelValue('Matricula', detail.employee.registrationId);
+      if (detail.employee.registrationId) labelValue('Matrícula', detail.employee.registrationId);
       if (detail.employee.orgNode) labelValue('Área / Setor', detail.employee.orgNode.name);
       labelValue('Movimentação', `${detail.currentJob.name} (Faixa ${detail.currentBand}) -> ${detail.targetJob.name} (Faixa ${detail.targetBand})`);
       labelValue('Solicitante', `${detail.requester.name}${detail.requester.jobTitle ? ' - ' + detail.requester.jobTitle : ''}`);
@@ -306,7 +306,7 @@ function CareerApprovalsContent() {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
         doc.setTextColor(120);
-        doc.text('OBSERVACAO DO APROVADOR', margin, y);
+        doc.text('OBSERVAÇÃO DO APROVADOR', margin, y);
         y += 14;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);

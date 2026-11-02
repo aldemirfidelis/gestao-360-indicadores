@@ -47,7 +47,7 @@ export function canUseCompanyModule(status: string | null | undefined, method = 
     return {
       allowed: method.toUpperCase() === 'GET',
       readOnly: true,
-      reason: 'Modulo liberado somente para leitura.',
+      reason: 'Módulo liberado somente para leitura.',
     };
   }
   if (['ATIVACAO_PROGRAMADA', 'EXPIRACAO_PROGRAMADA'].includes(normalized)) {
@@ -56,6 +56,6 @@ export function canUseCompanyModule(status: string | null | undefined, method = 
   return {
     allowed: false,
     readOnly: false,
-    reason: 'Este recurso nao esta disponivel para a empresa selecionada.',
+    reason: 'Este recurso não está disponível para a empresa selecionada.',
   };
 }

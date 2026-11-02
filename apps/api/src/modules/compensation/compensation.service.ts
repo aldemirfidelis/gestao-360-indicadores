@@ -451,7 +451,7 @@ export class CompensationService {
   }
 
   async createJob(me: AuthPayload, body: Record<string, unknown>) {
-    const name = requiredString(body.name, 'Nome do cargo e obrigatório');
+    const name = requiredString(body.name, 'Nome do cargo é obrigatório');
     const duplicate = await this.prisma.compensationJobCatalog.findFirst({
       where: { companyId: me.companyId, name: { equals: name, mode: 'insensitive' }, deletedAt: null },
     });
@@ -686,7 +686,7 @@ export class CompensationService {
 
   async createSalaryTable(me: AuthPayload, body: Record<string, unknown>) {
     const code = cleanString(body.code) || (await this.nextSalaryTableCode(me.companyId));
-    const name = requiredString(body.name, 'Nome da tabela salarial e obrigatório');
+    const name = requiredString(body.name, 'Nome da tabela salarial é obrigatório');
     const effectiveFrom = requiredDate(body.effectiveFrom, 'Vigência inicial obrigatória');
     const created = await this.prisma.$transaction(async (tx) => {
       const table = await tx.compensationSalaryTable.create({
@@ -937,7 +937,7 @@ export class CompensationService {
 
   async saveEmployeeProfile(me: AuthPayload, employeeId: string, body: Record<string, unknown>) {
     const employee = await this.prisma.orgEmployee.findFirst({ where: { id: employeeId, companyId: me.companyId } });
-    if (!employee) throw new NotFoundException('Colaborador nao encontrado');
+    if (!employee) throw new NotFoundException('Colaborador não encontrado');
     const data = {
       gender: normalizeGender(body.gender),
       raceEthnicity: cleanString(body.raceEthnicity),
@@ -1128,12 +1128,12 @@ export class CompensationService {
     const status = monthlyImpact && monthlyImpact.gt(0) && !availableBudget ? 'PENDING_BUDGET' : 'REQUESTED';
     const approvalSteps = buildApprovalSteps(body.approvalSteps);
     const protocol = await this.nextMovementProtocol(me.companyId);
-    const employeeId = await this.assertCompanyRef(this.prisma.orgEmployee, me.companyId, cleanString(body.employeeId), 'Colaborador nao encontrado');
-    const currentPositionId = await this.assertCompanyRef(this.prisma.compensationPosition, me.companyId, cleanString(body.currentPositionId), 'Posicao atual nao encontrada', { deletedAt: null });
-    const targetPositionId = await this.assertCompanyRef(this.prisma.compensationPosition, me.companyId, cleanString(body.targetPositionId), 'Posicao destino nao encontrada', { deletedAt: null });
-    const currentJobId = await this.assertCompanyRef(this.prisma.orgJob, me.companyId, cleanString(body.currentJobId), 'Cargo atual nao encontrado');
-    const targetJobId = await this.assertCompanyRef(this.prisma.orgJob, me.companyId, cleanString(body.targetJobId), 'Cargo destino nao encontrado');
-    const managerUserId = await this.assertCompanyRef(this.prisma.user, me.companyId, cleanString(body.managerUserId), 'Gestor nao encontrado', { deletedAt: null, active: true });
+    const employeeId = await this.assertCompanyRef(this.prisma.orgEmployee, me.companyId, cleanString(body.employeeId), 'Colaborador não encontrado');
+    const currentPositionId = await this.assertCompanyRef(this.prisma.compensationPosition, me.companyId, cleanString(body.currentPositionId), 'Posição atual não encontrada', { deletedAt: null });
+    const targetPositionId = await this.assertCompanyRef(this.prisma.compensationPosition, me.companyId, cleanString(body.targetPositionId), 'Posição destino não encontrada', { deletedAt: null });
+    const currentJobId = await this.assertCompanyRef(this.prisma.orgJob, me.companyId, cleanString(body.currentJobId), 'Cargo atual não encontrado');
+    const targetJobId = await this.assertCompanyRef(this.prisma.orgJob, me.companyId, cleanString(body.targetJobId), 'Cargo destino não encontrado');
+    const managerUserId = await this.assertCompanyRef(this.prisma.user, me.companyId, cleanString(body.managerUserId), 'Gestor não encontrado', { deletedAt: null, active: true });
     const created = await this.prisma.compensationMovementRequest.create({
       data: {
         companyId: me.companyId,
@@ -1257,7 +1257,7 @@ export class CompensationService {
             updatedById: me.sub,
           },
         });
-        if (position.count === 0) throw new NotFoundException('Posicao destino nao encontrada');
+        if (position.count === 0) throw new NotFoundException('Posição destino não encontrada');
       }
       if (before.employeeId && before.proposedSalary) {
         await tx.compensationSalarySnapshot.create({

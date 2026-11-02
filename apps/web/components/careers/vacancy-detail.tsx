@@ -25,7 +25,7 @@ interface ScreeningQuestion { id: string; order: number; type: string; question:
 interface ApplyResponse { id: string; status: string }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
-const MODE_LABEL: Record<string, string> = { PRESENCIAL: 'Presencial', HIBRIDO: 'Hibrido', REMOTO: 'Remoto' };
+const MODE_LABEL: Record<string, string> = { PRESENCIAL: 'Presencial', HIBRIDO: 'Híbrido', REMOTO: 'Remoto' };
 
 export function VacancyDetail() {
   return (
@@ -65,7 +65,7 @@ function VacancyDetailContent() {
     const qs = new URLSearchParams();
     if (empresa) qs.set('empresa', empresa);
     Promise.all([
-      fetch(`${API}/careers/vacancies/${vacancySlug}?${qs.toString()}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error('Vaga nao encontrada ou encerrada.')))),
+      fetch(`${API}/careers/vacancies/${vacancySlug}?${qs.toString()}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error('Vaga não encontrada ou encerrada.')))),
       fetch(`${API}/careers/vacancies/${vacancySlug}/screening-questions?${qs.toString()}`).then((r) => (r.ok ? r.json() : { questions: [] })),
     ])
       .then(([vacancyData, screening]) => {
@@ -193,9 +193,9 @@ function VacancyDetailContent() {
             {v.pcd && <span className="mt-2 inline-block rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">Vaga afirmativa PcD</span>}
             {v.salary && <p className="mt-2 text-sm font-medium">Faixa: {v.salary}</p>}
 
-            <Section title="Descricao" text={v.description} />
+            <Section title="Descrição" text={v.description} />
             <Section title="Requisitos" text={v.requirements} />
-            <Section title="Beneficios" text={v.benefits} />
+            <Section title="Benefícios" text={v.benefits} />
             <Section title="Etapas do processo" text={v.processSteps} />
 
             <section className="mt-8 rounded-lg border bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -229,7 +229,7 @@ function VacancyDetailContent() {
                   )}
                   <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
                     <FileUp className="h-4 w-4" />
-                    <span className="min-w-0 flex-1 truncate">{resume ? resume.name : 'Anexar curriculo em PDF, DOC, DOCX, PNG ou JPG'}</span>
+                    <span className="min-w-0 flex-1 truncate">{resume ? resume.name : 'Anexar currículo em PDF, DOC, DOCX, PNG ou JPG'}</span>
                     <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" className="hidden" onChange={pickResume} />
                   </label>
                   <label className="flex items-start gap-2 text-xs text-slate-500">
@@ -239,7 +239,7 @@ function VacancyDetailContent() {
                       onChange={(e) => setApplyForm((f) => ({ ...f, consent: e.target.checked }))}
                       className="mt-0.5"
                     />
-                    Autorizo o tratamento dos meus dados pessoais para fins de recrutamento e selecao desta vaga.
+                    Autorizo o tratamento dos meus dados pessoais para fins de recrutamento e seleção desta vaga.
                   </label>
                   {applyError && <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">{applyError}</div>}
                   <button
@@ -342,7 +342,7 @@ function QuestionField({ question, value, onChange }: { question: ScreeningQuest
         <select value={value === undefined ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value === 'true')} className="mt-1 h-10 w-full rounded-md border bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900">
           <option value="">Selecionar...</option>
           <option value="true">Sim</option>
-          <option value="false">Nao</option>
+          <option value="false">Não</option>
         </select>
       ) : ['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(question.type) && options.length ? (
         <select

@@ -37,7 +37,7 @@ function meetingFixture(overrides?: Record<string, unknown>) {
       name: 'Produtividade',
       code: 'KPI-01',
       ownerNodeId: 'areaA',
-      ownerNode: { id: 'areaA', name: 'Operacao' },
+      ownerNode: { id: 'areaA', name: 'Operação' },
       responsibleUser: { id: 'u2', name: 'Ana', email: 'ana@x.com', jobTitle: 'Gerente' },
       targets: [],
     },

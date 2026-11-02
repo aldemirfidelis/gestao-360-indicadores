@@ -72,7 +72,7 @@ export class PayrollEsocialService {
     const name = this.requiredText(payload.name, 'Nome do certificado');
     const storageMode = String(payload.storageMode ?? 'EXTERNAL_REF').trim().toUpperCase();
     if (!ALLOWED_CERT_STORAGE.includes(storageMode)) {
-      throw new BadRequestException('Modo de armazenamento invalido.');
+      throw new BadRequestException('Modo de armazenamento inválido.');
     }
     const created = await this.prisma.payrollDigitalCertificate.create({
       data: {
@@ -106,7 +106,7 @@ export class PayrollEsocialService {
   async testCertificate(me: AuthPayload, id: string) {
     const cert = await this.certificateOf(me.companyId, id);
     const checks = [
-      { key: 'validity', ok: !cert.validUntil || cert.validUntil.getTime() >= Date.now(), detail: cert.validUntil ? `Valido ate ${cert.validUntil.toISOString().slice(0, 10)}` : 'Validade nao informada' },
+      { key: 'validity', ok: !cert.validUntil || cert.validUntil.getTime() >= Date.now(), detail: cert.validUntil ? `Válido até ${cert.validUntil.toISOString().slice(0, 10)}` : 'Validade não informada' },
     ];
     if (cert.storageMode === 'ENCRYPTED_DB') {
       // Decifra e parseia de verdade (sem expor nada) para confirmar que assina.
@@ -121,19 +121,19 @@ export class PayrollEsocialService {
       }
       checks.push({ key: 'encrypted_pfx', ok: signable, detail });
     } else {
-      checks.push({ key: 'pfx_ref', ok: Boolean(cert.pfxSecretRef), detail: cert.pfxSecretRef ? 'Referencia do PFX cadastrada' : 'Referencia do PFX ausente' });
-      checks.push({ key: 'password_ref', ok: Boolean(cert.passwordSecretRef), detail: cert.passwordSecretRef ? 'Referencia da senha cadastrada' : 'Referencia da senha ausente' });
+      checks.push({ key: 'pfx_ref', ok: Boolean(cert.pfxSecretRef), detail: cert.pfxSecretRef ? 'Referência do PFX cadastrada' : 'Referência do PFX ausente' });
+      checks.push({ key: 'password_ref', ok: Boolean(cert.passwordSecretRef), detail: cert.passwordSecretRef ? 'Referência da senha cadastrada' : 'Referência da senha ausente' });
     }
     if (cert.storageMode === 'ENV_REF') {
       checks.push({
         key: 'env_pfx',
         ok: Boolean(cert.pfxSecretRef && process.env[cert.pfxSecretRef]),
-        detail: cert.pfxSecretRef ? 'Variavel externa do PFX verificada sem expor valor' : 'Referencia do PFX ausente',
+        detail: cert.pfxSecretRef ? 'Variável externa do PFX verificada sem expor valor' : 'Referência do PFX ausente',
       });
       checks.push({
         key: 'env_password',
         ok: Boolean(cert.passwordSecretRef && process.env[cert.passwordSecretRef]),
-        detail: cert.passwordSecretRef ? 'Variavel externa da senha verificada sem expor valor' : 'Referencia da senha ausente',
+        detail: cert.passwordSecretRef ? 'Variável externa da senha verificada sem expor valor' : 'Referência da senha ausente',
       });
     }
     const ok = checks.every((check) => check.ok);
@@ -146,7 +146,7 @@ export class PayrollEsocialService {
       entity: 'PayrollDigitalCertificate',
       entityId: id,
       action: 'TEST',
-      message: ok ? 'Referencia de certificado validada' : 'Referencia de certificado com pendencias',
+      message: ok ? 'Referência de certificado validada' : 'Referência de certificado com pendências',
       after: { ok, checks: checks.map((check) => ({ ...check, detail: check.detail.replace(/[A-Za-z0-9_:-]{24,}/g, '***') })) },
     });
     return { ok, certificate: this.redactCertificate(updated), checks };
@@ -262,9 +262,9 @@ export class PayrollEsocialService {
         workers: { include: { items: { orderBy: { sortOrder: 'asc' } } } },
       },
     });
-    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    if (!run) throw new NotFoundException('Processamento de folha não encontrado.');
     if (!GENERATABLE_RUN_STATUSES.includes(run.status)) {
-      throw new ConflictException('Gere eventos eSocial apenas apos calcular a folha sem pendencias.');
+      throw new ConflictException('Gere eventos eSocial apenas após calcular a folha sem pendências.');
     }
     if (!run.workers.length) throw new BadRequestException('Processamento sem colaboradores calculados.');
 
@@ -301,7 +301,7 @@ export class PayrollEsocialService {
       where: { companyId: me.companyId, runId: run.id, environment, batchId: { not: null } },
     });
     if (batchedEvents > 0) {
-      throw new ConflictException('Este processamento ja possui eventos eSocial em lote. Reabra/cancele o fluxo antes de regenerar.');
+      throw new ConflictException('Este processamento já possui eventos eSocial em lote. Reabra/cancele o fluxo antes de regenerar.');
     }
     const skipped: Array<{ workerId: string; employeeId: string; reason: string }> = [];
     const eventRows: Array<{
@@ -327,11 +327,11 @@ export class PayrollEsocialService {
       const employee = employeeById.get(worker.employeeId);
       const cpf = onlyDigits(employee?.personnelProfile?.cpf);
       if (!employee || !cpf) {
-        skipped.push({ workerId: worker.id, employeeId: worker.employeeId, reason: 'CPF do trabalhador ausente no prontuario.' });
+        skipped.push({ workerId: worker.id, employeeId: worker.employeeId, reason: 'CPF do trabalhador ausente no prontuário.' });
         continue;
       }
       if (worker.status !== 'CALCULATED') {
-        skipped.push({ workerId: worker.id, employeeId: worker.employeeId, reason: 'Colaborador do processamento possui pendencias.' });
+        skipped.push({ workerId: worker.id, employeeId: worker.employeeId, reason: 'Colaborador do processamento possui pendências.' });
         continue;
       }
       const eventType = run.kind === 'RESCISAO' ? 'S-2299' : 'S-1200';
@@ -350,10 +350,10 @@ export class PayrollEsocialService {
       if (eventType === 'S-2299') {
         const termination = terminationByEmployee.get(worker.employeeId);
         if (!termination) {
-          skipped.push({ workerId: worker.id, employeeId: worker.employeeId, reason: 'Sem registro de rescisao (aba Rescisoes) para gerar o S-2299.' });
+          skipped.push({ workerId: worker.id, employeeId: worker.employeeId, reason: 'Sem registro de rescisão (aba Rescisões) para gerar o S-2299.' });
           continue;
         }
-        issues = ['S-2299 simplificado para conferencia: nao projeta aviso/estabilidade nem substitui a homologacao.'];
+        issues = ['S-2299 simplificado para conferência: não projeta aviso/estabilidade nem substitui a homologação.'];
         xml = buildS2299Xml({
           eventId,
           environment,
@@ -451,7 +451,7 @@ export class PayrollEsocialService {
       where: { id: runId, companyId: me.companyId },
       include: { competence: true },
     });
-    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    if (!run) throw new NotFoundException('Processamento de folha não encontrado.');
     const employerRegistration = await this.employerRegistrationOf(me.companyId);
     const periodRef = `${run.competence.year}-${String(run.competence.month).padStart(2, '0')}`;
 
@@ -460,7 +460,7 @@ export class PayrollEsocialService {
       orderBy: { code: 'asc' },
       select: { code: true, name: true, nature: true },
     });
-    if (!rubrics.length) throw new BadRequestException('Nenhuma rubrica interna cadastrada. Calcule uma folha para semear as rubricas padrao.');
+    if (!rubrics.length) throw new BadRequestException('Nenhuma rubrica interna cadastrada. Calcule uma folha para semear as rubricas padrão.');
 
     const createdAt = new Date();
     const eventId = buildEventId({ employerRegistration, createdAt, seed: `${me.companyId}:S-1010:${periodRef}:${environment}` });
@@ -470,7 +470,7 @@ export class PayrollEsocialService {
       employerRegistration,
       rubrics: rubrics.map((rubric) => ({ code: rubric.code, description: rubric.name, nature: rubric.nature, validityRef: periodRef })),
     });
-    const issues = ['S-1010 simplificado: natRubr e codIncCP/IRRF/FGTS ficam em branco e exigem parametrizacao/validacao contabil antes de qualquer transmissao.'];
+    const issues = ['S-1010 simplificado: natRubr e codIncCP/IRRF/FGTS ficam em branco e exigem parametrização/validação contábil antes de qualquer transmissão.'];
 
     await this.upsertSingletonEvent(me, {
       runId: run.id,
@@ -496,12 +496,12 @@ export class PayrollEsocialService {
       where: { id: runId, companyId: me.companyId },
       include: { competence: true },
     });
-    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    if (!run) throw new NotFoundException('Processamento de folha não encontrado.');
     const periodRef = `${run.competence.year}-${String(run.competence.month).padStart(2, '0')}`;
     const remunCount = await this.prisma.payrollEsocialEvent.count({
       where: { companyId: me.companyId, runId: run.id, environment, eventType: 'S-1200' },
     });
-    if (remunCount === 0) throw new ConflictException('Gere os eventos de remuneracao (S-1200) antes de fechar o periodo.');
+    if (remunCount === 0) throw new ConflictException('Gere os eventos de remuneração (S-1200) antes de fechar o período.');
 
     const employerRegistration = await this.employerRegistrationOf(me.companyId);
     const [responsible, responsibleProfile] = await Promise.all([
@@ -518,12 +518,12 @@ export class PayrollEsocialService {
       environment,
       periodRef,
       employerRegistration,
-      responsibleName: responsible?.name ?? 'Responsavel pela folha',
+      responsibleName: responsible?.name ?? 'Responsável pela folha',
       responsibleCpf,
       hasRemuneration: true,
     });
-    const issues = ['Fechamento interno (S-1299) para conferencia. Nao substitui o fechamento oficial no ambiente do eSocial.'];
-    if (!responsibleCpf) issues.push('CPF do responsavel ausente (prontuario sem CPF) — informe antes de transmitir.');
+    const issues = ['Fechamento interno (S-1299) para conferência. Não substitui o fechamento oficial no ambiente do eSocial.'];
+    if (!responsibleCpf) issues.push('CPF do responsável ausente (prontuário sem CPF) — informe antes de transmitir.');
 
     await this.upsertSingletonEvent(me, {
       runId: run.id,
@@ -558,7 +558,7 @@ export class PayrollEsocialService {
       where: { companyId: me.companyId, runId: input.runId, eventType: input.eventType, environment: input.environment, batchId: { not: null } },
       select: { id: true },
     });
-    if (batched) throw new ConflictException(`Ja existe ${input.eventType} em lote para este processamento. Reabra/cancele antes de regenerar.`);
+    if (batched) throw new ConflictException(`Já existe ${input.eventType} em lote para este processamento. Reabra/cancele antes de regenerar.`);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.payrollEsocialEvent.deleteMany({
@@ -606,8 +606,8 @@ export class PayrollEsocialService {
       where: { id: runId, companyId: me.companyId },
       include: { competence: true, workers: { select: { id: true, employeeId: true, netPay: true, irrfValue: true, status: true } } },
     });
-    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
-    if (!GENERATABLE_RUN_STATUSES.includes(run.status)) throw new ConflictException('Gere os pagamentos apos calcular a folha sem pendencias.');
+    if (!run) throw new NotFoundException('Processamento de folha não encontrado.');
+    if (!GENERATABLE_RUN_STATUSES.includes(run.status)) throw new ConflictException('Gere os pagamentos após calcular a folha sem pendências.');
     const employerRegistration = await this.employerRegistrationOf(me.companyId);
     const periodRef = `${run.competence.year}-${String(run.competence.month).padStart(2, '0')}`;
     const paymentDate = this.resolvePaymentDate(body?.paymentDate, run.competence.year, run.competence.month);
@@ -622,16 +622,16 @@ export class PayrollEsocialService {
     const batched = await this.prisma.payrollEsocialEvent.count({
       where: { companyId: me.companyId, runId: run.id, environment, eventType: 'S-1210', batchId: { not: null } },
     });
-    if (batched > 0) throw new ConflictException('Ja existem pagamentos (S-1210) em lote para este processamento.');
+    if (batched > 0) throw new ConflictException('Já existem pagamentos (S-1210) em lote para este processamento.');
 
     const createdAt = new Date();
     const skipped: Array<{ employeeId: string; reason: string }> = [];
     const eventRows: Prisma.PayrollEsocialEventCreateManyInput[] = [];
     for (const worker of run.workers) {
-      if (worker.status !== 'CALCULATED') { skipped.push({ employeeId: worker.employeeId, reason: 'Colaborador com pendencias.' }); continue; }
+      if (worker.status !== 'CALCULATED') { skipped.push({ employeeId: worker.employeeId, reason: 'Colaborador com pendências.' }); continue; }
       const cpf = cpfByEmployee.get(worker.employeeId);
-      if (!cpf) { skipped.push({ employeeId: worker.employeeId, reason: 'CPF ausente no prontuario.' }); continue; }
-      if (Number(worker.netPay.toString()) <= 0) { skipped.push({ employeeId: worker.employeeId, reason: 'Liquido zero/negativo.' }); continue; }
+      if (!cpf) { skipped.push({ employeeId: worker.employeeId, reason: 'CPF ausente no prontuário.' }); continue; }
+      if (Number(worker.netPay.toString()) <= 0) { skipped.push({ employeeId: worker.employeeId, reason: 'Líquido zero/negativo.' }); continue; }
       const eventId = buildEventId({ employerRegistration, createdAt, seed: `${run.id}:${worker.id}:S-1210:${environment}` });
       const paymentId = sanitizeEsocialCode(`${run.kind}-${periodRef}-${worker.id.slice(0, 8)}`, 'G360', 30);
       const xml = buildS1210Xml({
@@ -644,7 +644,7 @@ export class PayrollEsocialService {
         competenceId: run.competenceId, periodRef, eventType: 'S-1210', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION,
         eventId, status: 'XML_GENERATED_WITH_WARNINGS', xml, xmlHash: hashXml(xml),
         payload: { source: 'payment', workerId: worker.id, paymentDate, periodRef, sourceUrl: ESOCIAL_SOURCE_URL } as Prisma.InputJsonValue,
-        issues: ['S-1210 simplificado: detalhamento de rendimentos/deducoes do IRRF resumido; validar antes de transmitir.'],
+        issues: ['S-1210 simplificado: detalhamento de rendimentos/deduções do IRRF resumido; validar antes de transmitir.'],
         createdById: me.sub,
       });
     }
@@ -681,7 +681,7 @@ export class PayrollEsocialService {
       where: { id: runId, companyId: me.companyId },
       include: { competence: true, workers: { select: { employeeId: true, baseSalary: true, status: true } } },
     });
-    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    if (!run) throw new NotFoundException('Processamento de folha não encontrado.');
     const employerRegistration = await this.employerRegistrationOf(me.companyId);
     const employeeIds = run.workers.map((worker) => worker.employeeId);
     const [employees, existing] = await Promise.all([
@@ -714,14 +714,14 @@ export class PayrollEsocialService {
 
     for (const worker of run.workers) {
       if (alreadyDone.has(worker.employeeId)) {
-        skipped.push({ employeeId: worker.employeeId, reason: 'Ja possui S-2200 neste ambiente.' });
+        skipped.push({ employeeId: worker.employeeId, reason: 'Já possui S-2200 neste ambiente.' });
         continue;
       }
       const employee = employeeById.get(worker.employeeId);
       const cpf = onlyDigits(employee?.personnelProfile?.cpf);
       const admissionDate = employee?.personnelProfile?.admissionDate;
       if (!employee || !cpf || !admissionDate) {
-        skipped.push({ employeeId: worker.employeeId, reason: 'Prontuario sem CPF ou data de admissao.' });
+        skipped.push({ employeeId: worker.employeeId, reason: 'Prontuário sem CPF ou data de admissão.' });
         continue;
       }
       const eventId = buildEventId({ employerRegistration, createdAt, seed: `${me.companyId}:S-2200:${worker.employeeId}:${environment}` });
@@ -729,10 +729,10 @@ export class PayrollEsocialService {
       const cbo = onlyDigits(employee.job?.cbo) || null;
       // Pendências cadastrais que o XSD oficial exigiria de fato.
       const issues: string[] = [];
-      if (!profile?.sex) issues.push('Sexo ausente no prontuario — presumido "M".');
-      if (!profile?.raceColor) issues.push('Raca/cor ausente — enviado "6" (nao informado).');
-      if (!cbo) issues.push('CBO do cargo ausente — obrigatorio no eSocial.');
-      issues.push('Municipio de nascimento (codigo IBGE) nao cadastrado — completar antes de transmitir.');
+      if (!profile?.sex) issues.push('Sexo ausente no prontuário — presumido "M".');
+      if (!profile?.raceColor) issues.push('Raca/cor ausente — enviado "6" (não informado).');
+      if (!cbo) issues.push('CBO do cargo ausente — obrigatório no eSocial.');
+      issues.push('Município de nascimento (código IBGE) não cadastrado — completar antes de transmitir.');
       const xml = buildS2200Xml({
         eventId,
         environment,
@@ -779,7 +779,7 @@ export class PayrollEsocialService {
         entity: 'PayrollEsocialEvent',
         entityId: run.id,
         action: 'GENERATE',
-        message: `Eventos S-2200 (admissao) gerados: ${eventRows.length}`,
+        message: `Eventos S-2200 (admissão) gerados: ${eventRows.length}`,
         after: { created: eventRows.length, environment },
       });
     }
@@ -797,7 +797,7 @@ export class PayrollEsocialService {
       orderBy: { createdAt: 'desc' },
     });
     if (existing) {
-      return { created: 0, skipped: [{ employeeId, reason: 'Ja possui S-2200 neste ambiente.' }], eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, event: existing };
+      return { created: 0, skipped: [{ employeeId, reason: 'Já possui S-2200 neste ambiente.' }], eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, event: existing };
     }
     const employee = await this.prisma.orgEmployee.findFirst({
       where: { id: employeeId, companyId: me.companyId },
@@ -817,11 +817,11 @@ export class PayrollEsocialService {
     const cpf = onlyDigits(employee?.personnelProfile?.cpf);
     const admissionDate = employee?.personnelProfile?.admissionDate;
     if (!employee || !cpf || !admissionDate) {
-      return { created: 0, skipped: [{ employeeId, reason: 'Prontuario sem CPF ou data de admissao.' }], eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, event: null };
+      return { created: 0, skipped: [{ employeeId, reason: 'Prontuário sem CPF ou data de admissão.' }], eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, event: null };
     }
     const salary = await this.admissionSalaryOf(me.companyId, employeeId, body);
     if (!salary) {
-      return { created: 0, skipped: [{ employeeId, reason: 'Sem salario vigente para gerar S-2200.' }], eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, event: null };
+      return { created: 0, skipped: [{ employeeId, reason: 'Sem salário vigente para gerar S-2200.' }], eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, event: null };
     }
     const employerRegistration = await this.employerRegistrationOf(me.companyId);
     const createdAt = new Date();
@@ -829,11 +829,11 @@ export class PayrollEsocialService {
     const profile = employee.personnelProfile;
     const cbo = onlyDigits(employee.job?.cbo) || null;
     const issues: string[] = [];
-    if (!profile?.sex) issues.push('Sexo ausente no prontuario - presumido "M".');
-    if (!profile?.raceColor) issues.push('Raca/cor ausente - enviado "6" (nao informado).');
-    if (!cbo) issues.push('CBO do cargo ausente - obrigatorio no eSocial.');
-    issues.push('Municipio de nascimento (codigo IBGE) nao cadastrado - completar antes de transmitir.');
-    issues.push('Evento gerado pelo recrutamento para conferencia; nada foi transmitido ao governo.');
+    if (!profile?.sex) issues.push('Sexo ausente no prontuário - presumido "M".');
+    if (!profile?.raceColor) issues.push('Raca/cor ausente - enviado "6" (não informado).');
+    if (!cbo) issues.push('CBO do cargo ausente - obrigatório no eSocial.');
+    issues.push('Município de nascimento (código IBGE) não cadastrado - completar antes de transmitir.');
+    issues.push('Evento gerado pelo recrutamento para conferência; nada foi transmitido ao governo.');
     const xml = buildS2200Xml({
       eventId,
       environment,
@@ -878,7 +878,7 @@ export class PayrollEsocialService {
       entity: 'PayrollEsocialEvent',
       entityId: event.id,
       action: 'GENERATE',
-      message: `Evento S-2200 (admissao) gerado para ${employee.name}`,
+      message: `Evento S-2200 (admissão) gerado para ${employee.name}`,
       after: { employeeId, environment },
     });
     return { created: 1, skipped: [], eventType: 'S-2200', environment, layoutVersion: ESOCIAL_LAYOUT_VERSION, event };
@@ -897,7 +897,7 @@ export class PayrollEsocialService {
       where: { id: runId, companyId: me.companyId },
       include: { workers: { select: { employeeId: true, inssBase: true, inssValue: true, irrfBase: true, irrfValue: true, fgtsBase: true, fgtsValue: true, status: true } } },
     });
-    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    if (!run) throw new NotFoundException('Processamento de folha não encontrado.');
     const events = await this.prisma.payrollEsocialEvent.findMany({
       where: { companyId: me.companyId, runId: run.id, environment, eventType: { in: ['S-1200', 'S-2299'] } },
       select: { employeeId: true, eventType: true },
@@ -988,9 +988,9 @@ export class PayrollEsocialService {
    */
   async validateRunEventsXsd(me: AuthPayload, runId: string) {
     const run = await this.prisma.payrollRun.findFirst({ where: { id: runId, companyId: me.companyId }, select: { id: true } });
-    if (!run) throw new NotFoundException('Processamento de folha nao encontrado.');
+    if (!run) throw new NotFoundException('Processamento de folha não encontrado.');
     if (!xsdConfigured()) {
-      return { validated: false, reason: 'Pasta de XSD nao configurada (defina PAYROLL_ESOCIAL_XSD_DIR com os XSDs oficiais).', results: [] };
+      return { validated: false, reason: 'Pasta de XSD não configurada (defina PAYROLL_ESOCIAL_XSD_DIR com os XSDs oficiais).', results: [] };
     }
     const events = await this.prisma.payrollEsocialEvent.findMany({
       where: { companyId: me.companyId, runId: run.id },
@@ -1008,7 +1008,7 @@ export class PayrollEsocialService {
     const invalid = results.filter((result) => !result.valid).length;
     await this.audit.record(me, {
       module: MODULE, entity: 'PayrollEsocialEvent', entityId: run.id, action: 'VALIDATE',
-      message: `Validacao XSD: ${results.length - invalid}/${results.length} validos`,
+      message: `Validação XSD: ${results.length - invalid}/${results.length} válidos`,
       after: { total: results.length, invalid },
     });
     return { validated: true, total: results.length, invalid, results };
@@ -1042,20 +1042,20 @@ export class PayrollEsocialService {
       where: { companyId: me.companyId, id: { in: ids } },
       orderBy: { createdAt: 'asc' },
     });
-    if (events.length !== ids.length) throw new BadRequestException('Algum evento selecionado nao existe nesta empresa.');
+    if (events.length !== ids.length) throw new BadRequestException('Algum evento selecionado não existe nesta empresa.');
     const alreadyBatched = events.find((event) => event.batchId);
-    if (alreadyBatched) throw new ConflictException('Um ou mais eventos ja pertencem a um lote.');
+    if (alreadyBatched) throw new ConflictException('Um ou mais eventos já pertencem a um lote.');
     const environments = new Set(events.map((event) => event.environment));
-    if (environments.size !== 1) throw new BadRequestException('Nao misture ambientes no mesmo lote.');
+    if (environments.size !== 1) throw new BadRequestException('Não misture ambientes no mesmo lote.');
 
     const certificateId = this.optionalText(body?.certificateId);
     let certificate: { id: string; status: string } | null = null;
     if (certificateId) {
       certificate = await this.certificateOf(me.companyId, certificateId);
-      if (certificate.status !== 'ACTIVE') throw new ConflictException('Certificado nao esta ativo.');
+      if (certificate.status !== 'ACTIVE') throw new ConflictException('Certificado não está ativo.');
     }
     const issues = [
-      'Lote interno sem assinatura digital. Nao transmitir ao governo.',
+      'Lote interno sem assinatura digital. Não transmitir ao governo.',
       certificate ? 'Certificado referenciado; assinatura real depende de cofre/assinador aprovado.' : 'Nenhum certificado referenciado ao lote.',
     ];
     const runId = events[0]?.runId ?? null;
@@ -1122,11 +1122,11 @@ export class PayrollEsocialService {
       where: { id: batchId, companyId: me.companyId },
       include: { events: true },
     });
-    if (!batch) throw new NotFoundException('Lote eSocial nao encontrado.');
+    if (!batch) throw new NotFoundException('Lote eSocial não encontrado.');
     if (!batch.certificateId) throw new BadRequestException('Vincule um certificado ao lote antes de assinar.');
-    if (batch.status === 'SIGNED') throw new ConflictException('Lote ja assinado.');
+    if (batch.status === 'SIGNED') throw new ConflictException('Lote já assinado.');
     const cert = await this.certificateOf(me.companyId, batch.certificateId);
-    if (cert.status !== 'ACTIVE') throw new ConflictException('Certificado nao esta ativo.');
+    if (cert.status !== 'ACTIVE') throw new ConflictException('Certificado não está ativo.');
     if (cert.validUntil && cert.validUntil.getTime() < Date.now()) throw new ConflictException('Certificado vencido.');
     if (!batch.events.length) throw new BadRequestException('Lote sem eventos.');
 
@@ -1188,7 +1188,7 @@ export class PayrollEsocialService {
       where: { id: batchId, companyId: me.companyId },
       include: { events: true, certificate: true },
     });
-    if (!batch) throw new NotFoundException('Lote eSocial nao encontrado.');
+    if (!batch) throw new NotFoundException('Lote eSocial não encontrado.');
     if (batch.status !== 'SIGNED') throw new ConflictException('Assine o lote antes de transmitir.');
     if (!batch.certificate) throw new BadRequestException('Lote sem certificado vinculado.');
     const environment = batch.environment as EsocialEnvironment;
@@ -1208,27 +1208,27 @@ export class PayrollEsocialService {
     // Dry-run: monta tudo e guarda, mas não contata o governo.
     if (!wantsSend) {
       const reason = !transmissionEnabled
-        ? 'Transmissao desabilitada (defina PAYROLL_ESOCIAL_TRANSMISSION_ENABLED=true).'
+        ? 'Transmissão desabilitada (defina PAYROLL_ESOCIAL_TRANSMISSION_ENABLED=true).'
         : !endpoint
-          ? 'Endpoint do eSocial nao configurado (PAYROLL_ESOCIAL_SEND_URL_*).'
-          : 'Envio nao confirmado (dry-run).';
+          ? 'Endpoint do eSocial não configurado (PAYROLL_ESOCIAL_SEND_URL_*).'
+          : 'Envio não confirmado (dry-run).';
       const updated = await this.prisma.payrollEsocialBatch.update({
         where: { id: batch.id },
         data: {
           transmissionStatus: 'DRY_RUN',
           transmitRequestXml: soapXml.slice(0, 100_000),
-          issues: ['Dry-run: envelope de transmissao gerado, mas NADA foi enviado ao governo.', reason],
+          issues: ['Dry-run: envelope de transmissão gerado, mas NADA foi enviado ao governo.', reason],
         },
       });
       await this.audit.record(me, {
         module: MODULE, entity: 'PayrollEsocialBatch', entityId: batch.id, action: 'TRANSMIT_DRYRUN',
-        message: `Transmissao em dry-run (${reason})`, after: { environment },
+        message: `Transmissão em dry-run (${reason})`, after: { environment },
       });
       return { transmitted: false, dryRun: true, reason, envelopePreview: soapXml.slice(0, 2000), status: updated.transmissionStatus };
     }
 
     if (environment === 'PRODUCTION' && process.env.PAYROLL_ESOCIAL_PRODUCTION_ENABLED !== 'true') {
-      throw new BadRequestException('Producao real bloqueada. Habilite PAYROLL_ESOCIAL_PRODUCTION_ENABLED=true.');
+      throw new BadRequestException('Produção real bloqueada. Habilite PAYROLL_ESOCIAL_PRODUCTION_ENABLED=true.');
     }
 
     // Envio real: TLS mútuo com o próprio certificado (decifrado só aqui).
@@ -1278,7 +1278,7 @@ export class PayrollEsocialService {
     try {
       return readFileSync(path);
     } catch (error) {
-      this.logger.warn(`PAYROLL_ESOCIAL_CA_BUNDLE ilegivel (${path}): ${(error as Error).message}. Usando o bundle padrao.`);
+      this.logger.warn(`PAYROLL_ESOCIAL_CA_BUNDLE ilegivel (${path}): ${(error as Error).message}. Usando o bundle padrão.`);
       return undefined;
     }
   }
@@ -1287,7 +1287,7 @@ export class PayrollEsocialService {
   private postSoap(endpoint: string, soapXml: string, pfxBase64: string, password: string): Promise<string> {
     return new Promise((resolve, reject) => {
       let url: URL;
-      try { url = new URL(endpoint); } catch { reject(new Error('Endpoint invalido.')); return; }
+      try { url = new URL(endpoint); } catch { reject(new Error('Endpoint inválido.')); return; }
       const payload = Buffer.from(soapXml, 'utf8');
       const ca = this.resolveCaBundle();
       const request = https.request(
@@ -1314,7 +1314,7 @@ export class PayrollEsocialService {
           response.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
         },
       );
-      request.on('timeout', () => request.destroy(new Error('Tempo de conexao esgotado com o eSocial.')));
+      request.on('timeout', () => request.destroy(new Error('Tempo de conexão esgotado com o eSocial.')));
       request.on('error', (error) => reject(error));
       request.write(payload);
       request.end();
@@ -1329,16 +1329,16 @@ export class PayrollEsocialService {
     if (cert.storageMode === 'ENV_REF') {
       const pfx = cert.pfxSecretRef ? process.env[cert.pfxSecretRef] : undefined;
       const pwd = cert.passwordSecretRef ? process.env[cert.passwordSecretRef] : undefined;
-      if (!pfx || !pwd) throw new BadRequestException('Variaveis de ambiente do certificado ausentes.');
+      if (!pfx || !pwd) throw new BadRequestException('Variáveis de ambiente do certificado ausentes.');
       return { pfxBase64: pfx.replace(/\s+/g, ''), password: pwd };
     }
-    throw new BadRequestException('Modo de custodia sem material local para TLS mutuo.');
+    throw new BadRequestException('Modo de custódia sem material local para TLS mútuo.');
   }
 
   /** Consulta o processamento de um lote transmitido pelo protocolo. */
   async queryBatch(me: AuthPayload, batchId: string, body: any = {}) {
     const batch = await this.prisma.payrollEsocialBatch.findFirst({ where: { id: batchId, companyId: me.companyId }, include: { certificate: true } });
-    if (!batch) throw new NotFoundException('Lote eSocial nao encontrado.');
+    if (!batch) throw new NotFoundException('Lote eSocial não encontrado.');
     if (!batch.protocolNumber) throw new BadRequestException('Lote sem protocolo — transmita antes de consultar.');
     if (!batch.certificate) throw new BadRequestException('Lote sem certificado vinculado.');
     const environment = batch.environment as EsocialEnvironment;
@@ -1370,7 +1370,7 @@ export class PayrollEsocialService {
       where: { id: batchId, companyId: me.companyId },
       select: { id: true, status: true, xml: true, xmlHash: true, environment: true, layoutVersion: true, issues: true },
     });
-    if (!batch) throw new NotFoundException('Lote eSocial nao encontrado.');
+    if (!batch) throw new NotFoundException('Lote eSocial não encontrado.');
     return batch;
   }
 
@@ -1378,7 +1378,7 @@ export class PayrollEsocialService {
     const requested = String(value ?? 'PRODUCTION_RESTRICTED').trim().toUpperCase();
     if (requested === 'PRODUCTION') {
       if (process.env.PAYROLL_ESOCIAL_PRODUCTION_ENABLED !== 'true') {
-        throw new BadRequestException('Ambiente de producao bloqueado. Use producao restrita ou habilite PAYROLL_ESOCIAL_PRODUCTION_ENABLED=true.');
+        throw new BadRequestException('Ambiente de produção bloqueado. Use produção restrita ou habilite PAYROLL_ESOCIAL_PRODUCTION_ENABLED=true.');
       }
       return 'PRODUCTION';
     }
@@ -1412,15 +1412,15 @@ export class PayrollEsocialService {
   }
 
   private eventIssues(itemCount: number, contractType: string | null | undefined): string[] {
-    const issues = ['Rubricas internas devem estar espelhadas no S-1010 antes de qualquer transmissao oficial.'];
-    if (!contractType) issues.push('Categoria eSocial presumida por ausencia de tipo de contrato no prontuario.');
+    const issues = ['Rubricas internas devem estar espelhadas no S-1010 antes de qualquer transmissão oficial.'];
+    if (!contractType) issues.push('Categoria eSocial presumida por ausência de tipo de contrato no prontuário.');
     if (itemCount === 0) issues.push('Colaborador sem itens de folha no processamento.');
     return issues;
   }
 
   private async certificateOf(companyId: string, id: string) {
     const cert = await this.prisma.payrollDigitalCertificate.findFirst({ where: { id, companyId } });
-    if (!cert) throw new NotFoundException('Certificado digital nao encontrado.');
+    if (!cert) throw new NotFoundException('Certificado digital não encontrado.');
     return cert;
   }
 
@@ -1441,7 +1441,7 @@ export class PayrollEsocialService {
   private rejectInlineSecrets(body: Record<string, unknown>) {
     for (const key of FORBIDDEN_SECRET_KEYS) {
       if (body[key] !== undefined) {
-        throw new BadRequestException('Nao envie PFX, senha ou chave privada para a API. Cadastre apenas referencias externas.');
+        throw new BadRequestException('Não envie PFX, senha ou chave privada para a API. Cadastre apenas referências externas.');
       }
     }
   }
@@ -1452,7 +1452,7 @@ export class PayrollEsocialService {
 
   private requiredText(value: unknown, label: string): string {
     const text = this.optionalText(value);
-    if (!text) throw new BadRequestException(`${label} e obrigatorio.`);
+    if (!text) throw new BadRequestException(`${label} é obrigatório.`);
     return text;
   }
 
@@ -1465,7 +1465,7 @@ export class PayrollEsocialService {
     const text = this.optionalText(value);
     if (!text) return null;
     const date = new Date(text);
-    if (Number.isNaN(date.getTime())) throw new BadRequestException('Data invalida.');
+    if (Number.isNaN(date.getTime())) throw new BadRequestException('Data inválida.');
     return date;
   }
 }

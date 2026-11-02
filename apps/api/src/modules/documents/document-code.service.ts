@@ -12,9 +12,9 @@ const DEFAULT_TYPES: Array<{
   category: DocumentType;
   defaultValidityDays: number;
 }> = [
-  { name: 'Politica', sigla: 'POL', prefix: 'POL', category: DocumentType.POLICY, defaultValidityDays: 730 },
+  { name: 'Política', sigla: 'POL', prefix: 'POL', category: DocumentType.POLICY, defaultValidityDays: 730 },
   { name: 'Procedimento', sigla: 'PRO', prefix: 'PRO', category: DocumentType.PROCEDURE, defaultValidityDays: 365 },
-  { name: 'Instrucao de Trabalho', sigla: 'IT', prefix: 'IT', category: DocumentType.INSTRUCTION, defaultValidityDays: 365 },
+  { name: 'Instrução de Trabalho', sigla: 'IT', prefix: 'IT', category: DocumentType.INSTRUCTION, defaultValidityDays: 365 },
   { name: 'Registro', sigla: 'REG', prefix: 'REG', category: DocumentType.RECORD, defaultValidityDays: 1825 },
   { name: 'Formulário', sigla: 'FOR', prefix: 'FOR', category: DocumentType.FORM, defaultValidityDays: 365 },
   { name: 'Manual', sigla: 'MAN', prefix: 'MAN', category: DocumentType.MANUAL, defaultValidityDays: 730 },
@@ -179,7 +179,7 @@ function formatCode(pattern: string, prefix: string, digits: number, next: numbe
 
 function requiredText(value: unknown, field: string) {
   const text = String(value ?? '').trim();
-  if (!text) throw new BadRequestException(`${field} e obrigatório.`);
+  if (!text) throw new BadRequestException(`${field} é obrigatório.`);
   return text;
 }
 

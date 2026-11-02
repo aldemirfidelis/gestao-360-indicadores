@@ -138,7 +138,7 @@ export class OrgNodesService {
         },
       },
     });
-    if (!node) throw new NotFoundException('No organizacional nao encontrado');
+    if (!node) throw new NotFoundException('No organizacional não encontrado');
 
     const allNodes = await this.prisma.orgNode.findMany({
       where: { companyId: me.companyId, deletedAt: null },
@@ -184,7 +184,7 @@ export class OrgNodesService {
   private async assertCanViewOrgNode(me: AuthPayload, orgNodeId: string, allNodes?: OrgNodeLink[]) {
     const visibleIds = await this.resolveVisibleOrgNodeIds(me, allNodes, undefined);
     if (visibleIds && !visibleIds.has(orgNodeId)) {
-      throw new ForbiddenException('Voce nao tem permissao para visualizar esta area da arvore organizacional.');
+      throw new ForbiddenException('Você não tem permissão para visualizar esta área da árvore organizacional.');
     }
   }
 
@@ -196,7 +196,7 @@ export class OrgNodesService {
     const scope = requestedScope ?? (canViewAll ? 'all' : 'mine');
     if (scope === 'all') {
       if (!canViewAll) {
-        throw new ForbiddenException('Voce nao tem permissao para visualizar todos os setores.');
+        throw new ForbiddenException('Você não tem permissão para visualizar todos os setores.');
       }
       return null;
     }
@@ -275,7 +275,7 @@ export class OrgNodesService {
 
   async update(id: string, input: Partial<OrgNodeAdminInput>, companyId: string, actorId?: string | null) {
     const node = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null, companyId } });
-    if (!node) throw new NotFoundException('No nao encontrado');
+    if (!node) throw new NotFoundException('No não encontrado');
 
     const nextName = input.name === undefined ? node.name : this.cleanRequired(input.name, 'Nome');
     const nextParentId = input.parentId === undefined ? node.parentId : input.parentId;
@@ -305,10 +305,10 @@ export class OrgNodesService {
 
   async move(id: string, companyId: string, newParentId: string | null, actorId?: string | null) {
     const node = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true, companyId: true, parentId: true, name: true } });
-    if (!node) throw new NotFoundException('No nao encontrado');
+    if (!node) throw new NotFoundException('No não encontrado');
     if (newParentId) {
       const parent = await this.prisma.orgNode.findFirst({ where: { id: newParentId, companyId: node.companyId, deletedAt: null }, select: { id: true } });
-      if (!parent) throw new NotFoundException('No pai nao encontrado para a empresa informada');
+      if (!parent) throw new NotFoundException('No pai não encontrado para a empresa informada');
     }
     await this.assertNoHierarchyCycle(node.companyId, id, newParentId);
     await this.assertNameAvailable(node.companyId, node.name, newParentId, id);
@@ -322,7 +322,7 @@ export class OrgNodesService {
 
   async removalImpact(id: string, companyId: string) {
     const node = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true, name: true } });
-    if (!node) throw new NotFoundException('No nao encontrado');
+    if (!node) throw new NotFoundException('No não encontrado');
     const [
       children,
       indicators,
@@ -391,7 +391,7 @@ export class OrgNodesService {
     if (impact.total > 0) {
       await this.audit(companyId, actorId ?? null, 'DELETE_BLOCKED', 'OrgNode', id, null, impact.relationships, impact.node.name, 'BLOCKED');
       throw new ConflictException({
-        message: 'Estrutura em uso nao pode ser excluida. Realoque ou desvincule os itens informados antes da exclusao.',
+        message: 'Estrutura em uso não pode ser excluída. Realoque ou desvincule os itens informados antes da exclusão.',
         relationships: impact.relationships,
       });
     }
@@ -405,7 +405,7 @@ export class OrgNodesService {
 
   async createActivity(me: AuthPayload, orgNodeId: string, body: ActivityInput) {
     await this.assertCanMaintainActivities(me, orgNodeId);
-    const title = this.cleanRequired(body.title, 'Titulo');
+    const title = this.cleanRequired(body.title, 'Título');
     const orderIndex = await this.nextActivityOrder(me.companyId, orgNodeId, body.orderIndex);
     await this.assertActivityTitleAvailable(me.companyId, orgNodeId, title);
 
@@ -422,7 +422,7 @@ export class OrgNodesService {
         items: body.items?.length
           ? {
               create: body.items.map((item, index) => ({
-                description: this.cleanRequired(item.description, 'Topico'),
+                description: this.cleanRequired(item.description, 'Tópico'),
                 orderIndex: item.orderIndex ?? index + 1,
                 isActive: item.isActive ?? true,
                 createdById: me.sub,
@@ -440,7 +440,7 @@ export class OrgNodesService {
   async updateActivity(me: AuthPayload, orgNodeId: string, activityId: string, body: ActivityInput) {
     await this.assertCanMaintainActivities(me, orgNodeId);
     const before = await this.getActivity(me.companyId, orgNodeId, activityId);
-    const nextTitle = body.title === undefined ? before.title : this.cleanRequired(body.title, 'Titulo');
+    const nextTitle = body.title === undefined ? before.title : this.cleanRequired(body.title, 'Título');
     if (nextTitle !== before.title) {
       await this.assertActivityTitleAvailable(me.companyId, orgNodeId, nextTitle, activityId);
     }
@@ -480,7 +480,7 @@ export class OrgNodesService {
   async createActivityItem(me: AuthPayload, orgNodeId: string, activityId: string, body: ActivityItemInput) {
     await this.assertCanMaintainActivities(me, orgNodeId);
     await this.getActivity(me.companyId, orgNodeId, activityId);
-    const description = this.cleanRequired(body.description, 'Topico');
+    const description = this.cleanRequired(body.description, 'Tópico');
     await this.assertActivityItemAvailable(activityId, description);
     const orderIndex = await this.nextActivityItemOrder(activityId, body.orderIndex);
     const created = await this.prisma.organizationalUnitActivityItem.create({
@@ -501,7 +501,7 @@ export class OrgNodesService {
     await this.assertCanMaintainActivities(me, orgNodeId);
     await this.getActivity(me.companyId, orgNodeId, activityId);
     const before = await this.getActivityItem(activityId, itemId);
-    const nextDescription = body.description === undefined ? before.description : this.cleanRequired(body.description, 'Topico');
+    const nextDescription = body.description === undefined ? before.description : this.cleanRequired(body.description, 'Tópico');
     if (nextDescription !== before.description) {
       await this.assertActivityItemAvailable(activityId, nextDescription, itemId);
     }
@@ -533,16 +533,16 @@ export class OrgNodesService {
   private async validateOrgLinks(companyId: string, input: Partial<OrgNodeAdminInput>, currentId?: string) {
     if (input.branchId) {
       const branch = await this.prisma.branch.findFirst({ where: { id: input.branchId, companyId, deletedAt: null }, select: { id: true } });
-      if (!branch) throw new NotFoundException('Filial nao encontrada para a empresa informada');
+      if (!branch) throw new NotFoundException('Filial não encontrada para a empresa informada');
     }
     if (input.parentId) {
-      if (input.parentId === currentId) throw new ConflictException('Um no nao pode ser pai dele mesmo');
+      if (input.parentId === currentId) throw new ConflictException('Um no não pode ser pai dele mesmo');
       const parent = await this.prisma.orgNode.findFirst({ where: { id: input.parentId, companyId, deletedAt: null }, select: { id: true } });
-      if (!parent) throw new NotFoundException('No pai nao encontrado para a empresa informada');
+      if (!parent) throw new NotFoundException('No pai não encontrado para a empresa informada');
     }
     if (input.responsibleUserId) {
       const user = await this.prisma.user.findFirst({ where: { id: input.responsibleUserId, companyId, deletedAt: null }, select: { id: true } });
-      if (!user) throw new NotFoundException('Responsavel nao encontrado para a empresa informada');
+      if (!user) throw new NotFoundException('Responsável não encontrado para a empresa informada');
     }
   }
 
@@ -553,7 +553,7 @@ export class OrgNodesService {
 
   private async assertOrgNodeInCompany(companyId: string, id: string) {
     const exists = await this.prisma.orgNode.count({ where: { id, companyId, deletedAt: null } });
-    if (!exists) throw new NotFoundException('No organizacional nao encontrado para a empresa informada');
+    if (!exists) throw new NotFoundException('No organizacional não encontrado para a empresa informada');
   }
 
   private async assertNameAvailable(companyId: string, name: string, parentId: string | null, ignoreId?: string) {
@@ -567,7 +567,7 @@ export class OrgNodesService {
       },
       select: { id: true },
     });
-    if (duplicate) throw new ConflictException('Ja existe item organizacional com este nome no mesmo nivel.');
+    if (duplicate) throw new ConflictException('Já existe item organizacional com este nome no mesmo nível.');
   }
 
   private async assertNoHierarchyCycle(companyId: string, nodeId: string, parentId: string | null) {
@@ -576,7 +576,7 @@ export class OrgNodesService {
     const visited = new Set<string>();
     while (cursor) {
       if (cursor === nodeId) throw new ConflictException('A hierarquia selecionada criaria um ciclo.');
-      if (visited.has(cursor)) throw new ConflictException('Hierarquia invalida com ciclo existente.');
+      if (visited.has(cursor)) throw new ConflictException('Hierarquia inválida com ciclo existente.');
       visited.add(cursor);
       const parent: { parentId: string | null } | null = await this.prisma.orgNode.findFirst({
         where: { id: cursor, companyId, deletedAt: null },
@@ -591,7 +591,7 @@ export class OrgNodesService {
       where: { id: activityId, companyId, organizationalUnitId: orgNodeId, deletedAt: null },
       include: { items: { where: { deletedAt: null }, orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }] } },
     });
-    if (!activity) throw new NotFoundException('Atividade nao encontrada para esta unidade organizacional');
+    if (!activity) throw new NotFoundException('Atividade não encontrada para esta unidade organizacional');
     return activity;
   }
 
@@ -599,7 +599,7 @@ export class OrgNodesService {
     const item = await this.prisma.organizationalUnitActivityItem.findFirst({
       where: { id: itemId, activityId, deletedAt: null },
     });
-    if (!item) throw new NotFoundException('Topico nao encontrado para esta atividade');
+    if (!item) throw new NotFoundException('Tópico não encontrado para esta atividade');
     return item;
   }
 
@@ -614,7 +614,7 @@ export class OrgNodesService {
       },
       select: { id: true },
     });
-    if (duplicate) throw new ConflictException('Ja existe bloco de atividade com este titulo nesta unidade.');
+    if (duplicate) throw new ConflictException('Já existe bloco de atividade com este título nesta unidade.');
   }
 
   private async assertActivityItemAvailable(activityId: string, description: string, ignoreId?: string) {
@@ -627,7 +627,7 @@ export class OrgNodesService {
       },
       select: { id: true },
     });
-    if (duplicate) throw new ConflictException('Ja existe topico com esta descricao no bloco.');
+    if (duplicate) throw new ConflictException('Já existe tópico com esta descrição no bloco.');
   }
 
   private async nextActivityOrder(companyId: string, orgNodeId: string, requested?: number) {
@@ -666,7 +666,7 @@ export class OrgNodesService {
 
   private cleanRequired(value: unknown, label: string) {
     const cleaned = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
-    if (!cleaned) throw new BadRequestException(`${label} e obrigatorio.`);
+    if (!cleaned) throw new BadRequestException(`${label} é obrigatório.`);
     return cleaned;
   }
 
@@ -679,7 +679,7 @@ export class OrgNodesService {
   private assertAllowedOrgNodeName(name: string) {
     const normalized = normalizeText(name);
     if (normalized === 'area nao classificada') {
-      throw new ConflictException('A area provisoria "Area nao classificada" nao pode ser criada na Arvore Organizacional.');
+      throw new ConflictException('A área provisória "Área não classificada" não pode ser criada na Árvore Organizacional.');
     }
   }
 

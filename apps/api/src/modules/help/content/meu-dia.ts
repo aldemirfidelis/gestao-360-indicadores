@@ -129,7 +129,7 @@ Cada tarefa mostra prioridade (Crítica/Alta/Média/Baixa), badge de atraso, pra
       slug: 'como-criar-uma-tarefa',
       title: 'Como criar uma tarefa?',
       summary: 'Tarefas nascem dentro de planos de ação, fluxos e ferramentas de análise.',
-      tags: ['criar tarefa', 'tarefa', 'nova tarefa', 'etapa', 'plano de acao'],
+      tags: ['criar tarefa', 'tarefa', 'nova tarefa', 'etapa', 'plano de ação'],
       body: `No Gestão 360, tarefas não ficam soltas — elas sempre pertencem a um contexto, o que garante rastreabilidade. Você cria tarefas assim:
 
 ## 1. Dentro de um Plano de Ação (o caminho principal)

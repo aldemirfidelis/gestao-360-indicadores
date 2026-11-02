@@ -67,7 +67,7 @@ Mantenha a árvore atualizada: ela é o mapa de responsabilidades da empresa.`,
       slug: 'mapa-estrategico-bsc',
       title: 'Mapa Estratégico (BSC)',
       summary: 'Balanced Scorecard visual: perspectivas, objetivos e causa-efeito.',
-      tags: ['mapa estrategico', 'bsc', 'balanced scorecard', 'objetivo estrategico', 'perspectiva', 'estrategia'],
+      tags: ['mapa estratégico', 'bsc', 'balanced scorecard', 'objetivo estratégico', 'perspectiva', 'estrategia'],
       body: `O **Mapa Estratégico** (Gestão à Vista > Mapa Estratégico) é o Balanced Scorecard visual da empresa.
 
 ## Como montar
@@ -125,7 +125,7 @@ Se um indicador **estratégico** fechar o período fora da meta, o passo seguint
       slug: 'visao-360-do-indicador',
       title: 'Visão 360° do indicador',
       summary: 'O painel executivo individual: KPIs, gráfico, insights e riscos.',
-      tags: ['visao 360', 'detalhe do indicador', 'impacto', 'insights', 'grafico'],
+      tags: ['visão 360', 'detalhe do indicador', 'impacto', 'insights', 'grafico'],
       body: `Ao abrir um indicador você acessa a **Visão 360°**: uma tela executiva com tudo sobre ele.
 
 ## O que mostra
@@ -166,7 +166,7 @@ Antes de discutir um indicador em reunião, abra a Visão 360°: em uma tela voc
       slug: 'como-criar-um-plano-de-acao',
       title: 'Como criar um plano de ação?',
       summary: 'Passo a passo: origem, tarefas, evidências e verificação de eficácia.',
-      tags: ['plano de acao', 'criar plano', 'acao', 'nova acao', 'corretiva', '5w2h'],
+      tags: ['plano de ação', 'criar plano', 'acao', 'nova ação', 'corretiva', '5w2h'],
       body: `1. Acesse **Gestão à Vista > Plano de Ação** e clique em **Nova ação** (planos também nascem de desvios, reuniões, NCs e da ferramenta 5W2H).
 2. Preencha:
    - **Título** e descrição do que será feito;
@@ -220,7 +220,7 @@ Dica: anexe a evidência no momento da conclusão — depois é retrabalho caça
       slug: 'ferramentas-analise-de-causa',
       title: 'Ferramentas de análise de causa (Ishikawa, 5 Porquês, 5W2H, PDCA)',
       summary: 'Como conduzir a investigação metodológica com apoio de IA.',
-      tags: ['ishikawa', '5 porques', '5w2h', 'pdca', 'analise de causa', 'causa raiz', 'espinha de peixe', '6m'],
+      tags: ['ishikawa', '5 porquês', '5w2h', 'pdca', 'análise de causa', 'causa raiz', 'espinha de peixe', '6m'],
       body: `Na aba **Análise de Causa** (disponível no plano de ação e na reunião), as ferramentas clássicas de qualidade são conduzidas em sequência metodológica, com **desbloqueio progressivo**: Ishikawa → 5 Porquês → 5W2H → PDCA.
 
 ## Ishikawa (espinha de peixe, 6M)
@@ -263,7 +263,7 @@ Reuniões criadas a partir de um **desvio** já vêm vinculadas ao indicador e a
       slug: 'reuniao-mensal-de-resultados',
       title: 'Reunião Mensal de Resultados',
       summary: 'O rito executivo mensal: preparação por área, apresentação e follow-ups.',
-      tags: ['reuniao mensal', 'resultados', 'analise critica', 'apresentacao', 'follow-up', 'rito'],
+      tags: ['reunião mensal', 'resultados', 'análise crítica', 'apresentacao', 'follow-up', 'rito'],
       body: `A **Reunião Mensal de Resultados** (Gestão à Vista > Reunião Mensal) organiza o rito executivo completo de análise crítica.
 
 ## Preparação

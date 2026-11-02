@@ -1,3 +1,4 @@
+import { formatQuantity } from '@g360/shared';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, OnModuleInit, Optional, Inject } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -128,7 +129,7 @@ export class MyDayService implements OnModuleInit {
     if (!enabled) {
       return {
         enabled: false,
-        disclaimer: 'IA assistiva desativada para este usuario ou empresa.',
+        disclaimer: 'IA assistiva desativada para este usuário ou empresa.',
         generatedAt: new Date().toISOString(),
         summary: null,
         recommendations: [],
@@ -177,7 +178,7 @@ export class MyDayService implements OnModuleInit {
     }
     return {
       enabled: true,
-      disclaimer: 'Sugestao assistida por IA. Avalie o contexto antes de executar qualquer acao. A decisao final e do usuario.',
+      disclaimer: 'Sugestão assistida por IA. Avalie o contexto antes de executar qualquer ação. A decisão final é do usuário.',
       generatedAt: new Date().toISOString(),
       summary: this.assistedSummary(summary),
       recommendations,
@@ -259,18 +260,18 @@ export class MyDayService implements OnModuleInit {
       if (action === 'approve') {
         await this.documents.approveEditRequest(me, item.sourceEntityId, { note: dto.justification });
         await this.ensureFresh(me, true);
-        return { ok: true, message: 'Edicao liberada.' };
+        return { ok: true, message: 'Edição liberada.' };
       }
       if (action === 'reject') {
-        if (!dto.justification?.trim()) throw new BadRequestException('Justificativa obrigatoria para rejeitar a edicao.');
+        if (!dto.justification?.trim()) throw new BadRequestException('Justificativa obrigatória para rejeitar a edição.');
         await this.documents.rejectEditRequest(me, item.sourceEntityId, { note: dto.justification });
         await this.ensureFresh(me, true);
-        return { ok: true, message: 'Solicitacao rejeitada.' };
+        return { ok: true, message: 'Solicitação rejeitada.' };
       }
       if (action === 'complete') {
         await this.documents.completeEditRequest(me, item.sourceEntityId, { note: dto.justification });
         await this.ensureFresh(me, true);
-        return { ok: true, message: 'Edicao concluida.' };
+        return { ok: true, message: 'Edição concluída.' };
       }
     }
 
@@ -319,13 +320,13 @@ export class MyDayService implements OnModuleInit {
 
   private assistedSummary(summary: any) {
     const parts: string[] = [];
-    if (summary.overdue > 0) parts.push(`${summary.overdue} vencido(s)`);
-    if (summary.dueToday > 0) parts.push(`${summary.dueToday} vencendo hoje`);
-    if (summary.approvals > 0) parts.push(`${summary.approvals} aprovacao(oes)`);
-    if (summary.risksCritical > 0) parts.push(`${summary.risksCritical} risco(s) critico(s)`);
-    if (summary.indicatorsOffTarget > 0) parts.push(`${summary.indicatorsOffTarget} indicador(es) fora da meta`);
-    if (parts.length === 0) return 'Sem concentracao critica no momento. Mantenha a rotina de acompanhamento.';
-    return `Seu dia concentra ${parts.join(', ')}. Comece pelos bloqueios, prazos vencidos e decisoes que liberam outras pessoas.`;
+    if (summary.overdue > 0) parts.push(formatQuantity(summary.overdue, 'item vencido', 'itens vencidos'));
+    if (summary.dueToday > 0) parts.push(formatQuantity(summary.dueToday, 'item vencendo hoje', 'itens vencendo hoje'));
+    if (summary.approvals > 0) parts.push(formatQuantity(summary.approvals, 'aprovação', 'aprovações'));
+    if (summary.risksCritical > 0) parts.push(formatQuantity(summary.risksCritical, 'risco crítico', 'riscos críticos'));
+    if (summary.indicatorsOffTarget > 0) parts.push(formatQuantity(summary.indicatorsOffTarget, 'indicador fora da meta', 'indicadores fora da meta'));
+    if (parts.length === 0) return 'Sem concentração crítica no momento. Mantenha a rotina de acompanhamento.';
+    return `Seu dia concentra ${parts.join(', ')}. Comece pelos bloqueios, prazos vencidos e decisões que liberam outras pessoas.`;
   }
 
   private buildRecommendations(summary: any, priorities: any[], overdue: any[], dueToday: any[]): AssistantRecommendation[] {
@@ -338,9 +339,9 @@ export class MyDayService implements OnModuleInit {
       out.push({
         key: 'overdue-cluster',
         severity: summary.overdue >= 6 ? 'CRITICAL' : 'HIGH',
-        title: 'Concentracao de itens vencidos',
-        explanation: `${summary.overdue} item(ns) estao vencidos. Padrao detectado: acumulo de prazos atrasados na sua caixa de trabalho.`,
-        suggestion: 'Revise os vencidos em bloco, conclua os rapidos e justifique/replaneje os que dependem de terceiros.',
+        title: 'Concentração de itens vencidos',
+        explanation: `${formatQuantity(summary.overdue, 'item está vencido', 'itens estão vencidos')}. Padrão detectado: acúmulo de prazos atrasados na sua caixa de trabalho.`,
+        suggestion: 'Revise os vencidos em bloco, conclua os rápidos e justifique/replaneje os que dependem de terceiros.',
         relatedItemIds: overdue.slice(0, 8).map((i) => i.id),
         pattern: 'overdue',
       });
@@ -349,9 +350,9 @@ export class MyDayService implements OnModuleInit {
       out.push({
         key: 'blocking-decisions',
         severity: blocking.length > 0 ? 'HIGH' : 'MEDIUM',
-        title: 'Decisoes podem destravar fluxos',
-        explanation: `${approvals.length} aprovacao(oes) e ${blocking.length} item(ns) bloqueante(s) aparecem entre suas prioridades.`,
-        suggestion: 'Trate primeiro aprovacoes e bloqueios. A IA nao aprova nem rejeita; apenas sugere a ordem de analise.',
+        title: 'Decisões podem destravar fluxos',
+        explanation: `${formatQuantity(approvals.length, 'aprovação', 'aprovações')} e ${formatQuantity(blocking.length, 'item que bloqueia o fluxo', 'itens que bloqueiam o fluxo')} aparecem entre suas prioridades.`,
+        suggestion: 'Trate primeiro aprovações e bloqueios. A IA não aprova nem rejeita; apenas sugere a ordem de análise.',
         relatedItemIds: [...blocking, ...approvals].slice(0, 8).map((i) => i.id),
         pattern: 'blocking',
       });
@@ -360,9 +361,9 @@ export class MyDayService implements OnModuleInit {
       out.push({
         key: 'critical-first',
         severity: 'CRITICAL',
-        title: 'Prioridade critica no topo',
-        explanation: `${critical.length} item(ns) critico(s) exigem atencao antes dos demais por risco, prazo ou impacto.`,
-        suggestion: 'Abra a Visao 360 dos itens criticos antes de executar acao irreversivel e registre justificativa quando houver decisao.',
+        title: 'Prioridade crítica no topo',
+        explanation: `${formatQuantity(critical.length, 'item crítico exige atenção', 'itens críticos exigem atenção')} antes dos demais por risco, prazo ou impacto.`,
+        suggestion: 'Abra a Visão 360 dos itens críticos antes de executar uma ação irreversível e registre a justificativa quando houver uma decisão.',
         relatedItemIds: critical.slice(0, 8).map((i) => i.id),
         pattern: 'critical',
       });
@@ -372,8 +373,8 @@ export class MyDayService implements OnModuleInit {
         key: 'due-today',
         severity: 'MEDIUM',
         title: 'Prazos de hoje',
-        explanation: `${dueToday.length} item(ns) vencem hoje e podem virar atraso no proximo ciclo.`,
-        suggestion: 'Reserve uma janela curta para liquidar itens de baixo esforco e fixe os que precisam de acompanhamento.',
+        explanation: `${formatQuantity(dueToday.length, 'item vence hoje e pode virar atraso', 'itens vencem hoje e podem virar atraso')} no próximo ciclo.`,
+        suggestion: 'Reserve uma janela curta para liquidar itens de baixo esforço e fixe os que precisam de acompanhamento.',
         relatedItemIds: dueToday.slice(0, 8).map((i) => i.id),
         pattern: 'due_today',
       });
@@ -382,9 +383,9 @@ export class MyDayService implements OnModuleInit {
       out.push({
         key: 'delegated-coverage',
         severity: 'INFO',
-        title: 'Cobertura por delegacao ativa',
-        explanation: `${delegated.length} item(ns) chegaram por substituicao temporaria.`,
-        suggestion: 'Priorize itens delegados com prazo curto e combine criterios de decisao com o responsavel original.',
+        title: 'Cobertura por delegação ativa',
+        explanation: `${formatQuantity(delegated.length, 'item chegou', 'itens chegaram')} por substituição temporária.`,
+        suggestion: 'Priorize itens delegados com prazo curto e combine critérios de decisão com o responsável original.',
         relatedItemIds: delegated.slice(0, 8).map((i) => i.id),
         pattern: 'delegation',
       });
@@ -394,8 +395,8 @@ export class MyDayService implements OnModuleInit {
         key: 'steady-state',
         severity: 'INFO',
         title: 'Rotina sob controle',
-        explanation: 'Nao ha padrao critico acumulado nos itens retornados agora.',
-        suggestion: 'Mantenha os itens importantes fixados e revise proximos prazos ao fim do dia.',
+        explanation: 'Não há padrão crítico acumulado nos itens retornados agora.',
+        suggestion: 'Mantenha os itens importantes fixados e revise próximos prazos ao fim do dia.',
         pattern: 'steady',
       });
     }
@@ -535,16 +536,16 @@ export class MyDayService implements OnModuleInit {
 
   async createDelegation(me: AuthPayload, dto: Record<string, any>) {
     const delegateUserId = String(dto.delegateUserId ?? '');
-    if (!delegateUserId || delegateUserId === me.sub) throw new BadRequestException('Informe um substituto valido.');
+    if (!delegateUserId || delegateUserId === me.sub) throw new BadRequestException('Informe um substituto válido.');
     const delegate = await this.prisma.user.findFirst({
       where: { id: delegateUserId, companyId: me.companyId, deletedAt: null, status: 'ACTIVE', active: true },
       select: { id: true },
     });
-    if (!delegate) throw new NotFoundException('Substituto nao encontrado.');
+    if (!delegate) throw new NotFoundException('Substituto não encontrado.');
     const startsAt = dto.startsAt ? new Date(dto.startsAt) : new Date();
     const endsAt = dto.endsAt ? new Date(dto.endsAt) : null;
-    if (Number.isNaN(startsAt.getTime()) || (endsAt && Number.isNaN(endsAt.getTime()))) throw new BadRequestException('Periodo invalido.');
-    if (endsAt && endsAt <= startsAt) throw new BadRequestException('O fim da delegacao deve ser posterior ao inicio.');
+    if (Number.isNaN(startsAt.getTime()) || (endsAt && Number.isNaN(endsAt.getTime()))) throw new BadRequestException('Período inválido.');
+    if (endsAt && endsAt <= startsAt) throw new BadRequestException('O fim da delegação deve ser posterior ao início.');
     const row = await this.prisma.userDelegation.create({
       data: {
         companyId: me.companyId,
@@ -562,8 +563,8 @@ export class MyDayService implements OnModuleInit {
 
   async revokeDelegation(me: AuthPayload, id: string) {
     const row = await this.prisma.userDelegation.findFirst({ where: { id, companyId: me.companyId } });
-    if (!row) throw new NotFoundException('Delegacao nao encontrada.');
-    if (row.delegatorUserId !== me.sub && row.delegateUserId !== me.sub) throw new ForbiddenException('Sem acesso a esta delegacao.');
+    if (!row) throw new NotFoundException('Delegação não encontrada.');
+    if (row.delegatorUserId !== me.sub && row.delegateUserId !== me.sub) throw new ForbiddenException('Sem acesso a esta delegação.');
     return this.prisma.userDelegation.update({ where: { id }, data: { status: 'REVOKED', revokedAt: new Date() } });
   }
 

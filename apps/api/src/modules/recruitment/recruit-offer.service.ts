@@ -58,8 +58,8 @@ export class RecruitOfferService {
       approvalRequired: bandResult.approvalRequired,
       approvedById: null,
       approvedAt: null,
-      startDate: body?.startDate ? parseDate(body.startDate, 'Data de inicio invalida.') : null,
-      expiresAt: body?.expiresAt ? parseDate(body.expiresAt, 'Validade invalida.') : null,
+      startDate: body?.startDate ? parseDate(body.startDate, 'Data de início inválida.') : null,
+      expiresAt: body?.expiresAt ? parseDate(body.expiresAt, 'Validade inválida.') : null,
       workMode: text(body?.workMode) ?? app.posting.workMode,
       contractType: text(body?.contractType) ?? app.posting.contractType,
       location: text(body?.location) ?? app.posting.location ?? app.posting.city,
@@ -71,12 +71,12 @@ export class RecruitOfferService {
     let saved;
     if (body?.id) {
       const existing = await this.prisma.recruitOffer.findFirst({ where: { id: String(body.id), companyId: me.companyId, applicationId } });
-      if (!existing) throw new NotFoundException('Proposta nao encontrada.');
-      if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(existing.status)) throw new ConflictException('Esta proposta nao pode mais ser editada.');
+      if (!existing) throw new NotFoundException('Proposta não encontrada.');
+      if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(existing.status)) throw new ConflictException('Esta proposta não pode mais ser editada.');
       saved = await this.prisma.recruitOffer.update({ where: { id: existing.id }, data });
     } else {
       const blocked = await this.prisma.recruitOffer.findFirst({ where: { companyId: me.companyId, applicationId, status: { in: ['SENT', 'ACCEPTED'] } } });
-      if (blocked) throw new ConflictException('Ja existe uma proposta enviada ou aceita para esta candidatura.');
+      if (blocked) throw new ConflictException('Já existe uma proposta enviada ou aceita para esta candidatura.');
       const revision = await this.prisma.recruitOffer.count({ where: { companyId: me.companyId, applicationId } });
       saved = await this.prisma.recruitOffer.create({ data: { ...data, revision: revision + 1 } });
     }
@@ -89,7 +89,7 @@ export class RecruitOfferService {
 
   async approveOffer(me: AuthPayload, id: string, body: any = {}) {
     const offer = await this.offerOrFail(me.companyId, id);
-    if (!['PENDING_APPROVAL', 'DRAFT', 'APPROVED'].includes(offer.status)) throw new ConflictException('Esta proposta nao pode ser aprovada.');
+    if (!['PENDING_APPROVAL', 'DRAFT', 'APPROVED'].includes(offer.status)) throw new ConflictException('Esta proposta não pode ser aprovada.');
     const saved = await this.prisma.recruitOffer.update({
       where: { id },
       data: { status: 'APPROVED', approvedById: me.sub, approvedAt: new Date(), justification: text(body?.comment) ?? offer.justification },
@@ -102,7 +102,7 @@ export class RecruitOfferService {
   async sendOffer(me: AuthPayload, id: string) {
     const offer = await this.offerOrFail(me.companyId, id, true);
     if (!canSendOffer(offer.status, offer.approvalRequired)) {
-      throw new BadRequestException('Proposta fora da faixa precisa de aprovacao antes do envio.');
+      throw new BadRequestException('Proposta fora da faixa precisa de aprovação antes do envio.');
     }
     const expiresAt = offer.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const offerStageId = offer.application.posting.pipelineTemplateId
@@ -121,7 +121,7 @@ export class RecruitOfferService {
 
   async cancelOffer(me: AuthPayload, id: string, body: any = {}) {
     const offer = await this.offerOrFail(me.companyId, id);
-    if (['ACCEPTED', 'DECLINED', 'CANCELLED'].includes(offer.status)) throw new ConflictException('Esta proposta nao pode ser cancelada.');
+    if (['ACCEPTED', 'DECLINED', 'CANCELLED'].includes(offer.status)) throw new ConflictException('Esta proposta não pode ser cancelada.');
     const saved = await this.prisma.recruitOffer.update({ where: { id }, data: { status: 'CANCELLED', declineReason: text(body?.reason) } });
     await this.prisma.recruitApplicationEvent.create({ data: { companyId: me.companyId, applicationId: offer.applicationId, type: 'OFFER_CANCELLED', note: text(body?.reason), actorType: 'USER', actorId: me.sub } });
     return saved;
@@ -142,15 +142,15 @@ export class RecruitOfferService {
     await this.applicationOrFail(me.companyId, applicationId);
     const offerId = text(body?.offerId);
     const offer = offerId ? await this.offerOrFail(me.companyId, offerId) : null;
-    if (offer && offer.applicationId !== applicationId) throw new BadRequestException('Proposta nao pertence a esta candidatura.');
+    if (offer && offer.applicationId !== applicationId) throw new BadRequestException('Proposta não pertence a esta candidatura.');
     const created = await this.prisma.$transaction((tx) => this.ensurePreAdmission(tx, {
       companyId: me.companyId,
       applicationId,
       offerId: offer?.id ?? null,
-      admissionTargetDate: body?.admissionTargetDate ? parseDate(body.admissionTargetDate, 'Data alvo invalida.') : offer?.startDate ?? null,
+      admissionTargetDate: body?.admissionTargetDate ? parseDate(body.admissionTargetDate, 'Data alvo inválida.') : offer?.startDate ?? null,
       createdById: me.sub,
     }));
-    await this.audit.record(me, { module: MODULE, entity: 'RecruitPreAdmission', entityId: created.id, action: 'CREATE', message: 'Pre-admissao iniciada' });
+    await this.audit.record(me, { module: MODULE, entity: 'RecruitPreAdmission', entityId: created.id, action: 'CREATE', message: 'Pré-admissão iniciada' });
     // Avisa o candidato por e-mail que o checklist de documentos foi aberto (não bloqueia o fluxo se o e-mail falhar).
     void this.emailDocumentsFor(me.companyId, created.id);
     return created;
@@ -173,10 +173,10 @@ export class RecruitOfferService {
         companyId: me.companyId,
         preAdmissionId,
         kind: text(body?.kind) ?? 'OTHER',
-        title: requiredText(body?.title, 'Titulo do documento e obrigatorio.'),
+        title: requiredText(body?.title, 'Título do documento é obrigatório.'),
         instructions: text(body?.instructions),
         required: body?.required !== false,
-        dueAt: body?.dueAt ? parseDate(body.dueAt, 'Prazo invalido.') : null,
+        dueAt: body?.dueAt ? parseDate(body.dueAt, 'Prazo inválido.') : null,
       },
     });
     await this.prisma.recruitApplicationEvent.create({ data: { companyId: me.companyId, applicationId: pre.applicationId, type: 'PREHIRE_DOC_REQUIRED', note: saved.title, actorType: 'USER', actorId: me.sub } });
@@ -185,9 +185,9 @@ export class RecruitOfferService {
 
   async reviewDocument(me: AuthPayload, id: string, body: any = {}) {
     const status = String(body?.status ?? '').toUpperCase();
-    if (!['APPROVED', 'REJECTED', 'WAIVED'].includes(status)) throw new BadRequestException('Decisao documental invalida.');
+    if (!['APPROVED', 'REJECTED', 'WAIVED'].includes(status)) throw new BadRequestException('Decisão documental inválida.');
     const doc = await this.prisma.recruitPreAdmissionDocument.findFirst({ where: { id, companyId: me.companyId }, include: { preAdmission: { include: { documents: true } } } });
-    if (!doc) throw new NotFoundException('Documento de pre-admissao nao encontrado.');
+    if (!doc) throw new NotFoundException('Documento de pré-admissão não encontrado.');
     const saved = await this.prisma.recruitPreAdmissionDocument.update({
       where: { id },
       data: { status, reviewedById: me.sub, reviewedAt: new Date(), reviewNote: text(body?.note) },
@@ -213,17 +213,17 @@ export class RecruitOfferService {
 
   async decideMyOffer(candidate: CandidateContext, id: string, body: any = {}) {
     const decision = String(body?.decision ?? '').toUpperCase();
-    if (!['ACCEPT', 'DECLINE'].includes(decision)) throw new BadRequestException('Decisao invalida.');
+    if (!['ACCEPT', 'DECLINE'].includes(decision)) throw new BadRequestException('Decisão inválida.');
     const offer = await this.prisma.recruitOffer.findFirst({
       where: { id, application: { candidateId: candidate.id } },
       include: { application: { include: { posting: true } } },
     });
-    if (!offer) throw new NotFoundException('Proposta nao encontrada.');
+    if (!offer) throw new NotFoundException('Proposta não encontrada.');
     if (!canCandidateDecideOffer(offer.status, offer.expiresAt)) {
       if (offer.status === 'SENT' && offer.expiresAt && offer.expiresAt < new Date()) {
         await this.prisma.recruitOffer.update({ where: { id }, data: { status: 'EXPIRED' } });
       }
-      throw new ConflictException('Esta proposta nao esta disponivel para decisao.');
+      throw new ConflictException('Esta proposta não está disponível para decisão.');
     }
     if (decision === 'DECLINE') {
       const saved = await this.prisma.recruitOffer.update({ where: { id }, data: { status: 'DECLINED', declinedAt: new Date(), declineReason: text(body?.reason) } });
@@ -262,11 +262,11 @@ export class RecruitOfferService {
       where: { id, preAdmission: { application: { candidateId: candidate.id } } },
       include: { preAdmission: true },
     });
-    if (!req) throw new NotFoundException('Documento solicitado nao encontrado.');
-    if (!['PENDING', 'REJECTED', 'SUBMITTED'].includes(req.status)) throw new ConflictException('Este documento nao pode ser reenviado.');
-    const docId = requiredText(body?.candidateDocumentId, 'Documento enviado e obrigatorio.');
+    if (!req) throw new NotFoundException('Documento solicitado não encontrado.');
+    if (!['PENDING', 'REJECTED', 'SUBMITTED'].includes(req.status)) throw new ConflictException('Este documento não pode ser reenviado.');
+    const docId = requiredText(body?.candidateDocumentId, 'Documento enviado é obrigatório.');
     const doc = await this.prisma.recruitCandidateDocument.findFirst({ where: { id: docId, candidateId: candidate.id, deletedAt: null } });
-    if (!doc) throw new NotFoundException('Documento do candidato nao encontrado.');
+    if (!doc) throw new NotFoundException('Documento do candidato não encontrado.');
     const saved = await this.prisma.recruitPreAdmissionDocument.update({
       where: { id },
       data: { candidateDocumentId: doc.id, status: 'SUBMITTED', submittedAt: new Date(), reviewedById: null, reviewedAt: null, reviewNote: null },
@@ -323,7 +323,7 @@ export class RecruitOfferService {
         ? { candidate: true, posting: { select: { id: true, title: true, requisitionId: true, pipelineTemplateId: true, workMode: true, contractType: true, location: true, city: true } } }
         : undefined,
     });
-    if (!app) throw new NotFoundException('Candidatura nao encontrada.');
+    if (!app) throw new NotFoundException('Candidatura não encontrada.');
     return app as typeof app & { candidate: { name: string; email: string }; posting: { id: string; title: string; requisitionId: string; pipelineTemplateId: string | null; workMode: string | null; contractType: string | null; location: string | null; city: string | null } };
   }
 
@@ -334,13 +334,13 @@ export class RecruitOfferService {
         ? { application: { include: { candidate: true, posting: { select: { title: true, slug: true, pipelineTemplateId: true } } } } }
         : undefined,
     });
-    if (!offer) throw new NotFoundException('Proposta nao encontrada.');
+    if (!offer) throw new NotFoundException('Proposta não encontrada.');
     return offer as typeof offer & { application: { candidate: { name: string; email: string }; posting: { title: string; slug: string; pipelineTemplateId: string | null } } };
   }
 
   private async preAdmissionOrFail(companyId: string, id: string) {
     const pre = await this.prisma.recruitPreAdmission.findFirst({ where: { id, companyId } });
-    if (!pre) throw new NotFoundException('Pre-admissao nao encontrada.');
+    if (!pre) throw new NotFoundException('Pré-admissão não encontrada.');
     return pre;
   }
 
@@ -423,12 +423,12 @@ function json(value: unknown): Prisma.InputJsonValue | undefined {
 function moneyToCents(body: any, base: string): number {
   if (`${base}Cents` in body) {
     const cents = Math.round(Number(body[`${base}Cents`]));
-    if (!Number.isFinite(cents) || cents <= 0) throw new BadRequestException('Valor da proposta invalido.');
+    if (!Number.isFinite(cents) || cents <= 0) throw new BadRequestException('Valor da proposta inválido.');
     return cents;
   }
   const raw = String(body?.[base] ?? '').replace(/\./g, '').replace(',', '.');
   const cents = Math.round(Number(raw) * 100);
-  if (!Number.isFinite(cents) || cents <= 0) throw new BadRequestException('Valor da proposta invalido.');
+  if (!Number.isFinite(cents) || cents <= 0) throw new BadRequestException('Valor da proposta inválido.');
   return cents;
 }
 

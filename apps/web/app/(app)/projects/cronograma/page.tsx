@@ -106,7 +106,7 @@ const STATUS_LABEL: Record<string, string> = {
   PLANNED: 'Planejado',
   IN_PROGRESS: 'Em andamento',
   ON_HOLD: 'Pausado',
-  DONE: 'Concluido',
+  DONE: 'Concluído',
   CANCELLED: 'Cancelado',
 };
 
@@ -256,7 +256,7 @@ export default function ProjectsPage() {
 
       {/* PMO KPIs superiores */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <KpiCard title="Projetos Ativos" value={formatNumber(pmo?.activeProjects)} change={`${formatNumber(pmo?.totalProjects)} no portfolio`} color="sky" icon={FolderKanban} />
+        <KpiCard title="Projetos Ativos" value={formatNumber(pmo?.activeProjects)} change={`${formatNumber(pmo?.totalProjects)} no portfólio`} color="sky" icon={FolderKanban} />
         <KpiCard title="Marcos Concluídos" value={`${formatNumber(pmo?.milestonesDone)}/${formatNumber(pmo?.milestonesTotal)}`} change={`${formatNumber(pmo?.milestonesOverdue)} vencidos`} color="rose" icon={AlertTriangle} />
         <KpiCard title="Orçamento Alocado" value={formatNumber(pmo?.activeBudget, { style: 'currency', currency: 'BRL' })} change={`Total ${formatNumber(pmo?.budgetTotal, { style: 'currency', currency: 'BRL' })}`} color="purple" icon={Wallet} />
         <KpiCard title="Progresso Médio" value={`${formatNumber(pmo?.avgProgress, { maximumFractionDigits: 0 })}%`} change={`${formatNumber(pmo?.behindSchedule)} abaixo do plano`} color="amber" icon={Clock3} />
@@ -411,7 +411,7 @@ export default function ProjectsPage() {
                   )}
                   <div className="mt-4 grid grid-cols-3 gap-3 text-xs text-slate-400">
                     <div>
-                      <div className="text-[9px] uppercase font-bold">Inicio</div>
+                      <div className="text-[9px] uppercase font-bold">Início</div>
                       <div className="text-slate-700 dark:text-slate-350">{formatDate(p.startsAt)}</div>
                     </div>
                     <div>
@@ -512,7 +512,7 @@ export default function ProjectsPage() {
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-2">
-                <Label>Inicio</Label>
+                <Label>Início</Label>
                 <Input
                   type="date"
                   value={form.startsAt}

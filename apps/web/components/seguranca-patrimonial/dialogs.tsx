@@ -125,7 +125,7 @@ export function QrValidateDialog({ onClose }: { onClose: () => void }) {
 type EntryPersonKind = 'EMPLOYEE' | 'THIRD_PARTY' | 'VISITOR';
 
 const ENTRY_PERSON_KIND_OPTIONS: Array<{ value: EntryPersonKind; label: string }> = [
-  { value: 'EMPLOYEE', label: 'Funcionario' },
+  { value: 'EMPLOYEE', label: 'Funcionário' },
   { value: 'THIRD_PARTY', label: 'Terceiro' },
   { value: 'VISITOR', label: 'Visitante' },
 ];
@@ -281,8 +281,8 @@ export function EntryDialog({ optionValues, onCreatePerson, onClose, onSaved }: 
           <div>
             <Label>Placa da entrada</Label>
             <Input value={form.plate} placeholder="ABC1D23" onChange={(e) => setForm((current) => ({ ...current, plate: e.target.value }))} />
-            {(typedPlate && !selectedPlate) && <p className="mt-1 text-xs text-muted-foreground">Se a placa nao existir, o sistema cadastra o veiculo ao registrar.</p>}
-            {plateDiffers && <p className="mt-1 text-xs text-status-yellow">Placa diferente do veiculo selecionado: sera cadastrado/vinculado novo veiculo.</p>}
+            {(typedPlate && !selectedPlate) && <p className="mt-1 text-xs text-muted-foreground">Se a placa não existir, o sistema cadastra o veículo ao registrar.</p>}
+            {plateDiffers && <p className="mt-1 text-xs text-status-yellow">Placa diferente do veículo selecionado: será cadastrado/vinculado novo veículo.</p>}
           </div>
           <div>
             <Label>Área de destino</Label>
@@ -329,7 +329,7 @@ function PersonLookupPanel({ loading, searched, person, companyLabel, kind, onCr
   if (!person) {
     return (
       <div className="flex flex-col gap-2 rounded-md border border-status-yellow/40 bg-status-yellow/5 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-        <span>{kind === 'EMPLOYEE' ? 'Colaborador nao encontrado na base importada.' : 'Pessoa nao encontrada. Cadastre antes de registrar a entrada.'}</span>
+        <span>{kind === 'EMPLOYEE' ? 'Colaborador não encontrado na base importada.' : 'Pessoa não encontrada. Cadastre antes de registrar a entrada.'}</span>
         <Button type="button" size="sm" variant="outline" onClick={onCreate}>Cadastrar pessoa</Button>
       </div>
     );

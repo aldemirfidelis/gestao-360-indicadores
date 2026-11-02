@@ -179,8 +179,8 @@ export const SITUATION_LABELS: Record<string, string> = {
   ABAIXO_DA_FAIXA: 'Abaixo da faixa',
   PROXIMO_AO_MINIMO: 'Próximo ao mínimo',
   DENTRO_DA_FAIXA: 'Dentro da faixa',
-  PROXIMO_AO_PONTO_MEDIO: 'Próximo ao ponto medio',
-  ACIMA_DO_PONTO_MEDIO: 'Acima do ponto medio',
+  PROXIMO_AO_PONTO_MEDIO: 'Próximo ao ponto médio',
+  ACIMA_DO_PONTO_MEDIO: 'Acima do ponto médio',
   PROXIMO_AO_TETO: 'Próximo ao teto',
   ACIMA_DA_FAIXA: 'Acima da faixa',
   SEM_TABELA: 'Sem tabela',
@@ -194,7 +194,7 @@ export const DESCRIPTION_STATUS_LABELS: Record<string, string> = {
   IN_APPROVAL: 'Em aprovação',
   APPROVED: 'Aprovada',
   PUBLISHED: 'Publicada',
-  REPLACED: 'Substituida',
+  REPLACED: 'Substituída',
   INACTIVE: 'Inativa',
 };
 

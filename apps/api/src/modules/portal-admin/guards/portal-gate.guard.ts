@@ -67,7 +67,7 @@ export class PortalGateGuard implements CanActivate {
         : storedStatus;
       const decision = canUseCompanyModule(effectiveStatus, req.method);
       if (!decision.allowed) {
-        throw new ForbiddenException(assignment?.note || decision.reason || `O modulo "${moduleCode}" nao esta disponivel para esta empresa.`);
+        throw new ForbiddenException(assignment?.note || decision.reason || `O módulo "${moduleCode}" não está disponível para esta empresa.`);
       }
     }
 

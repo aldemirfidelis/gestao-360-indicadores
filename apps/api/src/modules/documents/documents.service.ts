@@ -66,7 +66,7 @@ type LinkInput = {
   approverUserId?: string | null;
 };
 
-const DIRECT_STATUS_MESSAGE = 'Use as acoes de workflow para alterar o status do documento.';
+const DIRECT_STATUS_MESSAGE = 'Use as ações de workflow para alterar o status do documento.';
 
 const EDITABLE_STATUSES = new Set<DocumentStatus>([
   DocumentStatus.DRAFT,
@@ -199,7 +199,7 @@ export class DocumentsService {
 
   private requiredText(value: unknown, field: string) {
     const text = String(value ?? '').trim();
-    if (!text) throw new BadRequestException(`${field} e obrigatório.`);
+    if (!text) throw new BadRequestException(`${field} é obrigatório.`);
     return text;
   }
 
@@ -809,7 +809,7 @@ export class DocumentsService {
   }
 
   async create(me: AuthPayload, body: any) {
-    const title = this.requiredText(body?.title, 'Titulo');
+    const title = this.requiredText(body?.title, 'Título');
     const type = this.parseType(body?.type) ?? DocumentType.PROCEDURE;
     if (body?.status && this.parseStatus(body.status) !== DocumentStatus.DRAFT) {
       throw new BadRequestException(DIRECT_STATUS_MESSAGE);
@@ -988,7 +988,7 @@ export class DocumentsService {
     await this.assertWriteArea(me, links.area, 'edit');
 
     const data: any = { ...links.ids };
-    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Titulo');
+    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Título');
     if ('code' in (patch ?? {})) {
       const code = this.nullableText(patch.code);
       if (code && code !== before.code) {
@@ -1034,7 +1034,7 @@ export class DocumentsService {
     await this.assertWriteArea(me, this.areaOf(doc), 'delete');
     const removed = await this.prisma.$transaction(async (tx) => {
       const item = await tx.document.update({ where: { id }, data: { deletedAt: new Date() }, include: this.include() });
-      await this.auditTx(tx, me, doc.id, 'SOFT_DELETE', doc, { deletedAt: item.deletedAt }, 'Exclusao logica');
+      await this.auditTx(tx, me, doc.id, 'SOFT_DELETE', doc, { deletedAt: item.deletedAt }, 'Exclusão lógica');
       return item;
     });
     await this.traceability.record({
@@ -1044,7 +1044,7 @@ export class DocumentsService {
       eventType: TraceEventType.UPDATED,
       entityType: TraceEntityType.DOCUMENT,
       entityId: doc.id,
-      title: `Documento ${doc.code ?? `#${doc.number}`} excluido`,
+      title: `Documento ${doc.code ?? `#${doc.number}`} excluído`,
       description: doc.title,
       statusFrom: doc.status,
       statusTo: 'DELETED',
@@ -2302,7 +2302,7 @@ function renderDocxText(doc: any, revision: string) {
 function generatedDocumentBody(title: string, code: string, revision: string, description = '', content = '') {
   return [
     `Código: ${code}`,
-    `Titulo: ${title}`,
+    `Título: ${title}`,
     `Revisão: ${revision}`,
     `Data: ${new Date().toISOString().slice(0, 10)}`,
     '',

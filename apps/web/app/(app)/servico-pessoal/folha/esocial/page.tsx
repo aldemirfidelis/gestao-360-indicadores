@@ -238,7 +238,7 @@ export default function PayrollEsocialPage() {
   const createCertificate = useMutation({
     mutationFn: () => api<Certificate>('/payroll/digital-certificates', { method: 'POST', json: { ...certForm, storageMode: 'EXTERNAL_REF' } }),
     onSuccess: () => {
-      toast.success('Referencia de certificado cadastrada.');
+      toast.success('Referência de certificado cadastrada.');
       setCertOpen(false);
       setCertForm({ name: '', holderName: '', holderCpfCnpj: '', pfxSecretRef: '', passwordSecretRef: '', validUntil: '', notes: '' });
       void qc.invalidateQueries({ queryKey: ['payroll-digital-certificates'] });
@@ -249,7 +249,7 @@ export default function PayrollEsocialPage() {
   const testCertificate = useMutation({
     mutationFn: (id: string) => api<{ ok: boolean }>(`/payroll/digital-certificates/${id}/test`, { method: 'POST' }),
     onSuccess: (data) => {
-      toast[data.ok ? 'success' : 'warning'](data.ok ? 'Certificado validado.' : 'Certificado com pendencias.');
+      toast[data.ok ? 'success' : 'warning'](data.ok ? 'Certificado validado.' : 'Certificado com pendências.');
       void qc.invalidateQueries({ queryKey: ['payroll-digital-certificates'] });
     },
     onError: (err: any) => toast.error(err.message || 'Erro ao validar certificado.'),
@@ -336,7 +336,7 @@ export default function PayrollEsocialPage() {
 
       <PageHeader
         title="eSocial"
-        description="Eventos, lotes internos e referencias de certificado digital"
+        description="Eventos, lotes internos e referências de certificado digital"
         actions={
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline" className="h-9 gap-1 px-3">
@@ -386,7 +386,7 @@ export default function PayrollEsocialPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{certificates.length}</div>
-            <p className="mt-1 text-xs text-muted-foreground">Somente referencias externas</p>
+            <p className="mt-1 text-xs text-muted-foreground">Somente referências externas</p>
           </CardContent>
         </Card>
         <Card className="border-border/60">

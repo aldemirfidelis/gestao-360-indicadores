@@ -57,7 +57,7 @@ export class ProcessesService {
     if (!area) return;
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     if (permitted && !permitted.includes(area)) {
-      throw new ForbiddenException('Voce nao tem acesso aos processos desta area.');
+      throw new ForbiddenException('Você não tem acesso aos processos desta área.');
     }
   }
 
@@ -68,19 +68,19 @@ export class ProcessesService {
 
   private parseStatus(value?: string): ProcessStatus | undefined {
     if (!value) return undefined;
-    if (!Object.values(ProcessStatus).includes(value as ProcessStatus)) throw new BadRequestException('Status de processo invalido.');
+    if (!Object.values(ProcessStatus).includes(value as ProcessStatus)) throw new BadRequestException('Status de processo inválido.');
     return value as ProcessStatus;
   }
 
   private parseType(value?: string): ProcessType | undefined {
     if (!value) return undefined;
-    if (!Object.values(ProcessType).includes(value as ProcessType)) throw new BadRequestException('Tipo de processo invalido.');
+    if (!Object.values(ProcessType).includes(value as ProcessType)) throw new BadRequestException('Tipo de processo inválido.');
     return value as ProcessType;
   }
 
   private requiredText(value: unknown, field: string) {
     const text = String(value ?? '').trim();
-    if (!text) throw new BadRequestException(`${field} e obrigatorio.`);
+    if (!text) throw new BadRequestException(`${field} é obrigatório.`);
     return text;
   }
 
@@ -99,7 +99,7 @@ export class ProcessesService {
     if (value === undefined) return undefined;
     if (value === null || value === '') return null;
     const n = Number(value);
-    if (!Number.isFinite(n)) throw new BadRequestException('Valor numerico invalido.');
+    if (!Number.isFinite(n)) throw new BadRequestException('Valor numérico inválido.');
     return Math.max(min, Math.round(n));
   }
 
@@ -119,7 +119,7 @@ export class ProcessesService {
       where: { id, companyId, deletedAt: null },
       include: this.include(),
     });
-    if (!proc) throw new NotFoundException('Processo nao encontrado');
+    if (!proc) throw new NotFoundException('Processo não encontrado');
     return proc;
   }
 
@@ -129,7 +129,7 @@ export class ProcessesService {
       where: { id: stepId, process: { companyId, deletedAt: null } },
       include: { process: { include: { orgNode: { select: { id: true } }, indicator: { select: { ownerNodeId: true } } } } },
     });
-    if (!step) throw new NotFoundException('Etapa nao encontrada');
+    if (!step) throw new NotFoundException('Etapa não encontrada');
     return step;
   }
 
@@ -234,22 +234,22 @@ export class ProcessesService {
 
     if (ids.orgNodeId) {
       const orgNode = await this.prisma.orgNode.findFirst({ where: { id: ids.orgNodeId, companyId, deletedAt: null }, select: { id: true } });
-      if (!orgNode) throw new NotFoundException('Area ou processo nao encontrado');
+      if (!orgNode) throw new NotFoundException('Área ou processo não encontrado');
       areas.push(orgNode.id);
     }
     if (ids.indicatorId) {
       const indicator = await this.prisma.indicator.findFirst({ where: { id: ids.indicatorId, companyId, deletedAt: null }, select: { ownerNodeId: true } });
-      if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+      if (!indicator) throw new NotFoundException('Indicador não encontrado');
       if (indicator.ownerNodeId) areas.push(indicator.ownerNodeId);
     }
     if (ids.ownerUserId) {
       const user = await this.prisma.user.findFirst({ where: { id: ids.ownerUserId, companyId, deletedAt: null, active: true }, select: { id: true } });
-      if (!user) throw new NotFoundException('Dono do processo nao encontrado');
+      if (!user) throw new NotFoundException('Dono do processo não encontrado');
     }
 
     const uniqueAreas = Array.from(new Set(areas.filter(Boolean)));
     if (uniqueAreas.length > 1) {
-      throw new ConflictException('Vinculos do processo pertencem a areas diferentes.');
+      throw new ConflictException('Vínculos do processo pertencem a áreas diferentes.');
     }
     return { ids, area: uniqueAreas[0] ?? null };
   }
@@ -360,7 +360,7 @@ export class ProcessesService {
       eventType: TraceEventType.UPDATED,
       entityType: TraceEntityType.PROCESS,
       entityId: proc.id,
-      title: `Processo #${proc.number} excluido`,
+      title: `Processo #${proc.number} excluído`,
       description: proc.name,
       statusFrom: proc.status,
       statusTo: 'DELETED',

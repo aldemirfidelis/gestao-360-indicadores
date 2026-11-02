@@ -506,7 +506,7 @@ describe('FoodSafetyService - Fase 1 (programas/processos/etapas)', () => {
     const rows = await service.supplierScorecard(me);
     expect(rows[0].score).toBeLessThan(50);
     expect(rows[0].riskLevel).toBe('CRITICAL');
-    expect(rows[0].drivers).toContain('Revisao vencida');
+    expect(rows[0].drivers).toContain('Revisão vencida');
   });
 
   it('assistantInsights: gera recomendacao quando ha fornecedor critico', async () => {
@@ -578,7 +578,7 @@ describe('FoodSafetyService - Fase 1 (programas/processos/etapas)', () => {
     const { service } = makeService();
     await expect(
       service.createFlowTemplate(me, { name: 'X', steps: [{ name: 'Etapa', type: 'HACKED' }] }),
-    ).rejects.toThrow('Tipo de etapa invalido');
+    ).rejects.toThrow('Tipo de etapa inválido');
   });
 
   it('saveProcessAsFlowTemplate: snapshot das etapas do processo', async () => {
@@ -605,7 +605,7 @@ describe('FoodSafetyService - Fase 1 (programas/processos/etapas)', () => {
 
   it('saveProcessAsFlowTemplate: processo sem etapas -> BadRequest', async () => {
     const { service } = makeService({ process: { id: 'pr1', companyId: 'companyA', orgNodeId: null, name: 'Linha 1', steps: [] } });
-    await expect(service.saveProcessAsFlowTemplate(me, 'pr1', {})).rejects.toThrow('nao possui etapas');
+    await expect(service.saveProcessAsFlowTemplate(me, 'pr1', {})).rejects.toThrow('não possui etapas');
   });
 
   it('removeFlowTemplate: modelo de outra empresa -> NotFound', async () => {

@@ -37,7 +37,7 @@ export class PushService {
         this.logger.error({ event: 'vapid_setup_failed', error: err instanceof Error ? err.message : 'unknown' });
       }
     } else {
-      this.logger.warn('Web Push inativo: defina VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY para habilitar notificacoes push.');
+      this.logger.warn('Web Push inativo: defina VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY para habilitar notificações push.');
     }
   }
 

@@ -162,7 +162,7 @@ export class PrizeCalcService {
 
   async runV2(me: AuthPayload, competenceId: string, reason?: string) {
     const competence = await this.prisma.prizeCompetence.findFirst({ where: { id: competenceId, companyId: me.companyId } });
-    if (!competence) throw new NotFoundException('Competencia nao encontrada');
+    if (!competence) throw new NotFoundException('Competência não encontrada');
 
     const [
       snapshot,
@@ -205,13 +205,13 @@ export class PrizeCalcService {
       this.prisma.prizeProgram.findFirst({ where: { id: competence.programId } }),
     ]);
 
-    if (snapshot.length === 0) throw new BadRequestException('Importe a base elegivel (Apdata) antes de apurar');
+    if (snapshot.length === 0) throw new BadRequestException('Importe a base elegível (Apdata) antes de apurar');
 
     const groups = effectiveVersions.flatMap((version) =>
       version.ruleGroups.map((group) => ({ ...group, annexVersionId: version.id, annex: version.annex })),
     );
     if (groups.length === 0) {
-      throw new BadRequestException('Cadastre regras v2 em matriz para pelo menos um anexo vigente antes de rodar a apuracao do setor');
+      throw new BadRequestException('Cadastre regras v2 em matriz para pelo menos um anexo vigente antes de rodar a apuração do setor');
     }
 
     // Fallback hibrido: quando a combinacao nao tem parametro v2 para o mes,
@@ -345,7 +345,7 @@ export class PrizeCalcService {
         where: { id: run.id },
         data: { status: 'ERROR', errorsCount: 1, finishedAt: new Date(), params: { reason: 'NO_CELLS' } },
       });
-      throw new BadRequestException('As regras v2 nao geraram nenhuma celula area x cargo');
+      throw new BadRequestException('As regras v2 não geraram nenhuma célula área x cargo');
     }
     await this.prisma.prizeCellResult.createMany({ data: cellRows });
 
@@ -355,7 +355,7 @@ export class PrizeCalcService {
         data: { status: 'ERROR', errorsCount: pendingCells, finishedAt: new Date() },
       });
       await this.audit.log(me, { action: 'CALC_RUN_V2_BLOCKED', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { pendingCells } });
-      return { ...finished, pendingCells, blockedReason: 'Existem celulas com realizado, zero, meta ou faixas pendentes' };
+      return { ...finished, pendingCells, blockedReason: 'Existem células com realizado, zero, meta ou faixas pendentes' };
     }
 
     const unmatchedRows: Prisma.PrizeUnmatchedEmployeeCreateManyInput[] = [];
@@ -405,7 +405,7 @@ export class PrizeCalcService {
           positionRef: emp.positionRef,
           normalizedAreaKey: areaCandidates[0] ?? normalizeRuleKey(emp.areaRef),
           normalizedPositionKey: normalizedPositionKey || normalizeRuleKey(emp.positionRef),
-          reason: ambiguous ? 'Mais de uma combinacao area-cargo aplicavel' : 'Sem combinacao area-cargo aplicavel (fora do escopo da regua)',
+          reason: ambiguous ? 'Mais de uma combinação area-cargo aplicável' : 'Sem combinação area-cargo aplicável (fora do escopo da régua)',
         });
       }
     }
@@ -424,7 +424,7 @@ export class PrizeCalcService {
         data: { status: 'ERROR', totalEmployees: snapshot.length, errorsCount: ambiguousCount, finishedAt: new Date() },
       });
       await this.audit.log(me, { action: 'CALC_RUN_V2_BLOCKED', entityType: 'CALC_RUN', entityId: run.id, competenceId, after: { ambiguous: ambiguousCount, unmatched: unmatchedRows.length } });
-      return { ...finished, ambiguous: ambiguousCount, unmatched: unmatchedRows.length, blockedReason: `${ambiguousCount} colaborador(es) com mais de uma combinacao aplicavel (ambiguidade). Ajuste as combinacoes para que cada colaborador caia em apenas uma.` };
+      return { ...finished, ambiguous: ambiguousCount, unmatched: unmatchedRows.length, blockedReason: `${ambiguousCount} colaborador(es) com mais de uma combinação aplicável (ambiguidade). Ajuste as combinações para que cada colaborador caia em apenas uma.` };
     }
     const outOfScope = unmatchedRows.length; // 0 combinacoes — fora do escopo desta regua
 
@@ -449,7 +449,7 @@ export class PrizeCalcService {
           empEvents,
         );
         // match garante elegivel e nao bloqueado (os demais caem no continue acima).
-        const blockedReason = emp.blocked || !emp.eligible ? 'Colaborador bloqueado/nao elegivel' : null;
+        const blockedReason = emp.blocked || !emp.eligible ? 'Colaborador bloqueado/não elegível' : null;
 
         const out = computeV2Individual({
           registration: emp.registration,

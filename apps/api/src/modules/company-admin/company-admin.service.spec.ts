@@ -24,7 +24,7 @@ describe('CompanyAdminService - isolamento e minimizacao de dados', () => {
 
   it('recusa tabelas ou conjuntos fora do catalogo permitido', async () => {
     const service = new CompanyAdminService({} as any, { record: vi.fn() } as any);
-    await expect(service.list(me, 'InboundApiKey', { page: 1, pageSize: 25 })).rejects.toThrow('Conjunto de dados nao permitido');
+    await expect(service.list(me, 'InboundApiKey', { page: 1, pageSize: 25 })).rejects.toThrow('Conjunto de dados não permitido');
   });
 
   it('audita exportacao e nao inclui colunas sensiveis no CSV', async () => {

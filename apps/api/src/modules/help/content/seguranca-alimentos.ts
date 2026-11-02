@@ -11,7 +11,7 @@ export const segurancaAlimentos: HelpCatalogCategory = {
       slug: 'seguranca-alimentos-visao-geral',
       title: 'Segurança dos Alimentos: visão geral (FSMS/APPCC)',
       summary: 'O sistema de gestão de segurança de alimentos completo e integrado.',
-      tags: ['seguranca dos alimentos', 'fsms', 'appcc', 'haccp', 'iso 22000', 'alimentos'],
+      tags: ['segurança dos alimentos', 'fsms', 'appcc', 'haccp', 'iso 22000', 'alimentos'],
       body: `O módulo **Segurança dos Alimentos** é um FSMS (Sistema de Gestão de Segurança de Alimentos) completo, alinhado a ISO 22000 / FSSC 22000 / APPCC — para indústrias de alimentos e bebidas.
 
 ## O que cobre
@@ -54,7 +54,7 @@ As etapas do fluxograma são a base da **análise de perigos**: cada perigo é a
       slug: 'perigos-appcc-e-monitoramento',
       title: 'Perigos (APPCC) e monitoramento de PCC',
       summary: 'Análise de perigos, limites críticos e bloqueio automático de lote.',
-      tags: ['perigo', 'pcc', 'prp', 'oprp', 'monitoramento', 'limite critico', 'bloqueio de lote'],
+      tags: ['perigo', 'pcc', 'prp', 'oprp', 'monitoramento', 'limite crítico', 'bloqueio de lote'],
       body: `## Análise de perigos
 1. Configure a **matriz de risco** do programa.
 2. Cadastre os **perigos** por etapa do processo: categoria (**Biológico, Químico, Físico, Alergênico**), severidade × probabilidade (o sistema calcula índice e nível) e o **tipo de controle**: PRP, OPRP ou **PCC**.

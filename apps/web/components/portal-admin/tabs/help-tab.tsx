@@ -184,7 +184,7 @@ export function HelpTab() {
           </div>
           <div className="space-y-1.5 md:col-span-2">
             <Label>Tags</Label>
-            <Input value={form.tags} onChange={(e) => setForm((current) => ({ ...current, tags: e.target.value }))} placeholder="separadas por virgula" />
+            <Input value={form.tags} onChange={(e) => setForm((current) => ({ ...current, tags: e.target.value }))} placeholder="separadas por vírgula" />
           </div>
           <div className="space-y-1.5 md:col-span-2">
             <Label>Conteúdo</Label>

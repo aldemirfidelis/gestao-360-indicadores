@@ -409,7 +409,7 @@ export class IndicatorsService {
         },
       },
     });
-    if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+    if (!indicator) throw new NotFoundException('Indicador não encontrado');
     const area = deriveArea(indicator.ownerNode);
     const parentIndicator = indicator.childRelations?.[0]?.parent ?? null;
     const sharedAreas = (indicator.sharedAreas ?? []).map((link) => link.orgNode);
@@ -728,7 +728,7 @@ export class IndicatorsService {
   }
 
   async addRelation(parentId: string, childId: string, kind: string, weight: number) {
-    if (parentId === childId) throw new Error('Indicador nao pode se relacionar com ele mesmo');
+    if (parentId === childId) throw new Error('Indicador não pode se relacionar com ele mesmo');
     return this.prisma.indicatorTreeRelation.upsert({
       where: { parentId_childId: { parentId, childId } },
       create: { parentId, childId, kind: kind as any, weight },
@@ -830,7 +830,7 @@ export class IndicatorsService {
       where: { id: indicatorId },
       select: { periodicity: true, companyId: true },
     });
-    if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+    if (!indicator) throw new NotFoundException('Indicador não encontrado');
     const anchor = await this.periods.currentAnchorDate(indicator.companyId);
     const refs = lastNPeriodRefs(indicator.periodicity, points, anchor);
     const [targets, results] = await Promise.all([
@@ -901,7 +901,7 @@ export class IndicatorsService {
   }
 
   private async buildCreateData(companyId: string, input: IndicatorWriteInput): Promise<Prisma.IndicatorUncheckedCreateInput> {
-    const ownerNodeId = requiredString(input.ownerNodeId, 'Selecione a area micro ou estrutura responsável');
+    const ownerNodeId = requiredString(input.ownerNodeId, 'Selecione a área micro ou estrutura responsável');
     await this.validateLinks(companyId, {
       ownerNodeId,
       guidelineNodeId: cleanString(input.guidelineNodeId),
@@ -986,22 +986,22 @@ export class IndicatorsService {
   ) {
     if (links.ownerNodeId) {
       const node = await this.prisma.orgNode.findFirst({ where: { id: links.ownerNodeId, companyId, deletedAt: null }, select: { id: true } });
-      if (!node) throw new NotFoundException('Area responsável nao encontrada para a empresa');
+      if (!node) throw new NotFoundException('Área responsável não encontrada para a empresa');
     }
     if (links.guidelineNodeId) {
       const node = await this.prisma.orgNode.findFirst({ where: { id: links.guidelineNodeId, companyId, deletedAt: null }, select: { id: true } });
-      if (!node) throw new NotFoundException('Diretriz nao encontrada para a empresa');
+      if (!node) throw new NotFoundException('Diretriz não encontrada para a empresa');
     }
     for (const userId of [links.responsibleUserId, links.feederUserId].filter(Boolean) as string[]) {
       const user = await this.prisma.user.findFirst({ where: { id: userId, companyId, deletedAt: null }, select: { id: true } });
-      if (!user) throw new NotFoundException('Usuário responsável nao encontrado para a empresa');
+      if (!user) throw new NotFoundException('Usuário responsável não encontrado para a empresa');
     }
     if (links.strategicObjectiveId) {
       const objective = await this.prisma.strategicObjective.findFirst({
         where: { id: links.strategicObjectiveId, deletedAt: null, map: { companyId, deletedAt: null } },
         select: { id: true },
       });
-      if (!objective) throw new NotFoundException('Objetivo estratégico nao encontrado para a empresa');
+      if (!objective) throw new NotFoundException('Objetivo estratégico não encontrado para a empresa');
     }
   }
 
@@ -1016,7 +1016,7 @@ export class IndicatorsService {
 
   private async findIndicatorOrThrow(id: string) {
     const indicator = await this.prisma.indicator.findFirst({ where: { id, deletedAt: null } });
-    if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+    if (!indicator) throw new NotFoundException('Indicador não encontrado');
     return indicator;
   }
 
@@ -1028,7 +1028,7 @@ export class IndicatorsService {
         companyId: me.companyId,
       },
     });
-    if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+    if (!indicator) throw new NotFoundException('Indicador não encontrado');
     return indicator;
   }
 
@@ -1043,14 +1043,14 @@ export class IndicatorsService {
       return;
     }
     if (parentId === childId) {
-      throw new BadRequestException('Indicador macro nao pode ser ele mesmo.');
+      throw new BadRequestException('Indicador macro não pode ser ele mesmo.');
     }
     const parent = await tx.indicator.findFirst({
       where: { id: parentId, companyId, deletedAt: null },
       select: { id: true },
     });
     if (!parent) {
-      throw new NotFoundException('Indicador macro nao encontrado nesta empresa.');
+      throw new NotFoundException('Indicador macro não encontrado nesta empresa.');
     }
     await tx.indicatorTreeRelation.deleteMany({ where: { childId, NOT: { parentId } } });
     await tx.indicatorTreeRelation.upsert({
@@ -1149,7 +1149,7 @@ export class IndicatorsService {
       where: { id: indicatorId, companyId },
       select: { id: true },
     });
-    if (!ind) throw new NotFoundException('Indicador nao encontrado');
+    if (!ind) throw new NotFoundException('Indicador não encontrado');
   }
 
   async listResultNotes(companyId: string, indicatorId: string, periodRef: string) {
@@ -1175,7 +1175,7 @@ export class IndicatorsService {
     body: { fileName: string; mimeType?: string; dataBase64: string },
   ) {
     await this.assertIndicatorInCompany(me.companyId, indicatorId);
-    if (!body?.fileName || !body?.dataBase64) throw new BadRequestException('Arquivo invalido');
+    if (!body?.fileName || !body?.dataBase64) throw new BadRequestException('Arquivo inválido');
     // aceita data URL ("data:...;base64,XXXX") ou base64 puro
     const base64 = body.dataBase64.includes(',') ? body.dataBase64.split(',').pop()! : body.dataBase64;
     const buffer = Buffer.from(base64, 'base64');
@@ -1201,7 +1201,7 @@ export class IndicatorsService {
     const att = await this.prisma.indicatorResultAttachment.findFirst({
       where: { id: attachmentId, companyId },
     });
-    if (!att) throw new NotFoundException('Anexo nao encontrado');
+    if (!att) throw new NotFoundException('Anexo não encontrado');
     return {
       id: att.id,
       fileName: att.fileName,
@@ -1215,7 +1215,7 @@ export class IndicatorsService {
       where: { id: attachmentId, companyId },
       select: { id: true },
     });
-    if (!att) throw new NotFoundException('Anexo nao encontrado');
+    if (!att) throw new NotFoundException('Anexo não encontrado');
     await this.prisma.indicatorResultAttachment.delete({ where: { id: attachmentId } });
     return { ok: true };
   }
@@ -1223,7 +1223,7 @@ export class IndicatorsService {
   async addResultComment(me: AuthPayload, indicatorId: string, periodRef: string, body: { body: string }) {
     await this.assertIndicatorInCompany(me.companyId, indicatorId);
     const text = (body?.body ?? '').trim();
-    if (!text) throw new BadRequestException('Comentario vazio');
+    if (!text) throw new BadRequestException('Comentário vazio');
     return this.prisma.indicatorResultComment.create({
       data: {
         companyId: me.companyId,
@@ -1317,7 +1317,7 @@ function requiredNumber(value: unknown, message: string) {
 function optionalNumber(value: unknown, field: string) {
   if (value === undefined || value === null || value === '') return undefined;
   const number = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
-  if (!Number.isFinite(number)) throw new BadRequestException(`${field} deve ser numerico`);
+  if (!Number.isFinite(number)) throw new BadRequestException(`${field} deve ser numérico`);
   return number;
 }
 
@@ -1327,7 +1327,7 @@ function nullableNumber(value: unknown, field: string): number | null | undefine
   if (value === undefined) return undefined;
   if (value === null || value === '') return null;
   const number = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
-  if (!Number.isFinite(number)) throw new BadRequestException(`${field} deve ser numerico`);
+  if (!Number.isFinite(number)) throw new BadRequestException(`${field} deve ser numérico`);
   return number;
 }
 

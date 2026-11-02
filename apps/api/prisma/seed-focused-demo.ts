@@ -101,7 +101,7 @@ function isoWeek(d: Date): string {
 
 async function populate(prisma: Prisma.TransactionClient) {
   await prisma.$executeRaw`SELECT pg_advisory_xact_lock(360, 2026)`;
-  const candidates = await prisma.company.findMany({ where: { deletedAt: null, OR: [{ slug: PUBLIC_DEMO_COMPANY_SLUG }, { name: 'Empresa Demonstração' }, { name: 'Empresa Demonstracao' }] } });
+  const candidates = await prisma.company.findMany({ where: { deletedAt: null, OR: [{ slug: PUBLIC_DEMO_COMPANY_SLUG }, { name: 'Empresa Demonstração' }, { name: 'Empresa Demonstração' }] } });
   if (candidates.length > 1) throw new Error('Mais de uma empresa de demonstração: resolver o alvo antes de executar.');
   const demo = candidates[0] ?? await prisma.company.create({ data: { name: 'Empresa Demonstração', tradeName: 'Empresa Demonstração', slug: PUBLIC_DEMO_COMPANY_SLUG, notes: 'Empresa fictícia exclusiva para demonstração pública.' } });
   if (!/demonstra/i.test(demo.name)) throw new Error('Slug demo vinculado a empresa não demonstrativa.');
@@ -502,8 +502,8 @@ async function populate(prisma: Prisma.TransactionClient) {
     const ishikawa = await prisma.actionAnalysisSession.create({
       data: {
         actionId, method: 'ISHIKAWA', status: 'VALIDATED',
-        problem: 'Resultado do indicador abaixo da meta no periodo (demonstracao).',
-        rootCause: 'Falta de padronizacao na operacao somada a desgaste de equipamento critico.',
+        problem: 'Resultado do indicador abaixo da meta no período (demonstração).',
+        rootCause: 'Falta de padronização na operação somada a desgaste de equipamento crítico.',
         responsibleUserId: pick(userIds),
       },
       select: { id: true },
@@ -512,35 +512,35 @@ async function populate(prisma: Prisma.TransactionClient) {
       await prisma.actionIshikawaCause.create({
         data: {
           sessionId: ishikawa.id, category: cat, title: `Causa de ${cat}`,
-          description: `Causa potencial relacionada a ${cat.toLowerCase()} identificada no brainstorming (ficticia).`,
+          description: `Causa potencial relacionada a ${cat.toLowerCase()} identificada no brainstorming (fictícia).`,
           priority: pick(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const), impact: rint(2, 5), probability: rint(2, 5),
           status: pick(['DRAFT', 'CONFIRMED', 'DISCARDED'] as const), likelyRootCause: chance(0.3), responsibleUserId: pick(userIds),
         },
       });
     }
     const whys = await prisma.actionAnalysisSession.create({
-      data: { actionId, method: 'FIVE_WHYS', status: 'READY', problem: 'Por que o indicador ficou abaixo da meta no periodo?', responsibleUserId: pick(userIds) },
+      data: { actionId, method: 'FIVE_WHYS', status: 'READY', problem: 'Por que o indicador ficou abaixo da meta no período?', responsibleUserId: pick(userIds) },
       select: { id: true },
     });
     const whyQuestions = [
       'Por que o resultado ficou abaixo da meta?',
-      'Por que houve parada nao programada no equipamento?',
-      'Por que o equipamento falhou durante a operacao?',
-      'Por que a manutencao preventiva nao detectou o desgaste?',
-      'Por que o plano de manutencao estava desatualizado?',
+      'Por que houve parada não programada no equipamento?',
+      'Por que o equipamento falhou durante a operação?',
+      'Por que a manutenção preventiva não detectou o desgaste?',
+      'Por que o plano de manutenção estava desatualizado?',
     ];
     for (let p = 0; p < whyQuestions.length; p++) {
       await prisma.actionFiveWhy.create({
-        data: { sessionId: whys.id, position: p + 1, question: whyQuestions[p], answer: 'Resposta investigada com a equipe (ficticia para demonstracao).', isRootCause: p === whyQuestions.length - 1 },
+        data: { sessionId: whys.id, position: p + 1, question: whyQuestions[p], answer: 'Resposta investigada com a equipe (fictícia para demonstração).', isRootCause: p === whyQuestions.length - 1 },
       });
     }
     const pdca = await prisma.actionAnalysisSession.create({
-      data: { actionId, method: 'PDCA', status: 'IN_PROGRESS', problem: 'Ciclo de melhoria continua para recuperar o indicador.', responsibleUserId: pick(userIds) },
+      data: { actionId, method: 'PDCA', status: 'IN_PROGRESS', problem: 'Ciclo de melhoria contínua para recuperar o indicador.', responsibleUserId: pick(userIds) },
       select: { id: true },
     });
     const phases: [string, string, string][] = [
-      ['PLAN', 'Planejar', 'Definir metas, analisar causas e elaborar o plano de acao'],
-      ['DO', 'Executar', 'Implementar as acoes planejadas e treinar a equipe'],
+      ['PLAN', 'Planejar', 'Definir metas, analisar causas e elaborar o plano de ação'],
+      ['DO', 'Executar', 'Implementar as ações planejadas e treinar a equipe'],
       ['CHECK', 'Verificar', 'Avaliar os resultados versus as metas estabelecidas'],
       ['ACT', 'Agir', 'Padronizar o que funcionou ou corrigir o que desviou'],
     ];
@@ -548,7 +548,7 @@ async function populate(prisma: Prisma.TransactionClient) {
       const [phase, title, objective] = phases[pi];
       await prisma.actionPdcaStep.create({
         data: {
-          sessionId: pdca.id, phase, title, objective, description: 'Etapa do ciclo PDCA (ficticia para demonstracao).',
+          sessionId: pdca.id, phase, title, objective, description: 'Etapa do ciclo PDCA (fictícia para demonstração).',
           priority: 'MEDIUM', progress: pi === 0 ? 100 : pi === 1 ? 60 : 0,
           status: pi === 0 ? 'DONE' : pi === 1 ? 'IN_PROGRESS' : 'PENDING', responsibleUserId: pick(userIds),
         },
@@ -566,18 +566,18 @@ async function populate(prisma: Prisma.TransactionClient) {
   meetingStart.setHours(9, 0, 0, 0);
   const closedMeeting = await prisma.monthlyMeeting.create({
     data: {
-      companyId, title: `Reuniao Mensal de Resultados - ${meetingPeriod.periodRef}`, periodRef: meetingPeriod.periodRef,
+      companyId, title: `Reunião Mensal de Resultados - ${meetingPeriod.periodRef}`, periodRef: meetingPeriod.periodRef,
       cropSeason: `Exercício ${year}`, cycleName: 'Ciclo Mensal de Resultados', status: 'CLOSED', format: 'HYBRID',
-      startsAt: meetingStart, endsAt: new Date(meetingStart.getTime() + 3 * 3_600_000), location: 'Auditorio Central',
+      startsAt: meetingStart, endsAt: new Date(meetingStart.getTime() + 3 * 3_600_000), location: 'Auditório Central',
       responsibleUserId: demoUsers.find((u) => u.role === UserRoleEnum.DIRECTOR)?.id ?? pick(userIds),
       secretaryUserId: demoUsers.find((u) => u.role === UserRoleEnum.ANALYST)?.id ?? pick(userIds),
       followUpUserId: demoUsers.find((u) => u.role === UserRoleEnum.MANAGER)?.id ?? pick(userIds),
-      objective: 'Analisar criticamente os resultados do mes, tratar desvios e alinhar diretrizes com a diretoria.',
-      assumptions: 'Dados consolidados ate o fechamento do periodo. Metas conforme planejamento do exercicio.',
-      criticalRisks: 'Risco de parada nao programada na linha de producao; atraso de fornecedores afetando a producao.',
-      boardDirections: 'Priorizar disponibilidade de ativos e seguranca; manter investimento em manutencao preventiva.',
-      generalNotes: 'Reuniao conduzida com presenca da diretoria e gestores das areas industriais.',
-      keyMessage: 'Mes positivo em producao, com atencao redobrada para paradas nao programadas.',
+      objective: 'Analisar criticamente os resultados do mês, tratar desvios e alinhar diretrizes com a diretoria.',
+      assumptions: 'Dados consolidados até o fechamento do período. Metas conforme planejamento do exercício.',
+      criticalRisks: 'Risco de parada não programada na linha de produção; atraso de fornecedores afetando a produção.',
+      boardDirections: 'Priorizar disponibilidade de ativos e segurança; manter investimento em manutenção preventiva.',
+      generalNotes: 'Reunião conduzida com presença da diretoria e gestores das áreas industriais.',
+      keyMessage: 'Mês positivo em produção, com atenção redobrada para paradas não programadas.',
       nextMonthlyAt: new Date(meetingStart.getTime() + 30 * 86_400_000), nextWeeklyAt: new Date(meetingStart.getTime() + 7 * 86_400_000),
       closedAt: new Date(meetingStart.getTime() + 3 * 3_600_000), createdById: pick(userIds),
     },
@@ -590,7 +590,7 @@ async function populate(prisma: Prisma.TransactionClient) {
     const area = await prisma.monthlyMeetingArea.create({
       data: {
         meetingId: closedMeeting.id, orgNodeId, position: areaPos, readiness: 'VALIDATED', presenterUserId: pick(userIds),
-        areaKeyMessage: pick(['Area dentro das metas com pontos de atencao.', 'Resultados estaveis e plano de acao em curso.', 'Desvio tratado com acao corretiva definida.']),
+        areaKeyMessage: pick(['Área dentro das metas com pontos de atenção.', 'Resultados estáveis e plano de ação em curso.', 'Desvio tratado com ação corretiva definida.']),
         validatedById: pick(userIds), validatedAt: new Date(meetingStart.getTime() - rint(1, 5) * 86_400_000),
       },
       select: { id: true },
@@ -606,8 +606,8 @@ async function populate(prisma: Prisma.TransactionClient) {
           meetingId: closedMeeting.id, meetingAreaId: area.id, indicatorId: indId,
           target: targetByInd.get(indId) ?? null, current: r?.value ?? null, attainment: r?.attainment ?? null,
           deviationPct: r?.deviationPct ?? null, light, trend: pick(['UP', 'DOWN', 'STABLE']),
-          managerComment: critical ? 'Resultado abaixo da meta; desvio aberto e plano de acao em andamento.' : 'Resultado dentro do esperado para o periodo.',
-          executiveStatus: critical ? 'Requer atencao da diretoria' : 'Sob controle', isCritical: critical, showInPresentation: true,
+          managerComment: critical ? 'Resultado abaixo da meta; desvio aberto e plano de ação em andamento.' : 'Resultado dentro do esperado para o período.',
+          executiveStatus: critical ? 'Requer atenção da diretoria' : 'Sob controle', isCritical: critical, showInPresentation: true,
           financialImpact: critical ? round2(rfloat(10_000, 200_000)) : null, position: indPos,
           deviationId: critical && deviationIds.length ? pick(deviationIds) : null, actionPlanId: critical && actionIds.length ? pick(actionIds) : null,
         },
@@ -616,35 +616,35 @@ async function populate(prisma: Prisma.TransactionClient) {
     }
     areaPos += 1;
   }
-  const agendaTopics = ['Abertura e leitura da ata anterior', 'Resultados por area', 'Desvios criticos e planos de acao', 'Riscos e diretrizes da diretoria', 'Padronizacao e licoes aprendidas', 'Encerramento e proximos passos'];
+  const agendaTopics = ['Abertura e leitura da ata anterior', 'Resultados por área', 'Desvios críticos e planos de ação', 'Riscos e diretrizes da diretoria', 'Padronização e lições aprendidas', 'Encerramento e próximos passos'];
   for (let a = 0; a < agendaTopics.length; a++) {
     await prisma.monthlyMeetingAgendaItem.create({
-      data: { meetingId: closedMeeting.id, topic: agendaTopics[a], position: a, plannedMinutes: rint(10, 30), actualMinutes: rint(8, 35), presentationStatus: 'DISCUSSED', presenterUserId: pick(userIds), notes: chance(0.4) ? 'Discussao registrada em ata (ficticia).' : null },
+      data: { meetingId: closedMeeting.id, topic: agendaTopics[a], position: a, plannedMinutes: rint(10, 30), actualMinutes: rint(8, 35), presentationStatus: 'DISCUSSED', presenterUserId: pick(userIds), notes: chance(0.4) ? 'Discussão registrada em ata (fictícia).' : null },
     });
   }
   const decisionDefs: Array<{ kind: 'DECISION' | 'RISK' | 'ESCALATION' | 'PENDING'; description: string }> = [
-    { kind: 'DECISION', description: 'Aprovar a antecipacao da manutencao preventiva da linha de producao para reduzir paradas.' },
-    { kind: 'RISK', description: 'Monitorar risco de atraso de fornecedores que pode impactar a producao.' },
-    { kind: 'ESCALATION', description: 'Escalar para a diretoria a necessidade de contratacao de tecnicos de manutencao.' },
+    { kind: 'DECISION', description: 'Aprovar a antecipação da manutenção preventiva da linha de produção para reduzir paradas.' },
+    { kind: 'RISK', description: 'Monitorar risco de atraso de fornecedores que pode impactar a produção.' },
+    { kind: 'ESCALATION', description: 'Escalar para a diretoria a necessidade de contratação de técnicos de manutenção.' },
   ];
   for (const d of decisionDefs) {
     await prisma.monthlyMeetingDecision.create({
-      data: { meetingId: closedMeeting.id, kind: d.kind, topic: 'Resultados e riscos do mes', description: d.description, ownerName: randomName(), ownerUserId: pick(userIds), dueDate: new Date(meetingStart.getTime() + rint(7, 30) * 86_400_000), status: pick(['OPEN', 'IN_PROGRESS'] as const), actionPlanId: chance(0.5) && actionIds.length ? pick(actionIds) : null, createdById: pick(userIds) },
+      data: { meetingId: closedMeeting.id, kind: d.kind, topic: 'Resultados e riscos do mês', description: d.description, ownerName: randomName(), ownerUserId: pick(userIds), dueDate: new Date(meetingStart.getTime() + rint(7, 30) * 86_400_000), status: pick(['OPEN', 'IN_PROGRESS'] as const), actionPlanId: chance(0.5) && actionIds.length ? pick(actionIds) : null, createdById: pick(userIds) },
     });
   }
   for (let f = 0; f < 3; f++) {
     await prisma.monthlyMeetingFollowUp.create({
-      data: { meetingId: closedMeeting.id, level: pick(['WEEKLY', 'MONTHLY'] as const), title: pick(['Acompanhar plano de reducao de paradas', 'Verificar evolucao da eficiencia produtiva', 'Revisar indicadores de seguranca']), dueDate: new Date(meetingStart.getTime() + rint(7, 30) * 86_400_000), ownerUserId: pick(userIds), indicatorId: chance(0.7) ? pick(allIndIds) : null, actionPlanId: chance(0.5) ? pick(actionIds) : null, status: pick(['OPEN', 'IN_PROGRESS'] as const) },
+      data: { meetingId: closedMeeting.id, level: pick(['WEEKLY', 'MONTHLY'] as const), title: pick(['Acompanhar plano de redução de paradas', 'Verificar evolução da eficiência produtiva', 'Revisar indicadores de segurança']), dueDate: new Date(meetingStart.getTime() + rint(7, 30) * 86_400_000), ownerUserId: pick(userIds), indicatorId: chance(0.7) ? pick(allIndIds) : null, actionPlanId: chance(0.5) ? pick(actionIds) : null, status: pick(['OPEN', 'IN_PROGRESS'] as const) },
     });
   }
   for (let l = 0; l < 2; l++) {
     await prisma.monthlyMeetingLearning.create({
-      data: { meetingId: closedMeeting.id, orgNodeId: pick(meetingAreaIds), indicatorId: chance(0.6) ? pick(allIndIds) : null, learning: pick(['A inspecao preditiva reduziu paradas na linha de producao.', 'O checklist de partida da linha evitou retrabalho.']), treatedCause: 'Falha de manutencao preventiva', effectiveAction: 'Revisao do plano de manutencao com periodicidade ajustada', replicateToNodeId: chance(0.5) ? pick(meetingAreaIds) : null, ownerUserId: pick(userIds), status: 'OPEN' },
+      data: { meetingId: closedMeeting.id, orgNodeId: pick(meetingAreaIds), indicatorId: chance(0.6) ? pick(allIndIds) : null, learning: pick(['A inspeção preditiva reduziu paradas na linha de produção.', 'O checklist de partida da linha evitou retrabalho.']), treatedCause: 'Falha de manutenção preventiva', effectiveAction: 'Revisão do plano de manutenção com periodicidade ajustada', replicateToNodeId: chance(0.5) ? pick(meetingAreaIds) : null, ownerUserId: pick(userIds), status: 'OPEN' },
     });
   }
   const stdDefs: Array<{ type: 'POP' | 'CHECKLIST' | 'TRAINING'; description: string }> = [
-    { type: 'POP', description: 'Padronizar o procedimento de partida da linha de producao (POP) com base na licao aprendida.' },
-    { type: 'CHECKLIST', description: 'Criar checklist de inspecao preditiva dos equipamentos para todas as unidades.' },
+    { type: 'POP', description: 'Padronizar o procedimento de partida da linha de produção (POP) com base na lição aprendida.' },
+    { type: 'CHECKLIST', description: 'Criar checklist de inspeção preditiva dos equipamentos para todas as unidades.' },
   ];
   for (const s of stdDefs) {
     await prisma.monthlyMeetingStandardization.create({
@@ -656,7 +656,7 @@ async function populate(prisma: Prisma.TransactionClient) {
       data: { meetingId: closedMeeting.id, userId: u.id, role: u.role === UserRoleEnum.DIRECTOR ? 'RESPONSIBLE' : u.role === UserRoleEnum.ANALYST ? 'EXECUTOR' : 'PARTICIPANT', attended: chance(0.9) },
     });
   }
-  const checklistItems = ['Resultados consolidados e validados', 'Desvios criticos com plano de acao', 'Atas anteriores revisadas', 'Apresentacoes das areas prontas', 'Diretrizes da diretoria registradas'];
+  const checklistItems = ['Resultados consolidados e validados', 'Desvios críticos com plano de ação', 'Atas anteriores revisadas', 'Apresentações das áreas prontas', 'Diretrizes da diretoria registradas'];
   for (const label of checklistItems) {
     await prisma.monthlyMeetingChecklistItem.create({ data: { meetingId: closedMeeting.id, label, done: chance(0.8), severity: pick(['INFO', 'WARNING']) } });
   }
@@ -664,11 +664,11 @@ async function populate(prisma: Prisma.TransactionClient) {
   const currentPeriod = months[months.length - 1];
   const preparingMeeting = await prisma.monthlyMeeting.create({
     data: {
-      companyId, title: `Reuniao Mensal de Resultados - ${currentPeriod.periodRef}`, periodRef: currentPeriod.periodRef,
+      companyId, title: `Reunião Mensal de Resultados - ${currentPeriod.periodRef}`, periodRef: currentPeriod.periodRef,
       cropSeason: `Exercício ${year}`, cycleName: 'Ciclo Mensal de Resultados', status: 'PREPARING', format: 'HYBRID',
-      startsAt: new Date(Date.now() + rint(3, 12) * 86_400_000), location: 'Auditorio Central',
+      startsAt: new Date(Date.now() + rint(3, 12) * 86_400_000), location: 'Auditório Central',
       responsibleUserId: pick(userIds), secretaryUserId: pick(userIds),
-      objective: 'Preparar a analise critica dos resultados do mes corrente.', createdById: pick(userIds),
+      objective: 'Preparar a análise crítica dos resultados do mês corrente.', createdById: pick(userIds),
     },
     select: { id: true },
   });
@@ -761,9 +761,9 @@ async function populatePrize(prisma: Prisma.TransactionClient, companyId: string
   const indicator = await prisma.prizeIndicator.create({ data: { companyId, programId: program.id, annexVersionId: version.id, code: 'FD-OEE', name: 'Eficiência da produção', unit: '%', weight: 100, direction: 'HIGHER_BETTER', platformIndicatorId, orgNodeId: areaId } });
   await prisma.prizeIndicatorRange.createMany({ data: [ { indicatorId: indicator.id, orderIndex: 0, minLimit: 0, maxLimit: 79.99, gainPercent: 0 }, { indicatorId: indicator.id, orderIndex: 1, minLimit: 80, maxLimit: 89.99, gainPercent: 70 }, { indicatorId: indicator.id, orderIndex: 2, minLimit: 90, maxLimit: 100, gainPercent: 100 } ] });
   const areaRef = await prisma.prizeOrgRef.upsert({ where: { companyId_normalizedKey: { companyId, normalizedKey: 'producao' } }, update: {}, create: { companyId, code: 36001, name: 'Produção', normalizedKey: 'producao', source: 'DEMO', createdById: actor } });
-  const cargoRef = await prisma.prizeCargoRef.upsert({ where: { companyId_normalizedKey: { companyId, normalizedKey: 'equipe de producao' } }, update: {}, create: { companyId, code: 36001, name: 'Equipe de Produção', normalizedKey: 'equipe de producao', source: 'DEMO', createdById: actor } });
+  const cargoRef = await prisma.prizeCargoRef.upsert({ where: { companyId_normalizedKey: { companyId, normalizedKey: 'equipe de produção' } }, update: {}, create: { companyId, code: 36001, name: 'Equipe de Produção', normalizedKey: 'equipe de produção', source: 'DEMO', createdById: actor } });
   const catalog = await prisma.prizeIndicatorCatalog.create({ data: { companyId, code: 'FD-OEE', name: 'Eficiência da produção', unit: '%', platformIndicatorId, source: 'MANUAL', createdById: actor } });
-  const group = await prisma.prizeRuleGroup.create({ data: { companyId, annexVersionId: version.id, name: 'Equipe de Produção', areaRefs: ['Produção'], positionRefs: ['Equipe de Produção'], normalizedAreaKeys: ['producao'], normalizedPositionKeys: ['equipe de producao'], areaRefIds: [areaRef.id], cargoRefIds: [cargoRef.id], salaryPercent: 30, createdById: actor } });
+  const group = await prisma.prizeRuleGroup.create({ data: { companyId, annexVersionId: version.id, name: 'Equipe de Produção', areaRefs: ['Produção'], positionRefs: ['Equipe de Produção'], normalizedAreaKeys: ['producao'], normalizedPositionKeys: ['equipe de produção'], areaRefIds: [areaRef.id], cargoRefIds: [cargoRef.id], salaryPercent: 30, createdById: actor } });
   const rule = await prisma.prizeRuleIndicator.create({ data: { companyId, groupId: group.id, catalogId: catalog.id, weight: 100, createdById: actor } });
   for (let offset=2;offset>=0;offset--) {
     const date=new Date(year,month-1-offset,1), y=date.getFullYear(), m=date.getMonth()+1, label=date.toISOString().slice(0,7);
@@ -775,7 +775,7 @@ async function populatePrize(prisma: Prisma.TransactionClient, companyId: string
     await prisma.prizeCatalogActualResult.create({ data: { companyId, competenceId: competence.id, catalogId: catalog.id, year: y, month: m, realized: 95, status: 'CLOSED', closedAt: new Date(), closedById: actor, createdById: actor } });
     await prisma.prizeManualAdjustment.create({ data: { companyId, competenceId: competence.id, registration: 'FD-002', field: 'FINAL_VALUE', previousValue: '1200', newValue: '1080', amount: -120, reason: 'Ajuste fictício de proporcionalidade, refletido na memória.', status: 'APPROVED', requestedById: actor, decidedById: actor, decidedAt: new Date() } });
     const run=await prisma.prizeCalculationRun.create({ data: { companyId, competenceId:competence.id, version:1, status:'SUCCESS', engineVersion:'demo-snapshot-v1', totalEmployees:3, totalGross:3600, totalReductions:120, totalFinal:3480, createdById:actor, finishedAt:new Date(), reason:'Apuração fictícia para exploração da demonstração.' } });
-    await prisma.prizeCellResult.create({ data: { companyId, runId: run.id, competenceId: competence.id, groupId: group.id, annexVersionId: version.id, areaRef: 'Produção', positionRef: 'Equipe de Produção', normalizedAreaKey: 'producao', normalizedPositionKey: 'equipe de producao', possibleSalaryPercent: 30, achievedSalaryPercent: 30, weightedGainPercent: 100, details: { demo: true, indicator: 'FD-OEE', realized: 95 } } });
+    await prisma.prizeCellResult.create({ data: { companyId, runId: run.id, competenceId: competence.id, groupId: group.id, annexVersionId: version.id, areaRef: 'Produção', positionRef: 'Equipe de Produção', normalizedAreaKey: 'producao', normalizedPositionKey: 'equipe de produção', possibleSalaryPercent: 30, achievedSalaryPercent: 30, weightedGainPercent: 100, details: { demo: true, indicator: 'FD-OEE', realized: 95 } } });
     const batch=await prisma.prizePayrollBatch.create({ data: { companyId, competenceId:competence.id, runId:run.id, code:'FD-'+label, rubric:'PREMIO-DEMO', status:'RECONCILED', totalItems:3, totalValue:3480, generatedAt:new Date(), createdById:actor } });
     for(let i=0;i<3;i++) {
       const registration='FD-00'+(i+1), name=['Ana Exemplo','Bruno Exemplo','Carla Exemplo'][i], reduction=i===1?120:0, finalValue=1200-reduction;

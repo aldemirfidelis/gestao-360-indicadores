@@ -36,7 +36,7 @@ interface Overview {
 
 const CSV_REPORTS = [
   { key: 'indicators', label: 'Relatório por indicador', description: 'Catálogo completo com último realizado.', url: '/reports/indicators.csv' },
-  { key: 'results', label: 'Histórico de lançamentos', description: 'Realizados, farois, metas e atingimento.', url: '/reports/results.csv' },
+  { key: 'results', label: 'Histórico de lançamentos', description: 'Realizados, faróis, metas e atingimento.', url: '/reports/results.csv' },
   { key: 'actions', label: 'Planos de ação', description: 'Status, prazos, responsáveis e prioridades.', url: '/reports/actions.csv' },
   { key: 'deviations', label: 'Não conformidades', description: 'Severidade, planos, prazos e histórico.', url: '/reports/deviations.csv' },
 ];
@@ -99,7 +99,7 @@ export default function ReportsPage() {
         ['Em atenção', String(o.counts.YELLOW)],
         ['Fora da meta', String(o.counts.RED)],
         ['Sem dados', String(o.counts.GRAY)],
-        ['Atingimento medio', formatPercent(o.generalAttainment ?? 0)],
+        ['Atingimento médio', formatPercent(o.generalAttainment ?? 0)],
         ['Ações em aberto', String(o.openActions)],
         ['Ações atrasadas', String(o.overdueActions)],
         ['Desvios críticos', String(o.criticalDeviations)],
@@ -163,7 +163,7 @@ export default function ReportsPage() {
 
       <FilterBar
         actions={
-          <Button variant="outline" size="sm" disabled title="Filtros salvos serão ativados quando houver persistencia configurada.">
+          <Button variant="outline" size="sm" disabled title="Filtros salvos serão ativados quando houver persistência configurada.">
             <Save className="mr-2 h-4 w-4" />
             Salvar filtro
           </Button>

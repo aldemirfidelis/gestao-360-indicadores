@@ -140,7 +140,7 @@ export class StrategyService {
         },
       },
     });
-    if (!map) throw new NotFoundException('Mapa nao encontrado');
+    if (!map) throw new NotFoundException('Mapa não encontrado');
 
     const objectiveIndicatorIds = map.objectives.flatMap((obj) => uniqueIndicators(obj, map.companyId).map((indicator) => indicator.id));
     const [actionCounts, treatmentCounts, deviationCounts, actionDetails, projectCounts] = await Promise.all([
@@ -318,7 +318,7 @@ export class StrategyService {
         },
       },
     });
-    if (!source) throw new NotFoundException('Mapa nao encontrado');
+    if (!source) throw new NotFoundException('Mapa não encontrado');
 
     return this.prisma.$transaction(async (tx) => {
       const newMap = await tx.strategicMap.create({
@@ -428,7 +428,7 @@ export class StrategyService {
   }
 
   async createMap(me: AuthPayload, body: MapBody) {
-    if (!body.name?.trim()) throw new BadRequestException('Nome do mapa e obrigatorio');
+    if (!body.name?.trim()) throw new BadRequestException('Nome do mapa é obrigatório');
     const created = await this.prisma.strategicMap.create({
       data: {
         companyId: me.companyId,
@@ -474,7 +474,7 @@ export class StrategyService {
 
   async addPerspective(me: AuthPayload, mapId: string, body: PerspectiveBody) {
     await this.getMapRecord(me.companyId, mapId);
-    if (!body.name?.trim()) throw new BadRequestException('Nome da perspectiva e obrigatorio');
+    if (!body.name?.trim()) throw new BadRequestException('Nome da perspectiva é obrigatório');
     await this.assertPerspectiveNameAvailable(mapId, body.name);
     const count = await this.prisma.perspective.count({ where: { mapId, deletedAt: null } });
     const created = await this.prisma.perspective.create({
@@ -542,14 +542,14 @@ export class StrategyService {
     const existing = await this.prisma.perspective.findMany({ where: { mapId, id: { in: ids }, deletedAt: null }, select: { id: true } });
     if (existing.length !== ids.length) throw new BadRequestException('Lista de perspectivas inválida');
     await this.prisma.$transaction(ids.map((id, index) => this.prisma.perspective.update({ where: { id }, data: { position: index, updatedById: me.sub } })));
-    await this.audit(me, 'REORDER', 'Perspective', mapId, null, { ids }, 'Reordenacao de perspectivas');
+    await this.audit(me, 'REORDER', 'Perspective', mapId, null, { ids }, 'Reordenação de perspectivas');
     return { ok: true };
   }
 
   async addObjective(me: AuthPayload, mapId: string, body: ObjectiveBody) {
     await this.getMapRecord(me.companyId, mapId);
-    if (!body.perspectiveId) throw new BadRequestException('Perspectiva e obrigatoria');
-    if (!body.name?.trim()) throw new BadRequestException('Nome do objetivo e obrigatorio');
+    if (!body.perspectiveId) throw new BadRequestException('Perspectiva é obrigatória');
+    if (!body.name?.trim()) throw new BadRequestException('Nome do objetivo é obrigatório');
     await this.assertPerspectiveInMap(mapId, body.perspectiveId);
     await this.assertUserInCompany(me.companyId, body.responsibleUserId);
     await this.assertOrgNodeInCompany(me.companyId, body.ownerNodeId);
@@ -640,13 +640,13 @@ export class StrategyService {
           select: { id: true, perspectiveId: true, positionX: true, positionY: true, position: true, width: true, height: true },
         })
       : [];
-    if (objectives.length !== nodes.length) throw new BadRequestException('Layout contem objetivos inválidos');
+    if (objectives.length !== nodes.length) throw new BadRequestException('Layout contém objetivos inválidos');
     // Arrastar um objetivo para outra faixa troca a perspectiva dele: destino e
     // faixas gravadas precisam ser perspectivas deste mapa.
     const perspectiveIds = [...new Set([...nodes.flatMap((node) => (node.perspectiveId ? [node.perspectiveId] : [])), ...lanes.map((lane) => lane.id)])];
     if (perspectiveIds.length) {
       const found = await this.prisma.perspective.count({ where: { mapId, id: { in: perspectiveIds }, deletedAt: null } });
-      if (found !== perspectiveIds.length) throw new BadRequestException('Layout contem perspectivas inválidas');
+      if (found !== perspectiveIds.length) throw new BadRequestException('Layout contém perspectivas inválidas');
     }
     const before = objectives;
     await this.prisma.$transaction([
@@ -692,7 +692,7 @@ export class StrategyService {
   }
 
   async addRelation(me: AuthPayload, body: RelationBody) {
-    if (!body.fromId || !body.toId) throw new BadRequestException('Objetivos origem e destino sao obrigatorios');
+    if (!body.fromId || !body.toId) throw new BadRequestException('Objetivos origem e destino são obrigatórios');
     if (body.fromId === body.toId) throw new BadRequestException('Objetivo origem e destino devem ser diferentes');
     const [from, to] = await Promise.all([
       this.getObjectiveRecord(me.companyId, body.fromId),
@@ -734,7 +734,7 @@ export class StrategyService {
         active: body.active,
       },
     });
-    await this.audit(me, 'UPDATE', 'ObjectiveRelation', id, before, updated, updated.label ?? 'Ligacao estratégica');
+    await this.audit(me, 'UPDATE', 'ObjectiveRelation', id, before, updated, updated.label ?? 'Ligação estratégica');
     return updated;
   }
 
@@ -744,7 +744,7 @@ export class StrategyService {
       where: { id },
       data: { active: false, deletedAt: new Date() },
     });
-    await this.audit(me, 'LINK_REMOVED', 'ObjectiveRelation', id, before, updated, before.label ?? 'Ligacao estratégica');
+    await this.audit(me, 'LINK_REMOVED', 'ObjectiveRelation', id, before, updated, before.label ?? 'Ligação estratégica');
     return updated;
   }
 
@@ -776,7 +776,7 @@ export class StrategyService {
     if (indicator?.strategicObjectiveId === objectiveId) {
       await this.prisma.indicator.update({ where: { id: indicatorId }, data: { strategicObjectiveId: null } });
     }
-    await this.audit(me, 'INDICATOR_UNLINKED', 'StrategicObjectiveIndicator', updated.id, before, updated, 'Remocao de indicador');
+    await this.audit(me, 'INDICATOR_UNLINKED', 'StrategicObjectiveIndicator', updated.id, before, updated, 'Remoção de indicador');
     return updated;
   }
 
@@ -812,7 +812,7 @@ export class StrategyService {
       where: { objectiveId_orgNodeId_kind: { objectiveId, orgNodeId, kind } },
       data: { deletedAt: new Date() },
     });
-    await this.audit(me, 'ORG_UNLINKED', 'StrategicObjectiveOrgNode', updated.id, before, updated, 'Remocao de estrutura');
+    await this.audit(me, 'ORG_UNLINKED', 'StrategicObjectiveOrgNode', updated.id, before, updated, 'Remoção de estrutura');
     return updated;
   }
 
@@ -885,7 +885,7 @@ export class StrategyService {
       where: { companyId: me.companyId, id: { in: orgNodeIds }, deletedAt: null },
       select: { id: true },
     });
-    if (nodes.length !== uniqueIds(orgNodeIds).length) throw new BadRequestException('Lista de areas/setores inválida');
+    if (nodes.length !== uniqueIds(orgNodeIds).length) throw new BadRequestException('Lista de áreas/setores inválida');
     const before = await this.prisma.strategicObjectiveOrgNode.findMany({ where: { objectiveId, deletedAt: null } });
     const ids = uniqueIds(orgNodeIds);
     await this.prisma.$transaction([
@@ -906,13 +906,13 @@ export class StrategyService {
 
   private async getMapRecord(companyId: string, id: string) {
     const map = await this.prisma.strategicMap.findFirst({ where: { id, companyId, deletedAt: null } });
-    if (!map) throw new NotFoundException('Mapa nao encontrado');
+    if (!map) throw new NotFoundException('Mapa não encontrado');
     return map;
   }
 
   private async getPerspectiveRecord(companyId: string, id: string) {
     const perspective = await this.prisma.perspective.findFirst({ where: { id, map: { companyId, deletedAt: null }, deletedAt: null } });
-    if (!perspective) throw new NotFoundException('Perspectiva nao encontrada');
+    if (!perspective) throw new NotFoundException('Perspectiva não encontrada');
     return perspective;
   }
 
@@ -925,7 +925,7 @@ export class StrategyService {
         orgNodeLinks: { where: { deletedAt: null }, select: { orgNodeId: true, kind: true } },
       },
     });
-    if (!objective) throw new NotFoundException('Objetivo estratégico nao encontrado');
+    if (!objective) throw new NotFoundException('Objetivo estratégico não encontrado');
     return objective;
   }
 
@@ -934,13 +934,13 @@ export class StrategyService {
       where: { id, from: { map: { companyId, deletedAt: null } }, deletedAt: null },
       include: { from: { select: { id: true, name: true, mapId: true } }, to: { select: { id: true, name: true, mapId: true } } },
     });
-    if (!relation) throw new NotFoundException('Ligacao estratégica nao encontrada');
+    if (!relation) throw new NotFoundException('Ligação estratégica não encontrada');
     return relation;
   }
 
   private async assertPerspectiveInMap(mapId: string, perspectiveId: string) {
     const exists = await this.prisma.perspective.count({ where: { id: perspectiveId, mapId, deletedAt: null, active: true } });
-    if (!exists) throw new NotFoundException('Perspectiva nao encontrada para este mapa');
+    if (!exists) throw new NotFoundException('Perspectiva não encontrada para este mapa');
   }
 
   private async assertPerspectiveNameAvailable(mapId: string, name: string, ignoreId?: string) {
@@ -954,25 +954,25 @@ export class StrategyService {
   private async assertIndicatorInCompany(companyId: string, id?: string | null) {
     if (!id) return;
     const exists = await this.prisma.indicator.count({ where: { id, companyId, deletedAt: null } });
-    if (!exists) throw new NotFoundException('Indicador nao encontrado para esta empresa');
+    if (!exists) throw new NotFoundException('Indicador não encontrado para esta empresa');
   }
 
   private async assertOrgNodeInCompany(companyId: string, id?: string | null) {
     if (!id) return;
     const exists = await this.prisma.orgNode.count({ where: { id, companyId, deletedAt: null } });
-    if (!exists) throw new NotFoundException('Area, setor ou processo nao encontrado para esta empresa');
+    if (!exists) throw new NotFoundException('Área, setor ou processo não encontrado para esta empresa');
   }
 
   private async assertOrgJobInCompany(companyId: string, id?: string | null) {
     if (!id) return;
     const exists = await this.prisma.orgJob.count({ where: { id, companyId } });
-    if (!exists) throw new NotFoundException('Cargo nao encontrado para esta empresa');
+    if (!exists) throw new NotFoundException('Cargo não encontrado para esta empresa');
   }
 
   private async assertUserInCompany(companyId: string, id?: string | null) {
     if (!id) return;
     const exists = await this.prisma.user.count({ where: { id, companyId, deletedAt: null } });
-    if (!exists) throw new NotFoundException('Responsável nao encontrado para esta empresa');
+    if (!exists) throw new NotFoundException('Responsável não encontrado para esta empresa');
   }
 
   async getOrganograma(companyId: string) {
@@ -1001,7 +1001,7 @@ export class StrategyService {
 
       await Promise.all([
         this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Victor Rafael de Assis Claudino', jobId: gPessoas.id, registrationId: '945870', band: 'A', shift: 'D', isBudgeted: true } }),
-        this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Marcos Dias Moreira Junior', jobId: gAdmPl.id, registrationId: '943914', band: 'B', shift: 'D', isBudgeted: true } }),
+        this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Marcos Dias Moreira Júnior', jobId: gAdmPl.id, registrationId: '943914', band: 'B', shift: 'D', isBudgeted: true } }),
         this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Jailson Moreira Pimentel', jobId: gAdmJr.id, registrationId: '945951', band: 'A', shift: 'A', isBudgeted: true } }),
         this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Ana Paula Rodrigues', jobId: coordSr.id, registrationId: '926331', band: 'C', shift: 'D', isBudgeted: true } }),
         this.prisma.orgEmployee.create({ data: { companyId, orgNodeId: nodeId, name: 'Aline Jeronimo de Lima', jobId: coordSr.id, registrationId: '947296', band: 'B', shift: 'D', isBudgeted: true } }),
@@ -1097,7 +1097,7 @@ export class StrategyService {
     const requestedOrgNodeName = body.orgNodeName?.trim();
     if (!finalOrgNodeId && requestedOrgNodeName) {
       if (normalizeOrgNodeName(requestedOrgNodeName) === 'area nao classificada') {
-        throw new ConflictException('Area nao classificada nao pode ser criada automaticamente. Selecione um setor real da estrutura.');
+        throw new ConflictException('Área não classificada não pode ser criada automaticamente. Selecione um setor real da estrutura.');
       }
       const existing = await this.prisma.orgNode.findFirst({
         where: {
@@ -1157,7 +1157,7 @@ export class StrategyService {
     const before = await this.prisma.orgEmployee.findFirst({
       where: { id, companyId: me.companyId },
     });
-    if (!before) throw new NotFoundException('Colaborador nao encontrado');
+    if (!before) throw new NotFoundException('Colaborador não encontrado');
     if (body.orgNodeId) await this.assertOrgNodeInCompany(me.companyId, body.orgNodeId);
     if (body.jobId) await this.assertOrgJobInCompany(me.companyId, body.jobId);
     if (body.jobPretendedId) await this.assertOrgJobInCompany(me.companyId, body.jobPretendedId);
@@ -1294,17 +1294,17 @@ export class StrategyService {
       where: { id: body.employeeId, companyId: me.companyId },
       include: { job: true, jobPretended: true },
     });
-    if (!employee) throw new NotFoundException('Colaborador nao encontrado');
+    if (!employee) throw new NotFoundException('Colaborador não encontrado');
     const approver = await this.prisma.user.findFirst({
       where: { id: body.approverId, companyId: me.companyId, deletedAt: null, role: { in: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'DIRECTOR', 'MANAGER'] } },
       select: { id: true },
     });
-    if (!approver) throw new NotFoundException('Aprovador invalido (precisa ser ADMIN/MANAGER)');
+    if (!approver) throw new NotFoundException('Aprovador inválido (precisa ser ADMIN/MANAGER)');
 
     const existingPending = await this.prisma.orgJobApprovalRequest.findFirst({
       where: { employeeId: body.employeeId, status: 'PENDING' },
     });
-    if (existingPending) throw new ConflictException('Ja existe uma solicitacao pendente para este colaborador');
+    if (existingPending) throw new ConflictException('Já existe uma solicitação pendente para este colaborador');
 
     const targetJobId = body.targetJobId ?? employee.jobPretendedId ?? employee.jobId;
     const targetBand = body.targetBand ?? employee.bandPretended ?? employee.band;
@@ -1338,9 +1338,9 @@ export class StrategyService {
       where: { id, companyId: me.companyId },
       include: { employee: true },
     });
-    if (!request) throw new NotFoundException('Solicitacao nao encontrada');
-    if (request.approverId !== me.sub) throw new ConflictException('Apenas o aprovador designado pode decidir esta solicitacao');
-    if (request.status !== 'PENDING') throw new ConflictException('Esta solicitacao ja foi decidida');
+    if (!request) throw new NotFoundException('Solicitação não encontrada');
+    if (request.approverId !== me.sub) throw new ConflictException('Apenas o aprovador designado pode decidir esta solicitação');
+    if (request.status !== 'PENDING') throw new ConflictException('Esta solicitação já foi decidida');
 
     const updated = await this.prisma.orgJobApprovalRequest.update({
       where: { id },
@@ -1377,9 +1377,9 @@ export class StrategyService {
     const request = await this.prisma.orgJobApprovalRequest.findFirst({
       where: { id, companyId: me.companyId },
     });
-    if (!request) throw new NotFoundException('Solicitacao nao encontrada');
+    if (!request) throw new NotFoundException('Solicitação não encontrada');
     if (request.requesterId !== me.sub) throw new ConflictException('Apenas o solicitante pode cancelar');
-    if (request.status !== 'PENDING') throw new ConflictException('Apenas solicitacoes pendentes podem ser canceladas');
+    if (request.status !== 'PENDING') throw new ConflictException('Apenas solicitações pendentes podem ser canceladas');
 
     const updated = await this.prisma.orgJobApprovalRequest.update({
       where: { id },

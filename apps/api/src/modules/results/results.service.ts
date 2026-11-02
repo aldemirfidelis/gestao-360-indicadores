@@ -166,7 +166,7 @@ export class ResultsService {
         ownerNode: { select: { id: true, name: true } },
       },
     });
-    if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+    if (!indicator) throw new NotFoundException('Indicador não encontrado');
     // Restrição por área (leitura): bloqueia acesso direto a indicador de área não permitida.
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     if (permitted && indicator.ownerNodeId && !permitted.includes(indicator.ownerNodeId)) {
@@ -239,7 +239,7 @@ export class ResultsService {
     const indicator = await this.prisma.indicator.findFirst({
       where: { id: indicatorId, companyId, deletedAt: null },
     });
-    if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+    if (!indicator) throw new NotFoundException('Indicador não encontrado');
     return indicator;
   }
 
@@ -250,7 +250,7 @@ export class ResultsService {
   ): Promise<ResultSaveOutcome> {
     if (await this.closedMonths.isMonthClosed(indicator.companyId, input.periodRef)) {
       throw new ConflictException(
-        `O período ${input.periodRef} esta fechado para lançamentos. Solicite a reabertura ao administrador.`,
+        `O período ${input.periodRef} está fechado para lançamentos. Solicite a reabertura ao administrador.`,
       );
     }
 
@@ -334,13 +334,13 @@ export class ResultsService {
           resultId: result.id,
           periodRef: input.periodRef,
           title: `Tratativa - ${indicator.name} (${input.periodRef})`,
-          problem: `Resultado ${input.value} fora da meta ${target?.target ?? 'nao definida'}.`,
+          problem: `Resultado ${input.value} fora da meta ${target?.target ?? 'não definida'}.`,
           status: nextTreatmentStatus,
           createdById: userId,
         },
         update: {
           resultId: result.id,
-          problem: `Resultado ${input.value} fora da meta ${target?.target ?? 'nao definida'}.`,
+          problem: `Resultado ${input.value} fora da meta ${target?.target ?? 'não definida'}.`,
           status: existing?.status === TreatmentStatus.IGNORED_TEMPORARILY ? existing.status : nextTreatmentStatus,
         },
         select: { id: true, status: true },
@@ -424,7 +424,7 @@ export class ResultsService {
       where: { id, indicator: { companyId: me.companyId, deletedAt: null } },
       include: { indicator: { select: { ownerNodeId: true } } },
     });
-    if (!result) throw new NotFoundException('Resultado nao encontrado');
+    if (!result) throw new NotFoundException('Resultado não encontrado');
     await this.access.assertCanWrite(me.sub, result.indicator.ownerNodeId, MODULE, 'approve');
     return this.prisma.indicatorResult.update({
       where: { id },

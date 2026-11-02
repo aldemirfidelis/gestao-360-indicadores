@@ -27,7 +27,7 @@ describe('ApiKeyGuard - protecoes por chave', () => {
     const guard = new ApiKeyGuard(reflector, prisma);
     const ctx = context('203.0.113.11');
 
-    await expect(guard.canActivate(ctx.value)).rejects.toThrow('IP nao autorizado');
+    await expect(guard.canActivate(ctx.value)).rejects.toThrow('IP não autorizado');
     expect(prisma.inboundApiKey.update).not.toHaveBeenCalled();
   });
 

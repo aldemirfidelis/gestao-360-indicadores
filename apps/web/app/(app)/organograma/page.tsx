@@ -360,15 +360,15 @@ export default function OrganogramaPage() {
       onDragEnd();
       return;
     }
-    const justification = window.prompt('Informe a justificativa obrigatoria para a movimentação:')?.trim();
+    const justification = window.prompt('Informe a justificativa obrigatória para a movimentação:')?.trim();
     if (!justification) {
-      toast.error('Justificativa obrigatoria para movimentar colaborador');
+      toast.error('Justificativa obrigatória para movimentar colaborador');
       onDragEnd();
       return;
     }
     const effectiveAt = window.prompt('Data de vigência (AAAA-MM-DD):', new Date().toISOString().slice(0, 10))?.trim();
     if (!effectiveAt) {
-      toast.error('Data de vigência obrigatoria');
+      toast.error('Data de vigência obrigatória');
       onDragEnd();
       return;
     }

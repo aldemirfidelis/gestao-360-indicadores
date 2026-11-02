@@ -1,3 +1,4 @@
+import { formatQuantity } from '@g360/shared';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { listTake } from '../../common/http/list-take';
@@ -77,7 +78,7 @@ export class MeetingsService {
         deviation: { select: { indicator: { select: { ownerNodeId: true } } } },
       },
     });
-    if (!meeting) throw new NotFoundException('Reunião nao encontrada');
+    if (!meeting) throw new NotFoundException('Reunião não encontrada');
     return meeting;
   }
 
@@ -139,7 +140,7 @@ export class MeetingsService {
         calendarInvites: true,
       },
     });
-    if (!meeting) throw new NotFoundException('Reunião nao encontrada');
+    if (!meeting) throw new NotFoundException('Reunião não encontrada');
     // Restrição por área (leitura): bloqueia acesso direto a reunião de área não permitida.
     const area = this.areaOf(meeting);
     if (area) {
@@ -179,7 +180,7 @@ export class MeetingsService {
         where: { id: body.indicatorId, companyId, deletedAt: null },
         select: { ownerNodeId: true },
       });
-      if (!ind) throw new NotFoundException('Indicador nao encontrado');
+      if (!ind) throw new NotFoundException('Indicador não encontrado');
       area = ind.ownerNodeId;
     }
     if (body.deviationId) {
@@ -187,7 +188,7 @@ export class MeetingsService {
         where: { id: body.deviationId, companyId, deletedAt: null },
         include: { indicator: { select: { ownerNodeId: true } } },
       });
-      if (!dev) throw new NotFoundException('Desvio nao encontrado');
+      if (!dev) throw new NotFoundException('Desvio não encontrado');
       area = area ?? dev.indicator?.ownerNodeId ?? null;
     }
     // Só pode agendar reunião vinculada a uma área que o usuário possa atuar.
@@ -240,7 +241,7 @@ export class MeetingsService {
         actions: { select: { id: true }, take: 1, orderBy: { createdAt: 'asc' } },
       },
     });
-    if (!meeting) throw new NotFoundException('Reunião nao encontrada');
+    if (!meeting) throw new NotFoundException('Reunião não encontrada');
     const area = meeting.indicator?.ownerNodeId ?? null;
     await this.assertWriteArea(me, area, 'edit');
 
@@ -461,7 +462,7 @@ export class MeetingsService {
     if (linkedAction) {
       const count = await this.prisma.actionTask.count({ where: { actionId: linkedAction.id } });
       const title = (body.description ?? body.title ?? '').trim();
-      if (!title) throw new NotFoundException('Descrição da tarefa obrigatoria');
+      if (!title) throw new NotFoundException('Descrição da tarefa obrigatória');
       const task = await this.prisma.actionTask.create({
         data: {
           actionId: linkedAction.id,
@@ -567,7 +568,7 @@ export class MeetingsService {
       eventType: TraceEventType.MEETING_COMPLETED,
       entityType: TraceEntityType.MEETING,
       entityId: meetingId,
-      title: 'Reunião concluida',
+      title: 'Reunião concluída',
       description: meeting.title,
       statusFrom: meeting.status,
       statusTo: updated.status,
@@ -603,7 +604,7 @@ export class MeetingsService {
       eventType: TraceEventType.CALENDAR_INVITE_CREATED,
       entityType: TraceEntityType.MEETING,
       entityId: meetingId,
-      title: 'Convite de calendario gerado',
+      title: 'Convite de calendário gerado',
       description: meeting.title,
       metadata: { recipients: recipients.length },
     });
@@ -685,7 +686,7 @@ export class MeetingsService {
       ``,
       `Dados da reunião:`,
       `- Data: ${meeting.startsAt.toLocaleString('pt-BR')}`,
-      `- Horario: ${meeting.endsAt ? `${meeting.startsAt.toLocaleTimeString('pt-BR')} ate ${meeting.endsAt.toLocaleTimeString('pt-BR')}` : meeting.startsAt.toLocaleTimeString('pt-BR')}`,
+      `- Horário: ${meeting.endsAt ? `${meeting.startsAt.toLocaleTimeString('pt-BR')} até ${meeting.endsAt.toLocaleTimeString('pt-BR')}` : meeting.startsAt.toLocaleTimeString('pt-BR')}`,
       `- Local/Link: ${meeting.location ?? '-'}`,
       `- Responsável: ${meeting.responsibleUser?.name ?? indicator?.responsibleUser?.name ?? '-'}`,
       ``,
@@ -694,10 +695,10 @@ export class MeetingsService {
       `- Meta: ${target ?? '-'}`,
       `- Resultado atual: ${result?.value ?? '-'}`,
       `- Desvio: ${result?.deviationPct ?? '-'}`,
-      `- Area responsável: ${indicator?.ownerNode?.name ?? '-'}`,
+      `- Área responsável: ${indicator?.ownerNode?.name ?? '-'}`,
       ``,
       `Pauta:`,
-      agenda || '- Discussão das ações necessarias',
+      agenda || '- Discussão das ações necessárias',
       ``,
       `Acesse o sistema para acompanhar os detalhes e registrar as decisões.`,
     ].join('\n');
@@ -741,21 +742,21 @@ export class MeetingsService {
 
   private buildMinutesPrompt(meeting: any) {
     const context = this.minutesContext(meeting);
-    return `Voce e um secretario executivo especializado em reunioes de gestao, indicadores e planos de acao.
-Gere uma minuta de ata profissional, objetiva e revisavel em portugues do Brasil.
-Nao invente fatos. Quando uma informacao nao existir no contexto, marque como "Pendente".
-Priorize decisoes, responsaveis, prazos, riscos e proximos passos.
+    return `Você é um secretário executivo especializado em reuniões de gestão, indicadores e planos de ação.
+Gere uma minuta de ata profissional, objetiva e revisável em português do Brasil.
+Não invente fatos. Quando uma informação não existir no contexto, marque como "Pendente".
+Priorize decisões, responsáveis, prazos, riscos e próximos passos.
 
 Responda no schema JSON:
 {
-  "summary": "Resumo executivo em ate 4 linhas",
+  "summary": "Resumo executivo em até 4 linhas",
   "minutes": "Minuta textual da ata em Markdown curto",
-  "decisions": ["decisao 1"],
+  "decisions": ["decisão 1"],
   "actionItems": [
-    { "description": "acao", "owner": "responsavel ou null", "dueDate": "YYYY-MM-DD ou null", "priority": "LOW|MEDIUM|HIGH|CRITICAL ou null", "source": "agenda|decisao|plano|ia" }
+    { "description": "ação", "owner": "responsável ou null", "dueDate": "YYYY-MM-DD ou null", "priority": "LOW|MEDIUM|HIGH|CRITICAL ou null", "source": "agenda|decisao|plano|ia" }
   ],
-  "risks": ["risco ou pendencia"],
-  "nextSteps": ["proximo passo"]
+  "risks": ["risco ou pendência"],
+  "nextSteps": ["próximo passo"]
 }
 
 CONTEXTO:
@@ -844,7 +845,7 @@ ${JSON.stringify(context, null, 2)}`;
   private buildDeterministicMinutes(meeting: any): MeetingMinutesDraft {
     const decisions = (meeting.decisions ?? []).map((item: any) => this.asText(item.decision)).filter(Boolean);
     const decisionActions = (meeting.decisions ?? []).map((item: any) => ({
-      description: this.asText(item.decision) || 'Decisao a detalhar',
+      description: this.asText(item.decision) || 'Decisão a detalhar',
       owner: this.nullableText(item.owner),
       dueDate: item.dueDate ? new Date(item.dueDate).toISOString().slice(0, 10) : null,
       priority: null,
@@ -866,25 +867,25 @@ ${JSON.stringify(context, null, 2)}`;
       ...(meeting.guests ?? []).map((item: any) => item.name),
     ].filter(Boolean);
     const risks = [
-      ...(meeting.actions?.length ? [] : ['Nenhum plano de acao vinculado a reuniao.']),
+      ...(meeting.actions?.length ? [] : ['Nenhum plano de ação vinculado à reunião.']),
       ...(meeting.analysis?.content || meeting.actions?.some((action: any) => action.rootCause || action.analysisSessions?.[0]?.rootCause)
         ? []
-        : ['Causa raiz ainda nao consolidada.']),
+        : ['Causa raiz ainda não consolidada.']),
     ];
     const nextSteps = actionItems.length
       ? actionItems.slice(0, 5).map((item) => item.description)
-      : ['Registrar decisoes, responsaveis e prazos antes de concluir a reuniao.'];
+      : ['Registrar decisões, responsáveis e prazos antes de concluir a reunião.'];
 
     const draft: MeetingMinutesDraft = {
       provider: 'deterministic',
       generatedAt: new Date().toISOString(),
-      summary: `Reuniao "${meeting.title}" com ${participants.length} participante(s), ${agenda.length} item(ns) de pauta, ${decisions.length} decisao(oes) e ${actionItems.length} acao(oes) mapeada(s).`,
+      summary: `Reunião "${meeting.title}" com ${formatQuantity(participants.length, 'participante', 'participantes')}, ${formatQuantity(agenda.length, 'item de pauta', 'itens de pauta')}, ${formatQuantity(decisions.length, 'decisão', 'decisões')} e ${formatQuantity(actionItems.length, 'ação mapeada', 'ações mapeadas')}.`,
       minutes: [
-        `A reuniao tratou ${meeting.objective || meeting.indicator?.name || meeting.deviation?.title || 'os temas previstos em pauta'}.`,
-        agenda.length ? `Pauta abordada: ${agenda.join('; ')}.` : 'Pauta formal nao registrada.',
-        decisions.length ? `Decisoes registradas: ${decisions.join('; ')}.` : 'Nenhuma decisao formal registrada ate o momento.',
+        `A reunião tratou ${meeting.objective || meeting.indicator?.name || meeting.deviation?.title || 'os temas previstos em pauta'}.`,
+        agenda.length ? `Pauta abordada: ${agenda.join('; ')}.` : 'Pauta formal não registrada.',
+        decisions.length ? `Decisões registradas: ${decisions.join('; ')}.` : 'Nenhuma decisão formal registrada até o momento.',
       ].join('\n'),
-      decisions: decisions.length ? decisions : ['Nenhuma decisao formal registrada.'],
+      decisions: decisions.length ? decisions : ['Nenhuma decisão formal registrada.'],
       actionItems,
       risks: risks.length ? risks : ['Sem riscos adicionais identificados no registro atual.'],
       nextSteps,
@@ -933,7 +934,7 @@ ${JSON.stringify(context, null, 2)}`;
   private renderMinutesMarkdown(meeting: any, draft: MeetingMinutesDraft) {
     const actionLines = draft.actionItems.length
       ? draft.actionItems.map((item) => `- ${item.description}${item.owner ? ` | Resp.: ${item.owner}` : ''}${item.dueDate ? ` | Prazo: ${item.dueDate}` : ''}`)
-      : ['- Nenhuma acao mapeada.'];
+      : ['- Nenhuma ação mapeada.'];
     return [
       `# Minuta de ata - ${meeting.title}`,
       '',
@@ -946,16 +947,16 @@ ${JSON.stringify(context, null, 2)}`;
       '## Ata',
       draft.minutes,
       '',
-      '## Decisoes',
+      '## Decisões',
       ...draft.decisions.map((item) => `- ${item}`),
       '',
-      '## Acoes e responsaveis',
+      '## Ações e responsáveis',
       ...actionLines,
       '',
-      '## Riscos e pendencias',
+      '## Riscos e pendências',
       ...draft.risks.map((item) => `- ${item}`),
       '',
-      '## Proximos passos',
+      '## Próximos passos',
       ...draft.nextSteps.map((item) => `- ${item}`),
     ].join('\n');
   }

@@ -10,7 +10,7 @@ export const DEFAULT_INTEGRATIONS = [
   { code: 'ai', name: 'Serviço de IA', type: 'ai', env: 'GEMINI_API_KEY' },
   { code: 'database', name: 'Banco de Dados', type: 'database', env: 'DATABASE_URL' },
   { code: 'storage', name: 'Armazenamento', type: 'storage', env: null },
-  { code: 'communication', name: 'Comunicacao Interna', type: 'communication', env: null },
+  { code: 'communication', name: 'Comunicação Interna', type: 'communication', env: null },
   { code: 'help-center', name: 'Central de Ajuda', type: 'support', env: null },
 ];
 

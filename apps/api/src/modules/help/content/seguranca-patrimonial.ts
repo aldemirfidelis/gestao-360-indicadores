@@ -11,7 +11,7 @@ export const segurancaPatrimonial: HelpCatalogCategory = {
       slug: 'seguranca-patrimonial-visao-geral',
       title: 'Segurança Patrimonial: visão geral da portaria digital',
       summary: 'Entradas e saídas, presentes na unidade e operação offline na guarita.',
-      tags: ['seguranca patrimonial', 'portaria', 'controle de acesso', 'entrada', 'saida', 'guarita'],
+      tags: ['segurança patrimonial', 'portaria', 'controle de acesso', 'entrada', 'saida', 'guarita'],
       body: `O módulo **Segurança Patrimonial** substitui o caderno da portaria por um console operacional completo.
 
 ## Operação diária (aba Operação)

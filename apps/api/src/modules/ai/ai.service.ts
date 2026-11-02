@@ -70,7 +70,7 @@ export class AiService {
         results: { orderBy: { periodDate: 'asc' }, take: 24 },
       },
     });
-    if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+    if (!indicator) throw new NotFoundException('Indicador não encontrado');
 
     const targetByRef = new Map(indicator.targets.map((t) => [t.periodRef, t.target]));
     const tail = indicator.results.slice(-12);
@@ -169,7 +169,7 @@ export class AiService {
     }
     const lastLight = history.length ? history[history.length - 1].light : null;
     const pct = (v: number | null) => (v === null ? '-' : `${(v * 100).toFixed(1)}%`);
-    const summary = `Direcao do indicador: ${direction}. Tendencia ${directionLabel} nos ultimos ${last3.length} periodos. Atingimento medio dos periodos com dado: ${pct(averageAttainment)}. ${redStreak > 0 ? `Sequencia atual de ${redStreak} periodo(s) em vermelho.` : 'Sem periodos em vermelho na ponta.'}`;
+    const summary = `Direção do indicador: ${direction}. Tendência ${directionLabel} nos últimos ${last3.length} períodos. Atingimento médio dos períodos com dado: ${pct(averageAttainment)}. ${redStreak > 0 ? `Sequência atual de ${redStreak} período(s) em vermelho.` : 'Sem períodos em vermelho na ponta.'}`;
     return { points: last3.length, direction: directionLabel, averageAttainment, lastLight, redStreak, summary };
   }
 }

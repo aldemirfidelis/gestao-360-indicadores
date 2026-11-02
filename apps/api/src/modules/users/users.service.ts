@@ -51,7 +51,7 @@ export class UsersService {
         permissions: { select: { permission: true } },
       },
     });
-    if (!user) throw new NotFoundException('Usuário nao encontrado');
+    if (!user) throw new NotFoundException('Usuário não encontrado');
     return user;
   }
 
@@ -119,7 +119,7 @@ export class UsersService {
       throw new ForbiddenException('Somente um Super Admin pode atribuir o papel SUPER_ADMIN.');
     }
     const exists = await this.prisma.user.findUnique({ where: { email: input.email } });
-    if (exists) throw new ConflictException('Email ja cadastrado');
+    if (exists) throw new ConflictException('Email já cadastrado');
     const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '10', 10);
     const hash = await bcrypt.hash(input.password, rounds);
     const status = input.status ?? UserAccessStatus.ACTIVE;
@@ -145,7 +145,7 @@ export class UsersService {
 
   async setActive(id: string, companyId: string, isSuperAdmin: boolean, active: boolean) {
     const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true, role: true } });
-    if (!user) throw new NotFoundException('Usuário nao encontrado');
+    if (!user) throw new NotFoundException('Usuário não encontrado');
     if (!isSuperAdmin && user.role === UserRoleEnum.SUPER_ADMIN) {
       throw new ForbiddenException('Somente um Super Admin pode alterar outro Super Admin.');
     }
@@ -175,7 +175,7 @@ export class UsersService {
     },
   ) {
     const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId } });
-    if (!user) throw new NotFoundException('Usuário nao encontrado');
+    if (!user) throw new NotFoundException('Usuário não encontrado');
     // Anti-escalonamento: nao-super-admin nao pode promover ninguem (nem a si) a SUPER_ADMIN,
     // nem rebaixar um SUPER_ADMIN existente.
     if (!isSuperAdmin && (input.role === UserRoleEnum.SUPER_ADMIN || user.role === UserRoleEnum.SUPER_ADMIN)) {
@@ -185,7 +185,7 @@ export class UsersService {
 
     if (input.email && input.email.toLowerCase() !== user.email) {
       const exists = await this.prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
-      if (exists) throw new ConflictException('Email ja cadastrado');
+      if (exists) throw new ConflictException('Email já cadastrado');
     }
 
     const data: Prisma.UserUpdateInput = {
@@ -264,7 +264,7 @@ export class UsersService {
   async setPermissions(id: string, companyId: string, isSuperAdmin: boolean, permissionKeys: string[]) {
     await this.ensurePermissionCatalog();
     const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true, role: true } });
-    if (!user) throw new NotFoundException('Usuário nao encontrado');
+    if (!user) throw new NotFoundException('Usuário não encontrado');
     if (!isSuperAdmin && user.role === UserRoleEnum.SUPER_ADMIN) {
       throw new ForbiddenException('Somente um Super Admin pode alterar outro Super Admin.');
     }
@@ -287,7 +287,7 @@ export class UsersService {
 
   async remove(id: string, companyId: string, isSuperAdmin: boolean) {
     const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null, companyId }, select: { id: true, role: true } });
-    if (!user) throw new NotFoundException('Usuário nao encontrado');
+    if (!user) throw new NotFoundException('Usuário não encontrado');
     if (!isSuperAdmin && user.role === UserRoleEnum.SUPER_ADMIN) {
       throw new ForbiddenException('Somente um Super Admin pode alterar outro Super Admin.');
     }
@@ -370,21 +370,21 @@ export class UsersService {
   ) {
     if (input.branchId) {
       const branch = await this.prisma.branch.findFirst({ where: { id: input.branchId, companyId, deletedAt: null }, select: { id: true } });
-      if (!branch) throw new NotFoundException('Filial nao encontrada para a empresa informada');
+      if (!branch) throw new NotFoundException('Filial não encontrada para a empresa informada');
     }
     if (input.accessProfileId) {
       const profile = await this.prisma.accessProfile.findFirst({
         where: { id: input.accessProfileId, OR: [{ companyId }, { companyId: null }], deletedAt: null },
         select: { id: true, role: true },
       });
-      if (!profile) throw new NotFoundException('Perfil de acesso nao encontrado para a empresa informada');
+      if (!profile) throw new NotFoundException('Perfil de acesso não encontrado para a empresa informada');
       if (enforceProfileRole && profile.role && role && profile.role !== role) {
         throw new BadRequestException('O papel do usuário deve ser o mesmo papel base definido no perfil de acesso.');
       }
     }
     if (input.defaultNodeId) {
       const node = await this.prisma.orgNode.findFirst({ where: { id: input.defaultNodeId, companyId, deletedAt: null }, select: { id: true } });
-      if (!node) throw new NotFoundException('Estrutura organizacional nao encontrada para a empresa informada');
+      if (!node) throw new NotFoundException('Estrutura organizacional não encontrada para a empresa informada');
     }
   }
 }

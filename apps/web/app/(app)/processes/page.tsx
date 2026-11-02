@@ -1,4 +1,5 @@
 'use client';
+import { formatQuantity } from '@g360/shared';
 
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -103,7 +104,7 @@ interface StepForm {
 }
 
 const TYPE_LABEL: Record<ProcessType, string> = {
-  CORE: 'Finalistico',
+  CORE: 'Finalístico',
   SUPPORT: 'Apoio',
   MANAGEMENT: 'Gerencial',
 };
@@ -568,7 +569,7 @@ function SipocBlock({ title, value }: { title: string; value: string | null }) {
       {items.length ? (
         <ul className="mt-2 space-y-1 text-sm">
           {items.slice(0, 5).map((item, index) => <li key={`${title}-${index}`}>{item}</li>)}
-          {items.length > 5 ? <li className="text-xs text-muted-foreground">+{items.length - 5} item(ns)</li> : null}
+          {items.length > 5 ? <li className="text-xs text-muted-foreground">+{formatQuantity(items.length - 5, 'item', 'itens')}</li> : null}
         </ul>
       ) : <p className="mt-2 text-sm text-muted-foreground">Não informado</p>}
     </div>

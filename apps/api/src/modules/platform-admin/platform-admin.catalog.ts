@@ -3,31 +3,31 @@ import { expandPlanModules } from '../portal-admin/business-modules';
 
 export const PLATFORM_PERMISSIONS = [
   ['platform.*', 'Acesso total ao Portal Admin Global', 'Sistema', 'manage'],
-  ['platform.dashboard.view', 'Visualizar dashboard global', 'Visao Geral', 'view'],
+  ['platform.dashboard.view', 'Visualizar dashboard global', 'Visão Geral', 'view'],
   ['platform.companies.view', 'Visualizar empresas', 'Empresas', 'view'],
   ['platform.companies.create', 'Cadastrar empresas', 'Empresas', 'create'],
   ['platform.companies.edit', 'Editar empresas', 'Empresas', 'edit'],
   ['platform.companies.suspend', 'Suspender ou reativar empresas', 'Empresas', 'suspend'],
-  ['platform.modules.view', 'Visualizar catalogo e matriz de modulos', 'Modulos', 'view'],
-  ['platform.modules.manage', 'Liberar, bloquear e configurar modulos', 'Modulos', 'manage'],
+  ['platform.modules.view', 'Visualizar catálogo e matriz de módulos', 'Módulos', 'view'],
+  ['platform.modules.manage', 'Liberar, bloquear e configurar módulos', 'Módulos', 'manage'],
   ['platform.plans.view', 'Visualizar planos e contratos', 'Planos', 'view'],
   ['platform.plans.manage', 'Gerenciar planos, limites e contratos', 'Planos', 'manage'],
-  ['platform.users.view', 'Visualizar usuarios globais', 'Usuarios', 'view'],
-  ['platform.users.manage', 'Bloquear usuarios, revogar sessoes e convites', 'Usuarios', 'manage'],
-  ['platform.access_logs.view', 'Visualizar sessoes e logs de acesso', 'Seguranca', 'view'],
+  ['platform.users.view', 'Visualizar usuários globais', 'Usuários', 'view'],
+  ['platform.users.manage', 'Bloquear usuários, revogar sessões e convites', 'Usuários', 'manage'],
+  ['platform.access_logs.view', 'Visualizar sessões e logs de acesso', 'Segurança', 'view'],
   ['platform.audit_logs.view', 'Visualizar trilha de auditoria', 'Auditoria', 'view'],
   ['platform.database.read', 'Consultar explorador seguro do banco', 'Banco de Dados', 'read'],
-  ['platform.database.health', 'Visualizar saude e integridade do banco', 'Banco de Dados', 'health'],
+  ['platform.database.health', 'Visualizar saúde e integridade do banco', 'Banco de Dados', 'health'],
   ['platform.database.backup', 'Registrar e consultar backups', 'Banco de Dados', 'backup'],
-  ['platform.database.restore_request', 'Solicitar restauracao controlada', 'Banco de Dados', 'restore_request'],
+  ['platform.database.restore_request', 'Solicitar restauração controlada', 'Banco de Dados', 'restore_request'],
   ['platform.feature_flags.manage', 'Gerenciar feature flags e experimentos', 'Funcionalidades', 'manage'],
-  ['platform.environments.manage', 'Gerenciar ambientes, versoes e releases', 'Ambientes', 'manage'],
+  ['platform.environments.manage', 'Gerenciar ambientes, versões e releases', 'Ambientes', 'manage'],
   ['platform.support_mode.start', 'Iniciar modo seguro de suporte', 'Suporte', 'start'],
-  ['platform.maintenance.manage', 'Gerenciar manutencoes da plataforma', 'Manutencao', 'manage'],
-  ['platform.integrations.manage', 'Gerenciar integracoes globais', 'Integracoes', 'manage'],
+  ['platform.maintenance.manage', 'Gerenciar manutenções da plataforma', 'Manutenção', 'manage'],
+  ['platform.integrations.manage', 'Gerenciar integrações globais', 'Integrações', 'manage'],
   ['platform.jobs.manage', 'Visualizar e reprocessar jobs', 'Jobs', 'manage'],
-  ['platform.internal_users.manage', 'Gerenciar usuarios internos da plataforma', 'Usuarios Internos', 'manage'],
-  ['platform.site_analytics.view', 'Visualizar visitantes do site e da demonstracao', 'Visitantes do Site', 'view'],
+  ['platform.internal_users.manage', 'Gerenciar usuários internos da plataforma', 'Usuários Internos', 'manage'],
+  ['platform.site_analytics.view', 'Visualizar visitantes do site e da demonstração', 'Visitantes do Site', 'view'],
 ] as const;
 
 const ALL = PLATFORM_PERMISSIONS.map(([key]) => key);
@@ -38,19 +38,19 @@ export const PLATFORM_ROLES = [
   {
     code: 'PLATFORM_OWNER',
     name: 'Platform Owner',
-    description: 'Acesso maximo ao Portal Admin Global.',
+    description: 'Acesso máximo ao Portal Admin Global.',
     permissions: ['platform.*'],
   },
   {
     code: 'SUPER_ADMIN',
     name: 'Super Admin',
-    description: 'Administra empresas, modulos, usuarios internos e operacao geral.',
+    description: 'Administra empresas, módulos, usuários internos e operação geral.',
     permissions: ALL.filter((key) => key !== 'platform.*'),
   },
   {
     code: 'IMPLEMENTATION_MANAGER',
-    name: 'Gestor de Implantacao',
-    description: 'Configura empresas, planos iniciais e modulos autorizados.',
+    name: 'Gestor de Implantação',
+    description: 'Configura empresas, planos iniciais e módulos autorizados.',
     permissions: [
       'platform.dashboard.view',
       'platform.companies.view',
@@ -64,8 +64,8 @@ export const PLATFORM_ROLES = [
   },
   {
     code: 'TECHNICAL_SUPPORT',
-    name: 'Suporte Tecnico',
-    description: 'Consulta configuracoes, logs e inicia suporte somente leitura.',
+    name: 'Suporte Técnico',
+    description: 'Consulta configurações, logs e inicia suporte somente leitura.',
     permissions: [
       'platform.dashboard.view',
       'platform.companies.view',
@@ -80,7 +80,7 @@ export const PLATFORM_ROLES = [
   {
     code: 'DATABASE_ADMIN',
     name: 'Administrador de Banco de Dados',
-    description: 'Acompanha integridade, backups, migracoes e consultas controladas.',
+    description: 'Acompanha integridade, backups, migrações e consultas controladas.',
     permissions: [
       'platform.dashboard.view',
       'platform.companies.view',
@@ -94,7 +94,7 @@ export const PLATFORM_ROLES = [
   {
     code: 'DEVELOPER',
     name: 'Desenvolvedor',
-    description: 'Acessa logs tecnicos, ambientes, feature flags, jobs e diagnosticos.',
+    description: 'Acessa logs técnicos, ambientes, feature flags, jobs e diagnósticos.',
     permissions: [
       'platform.dashboard.view',
       'platform.modules.view',
@@ -109,7 +109,7 @@ export const PLATFORM_ROLES = [
   {
     code: 'COMMERCIAL_FINANCE',
     name: 'Comercial ou Financeiro',
-    description: 'Administra planos, contratos, limites e modulos contratados.',
+    description: 'Administra planos, contratos, limites e módulos contratados.',
     permissions: [
       'platform.dashboard.view',
       'platform.companies.view',
@@ -123,7 +123,7 @@ export const PLATFORM_ROLES = [
   {
     code: 'PLATFORM_AUDITOR',
     name: 'Auditor Interno da Plataforma',
-    description: 'Consulta trilhas de auditoria e historicos sem alterar dados.',
+    description: 'Consulta trilhas de auditoria e históricos sem alterar dados.',
     permissions: VIEW_ONLY,
   },
 ] as const;
@@ -164,8 +164,8 @@ export const PLATFORM_PLANS = [
     defaultUsers: 25,
     defaultBranches: 1,
     storageLimitMb: 10240,
-    supportLevel: 'Padrao',
-    sla: 'Proximo dia util',
+    supportLevel: 'Padrão',
+    sla: 'Próximo dia útil',
     trialDays: 14,
     // Padrão (Meu Dia, Tarefas, Administração) + Gestão à Vista.
     modules: expandPlanModules('ESSENCIAL'),
@@ -178,8 +178,8 @@ export const PLATFORM_PLANS = [
     defaultUsers: 80,
     defaultBranches: 5,
     storageLimitMb: 51200,
-    supportLevel: 'Prioritario',
-    sla: '8 horas uteis',
+    supportLevel: 'Prioritário',
+    sla: '8 horas úteis',
     trialDays: 21,
     // Padrão + Gestão à Vista + Qualidade e Compliance + Comunicação.
     modules: expandPlanModules('PROFISSIONAL'),
@@ -193,7 +193,7 @@ export const PLATFORM_PLANS = [
     defaultBranches: 20,
     storageLimitMb: 204800,
     supportLevel: 'Dedicado',
-    sla: '4 horas uteis',
+    sla: '4 horas úteis',
     trialDays: 30,
     // Padrão + Gestão à Vista + Qualidade e Compliance + Comunicação + Cargos e Salários + Segurança (Alimentos e Patrimonial).
     modules: expandPlanModules('CORPORATIVO'),
@@ -207,7 +207,7 @@ export const PLATFORM_PLANS = [
     defaultBranches: null,
     storageLimitMb: null,
     supportLevel: 'SLA customizado',
-    sla: 'Contrato especifico',
+    sla: 'Contrato específico',
     trialDays: 30,
     // Tudo: Padrão + todas as abas de negócio (inclui Gestão de Prêmio).
     modules: expandPlanModules('ENTERPRISE'),

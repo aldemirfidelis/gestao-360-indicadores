@@ -139,7 +139,7 @@ export default function StrategyPage() {
         eyebrow="Estratégia"
         tone="view"
         title="Mapa Estratégico"
-        description="Crie, publique e mantenha mapas estratégicos editaveis conectados a Arvore Organizacional e aos indicadores."
+        description="Crie, publique e mantenha mapas estratégicos editáveis conectados a Árvore Organizacional e aos indicadores."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Visualização', href: '/visualization' }, { label: 'Mapa Estratégico' }]}
         actions={
           canCreate ? (
@@ -158,7 +158,7 @@ export default function StrategyPage() {
         <MetricCard compact title="Versões" value={formatNumber(versions)} description="Histórico publicado" icon={<CalendarDays className="h-4 w-4" />} tone="yellow" />
       </div>
 
-      <SectionCard title="Mapas cadastrados" description="Abra um mapa para editar perspectivas, objetivos, ligacoes e vínculos com indicadores." contentClassName="space-y-3">
+      <SectionCard title="Mapas cadastrados" description="Abra um mapa para editar perspectivas, objetivos, ligações e vínculos com indicadores." contentClassName="space-y-3">
         {maps.map((m) => (
           <div key={m.id} className={cn('rounded-lg border bg-card p-4', !m.active && 'opacity-60')}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -244,7 +244,7 @@ export default function StrategyPage() {
                   className="mt-1"
                 />
                 <span>
-                  <span className="block font-medium">Criar estrutura inicial editavel</span>
+                  <span className="block font-medium">Criar estrutura inicial editável</span>
                   <span className="text-xs text-muted-foreground">Financeira, Clientes, Processos Internos, Pessoas e Aprendizado.</span>
                 </span>
               </label>

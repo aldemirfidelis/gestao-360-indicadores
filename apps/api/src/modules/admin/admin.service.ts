@@ -9,8 +9,8 @@ import { AuthPayload } from '../auth/auth.types';
 const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; description: string; items?: Array<{ code: string; name: string; description?: string }> }> = [
   { code: 'UNIDADES', name: 'Unidades', module: 'Estrutura', description: 'Unidades operacionais e administrativas.' },
   { code: 'SETORES', name: 'Setores', module: 'Estrutura', description: 'Setores organizacionais usados em filtros e indicadores.' },
-  { code: 'AREAS', name: 'Areas', module: 'Estrutura', description: 'Areas corporativas e de gestão.' },
-  { code: 'SUBAREAS', name: 'Subareas', module: 'Estrutura', description: 'Subdivisoes de areas.' },
+  { code: 'AREAS', name: 'Áreas', module: 'Estrutura', description: 'Áreas corporativas e de gestão.' },
+  { code: 'SUBAREAS', name: 'Subáreas', module: 'Estrutura', description: 'Subdivisões de áreas.' },
   { code: 'CARGOS', name: 'Cargos', module: 'Usuários', description: 'Cargos e funções dos usuários.' },
   { code: 'DEPARTAMENTOS', name: 'Departamentos', module: 'Estrutura', description: 'Departamentos da empresa.' },
   { code: 'CENTROS_CUSTO', name: 'Centros de custo', module: 'Financeiro', description: 'Centros de custo para planos e indicadores.' },
@@ -22,7 +22,7 @@ const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; 
     code: 'TIPOS_INDICADOR',
     name: 'Tipos de indicadores',
     module: 'Indicadores',
-    description: 'Classificacao dos indicadores.',
+    description: 'Classificação dos indicadores.',
     items: [
       { code: 'STRATEGIC', name: 'Estratégico' },
       { code: 'TACTICAL', name: 'Tático' },
@@ -34,9 +34,9 @@ const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; 
   { code: 'CATEGORIAS_INDICADOR', name: 'Categorias de indicadores', module: 'Indicadores', description: 'Categorias livres para KPIs.' },
   {
     code: 'PERIODICIDADES',
-    name: 'Periodicidades de medicao',
+    name: 'Periodicidades de medição',
     module: 'Indicadores',
-    description: 'Frequencias de apuracao.',
+    description: 'Frequências de apuração.',
     items: [
       { code: 'DAILY', name: 'Diária' },
       { code: 'WEEKLY', name: 'Semanal' },
@@ -66,15 +66,15 @@ const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; 
   { code: 'STATUS_PLANO_ACAO', name: 'Status de planos de ação', module: 'Planos de ação', description: 'Estados de planos de ação.' },
   { code: 'CRITICIDADES', name: 'Criticidades', module: 'Governanca', description: 'Níveis de criticidade.' },
   { code: 'PRIORIDADES', name: 'Prioridades', module: 'Governanca', description: 'Prioridades corporativas.' },
-  { code: 'TIPOS_REUNIAO', name: 'Tipos de reunião', module: 'Reuniões', description: 'Classificacoes de reuniões.' },
+  { code: 'TIPOS_REUNIAO', name: 'Tipos de reunião', module: 'Reuniões', description: 'Classificações de reuniões.' },
   { code: 'TIPOS_ANALISE_CAUSA', name: 'Tipos de análise de causa', module: 'Tratativas', description: 'Tipos de análise.' },
   {
     code: 'METODOS_ANALISE_CAUSA',
-    name: 'Metodos de análise de causa',
+    name: 'Métodos de análise de causa',
     module: 'Tratativas',
-    description: 'Metodos como 5 Porques, Ishikawa, PDCA e FCA.',
+    description: 'Métodos como 5 Porquês, Ishikawa, PDCA e FCA.',
     items: [
-      { code: 'FIVE_WHYS', name: '5 Porques' },
+      { code: 'FIVE_WHYS', name: '5 Porquês' },
       { code: 'ISHIKAWA', name: 'Ishikawa' },
       { code: 'PDCA', name: 'PDCA' },
       { code: 'FCA', name: 'FCA' },
@@ -83,10 +83,10 @@ const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; 
     ],
   },
   { code: 'MODELOS_PLANO_ACAO', name: 'Modelos de plano de ação', module: 'Planos de ação', description: 'Templates para abertura de ações.' },
-  { code: 'TIPOS_EVIDENCIA', name: 'Tipos de evidencia', module: 'Evidencias', description: 'Tipos de anexo e comprovacao.' },
-  { code: 'PARAMETROS_NOTIFICACAO', name: 'Parametros de notificação', module: 'Sistema', description: 'Regras e canais de notificação.' },
-  { code: 'PARAMETROS_APROVACAO', name: 'Parametros de aprovação', module: 'Sistema', description: 'Regras de aprovação.' },
-  { code: 'PARAMETROS_GERAIS', name: 'Parametros gerais do sistema', module: 'Sistema', description: 'Configurações gerais.' },
+  { code: 'TIPOS_EVIDENCIA', name: 'Tipos de evidência', module: 'Evidencias', description: 'Tipos de anexo e comprovação.' },
+  { code: 'PARAMETROS_NOTIFICACAO', name: 'Parâmetros de notificação', module: 'Sistema', description: 'Regras e canais de notificação.' },
+  { code: 'PARAMETROS_APROVACAO', name: 'Parâmetros de aprovação', module: 'Sistema', description: 'Regras de aprovação.' },
+  { code: 'PARAMETROS_GERAIS', name: 'Parâmetros gerais do sistema', module: 'Sistema', description: 'Configurações gerais.' },
 ];
 
 @Injectable()
@@ -260,7 +260,7 @@ export class AdminService {
       this.prisma.actionPlan.count({ where: { companyId: id, deletedAt: null } }),
       this.prisma.branch.count({ where: { companyId: id, deletedAt: null } }),
     ]);
-    if (usage.some((count) => count > 0)) throw new ConflictException('Empresa em uso nao pode ser excluida. Inative o cadastro.');
+    if (usage.some((count) => count > 0)) throw new ConflictException('Empresa em uso não pode ser excluída. Inative o cadastro.');
     const updated = await this.prisma.company.update({ where: { id }, data: { deletedAt: new Date(), active: false } });
     await this.audit(me, 'DELETE', 'Empresas', 'Company', id, before, updated);
     return updated;
@@ -298,14 +298,14 @@ export class AdminService {
       this.prisma.orgNode.count({ where: { branchId: id, deletedAt: null } }),
       this.prisma.user.count({ where: { branchId: id, deletedAt: null } }),
     ]);
-    if (orgNodes + users > 0) throw new ConflictException('Filial em uso nao pode ser excluida. Inative o cadastro.');
+    if (orgNodes + users > 0) throw new ConflictException('Filial em uso não pode ser excluída. Inative o cadastro.');
     const updated = await this.prisma.branch.update({ where: { id }, data: { deletedAt: new Date(), active: false } });
     await this.audit(me, 'DELETE', 'Filiais', 'Branch', id, before, updated);
     return updated;
   }
 
   async createCategory(me: AuthPayload, body: any) {
-    if (!body.code || !body.name) throw new BadRequestException('Código e nome sao obrigatorios');
+    if (!body.code || !body.name) throw new BadRequestException('Código e nome são obrigatórios');
     const companyId = body.global ? null : me.companyId;
     const created = await this.prisma.parameterCategory.create({
       data: {
@@ -319,7 +319,7 @@ export class AdminService {
         createdById: me.sub,
       },
     });
-    await this.audit(me, 'CREATE', 'Parametros', 'ParameterCategory', created.id, null, created);
+    await this.audit(me, 'CREATE', 'Parâmetros', 'ParameterCategory', created.id, null, created);
     return created;
   }
 
@@ -337,7 +337,7 @@ export class AdminService {
         updatedById: me.sub,
       },
     });
-    await this.audit(me, 'UPDATE', 'Parametros', 'ParameterCategory', id, before, updated);
+    await this.audit(me, 'UPDATE', 'Parâmetros', 'ParameterCategory', id, before, updated);
     return updated;
   }
 
@@ -346,12 +346,12 @@ export class AdminService {
     const items = await this.prisma.parameterItem.count({ where: { categoryId: id, deletedAt: null } });
     if (items > 0) throw new ConflictException('Categoria possui itens vinculados. Inative ou exclua os itens antes.');
     const updated = await this.prisma.parameterCategory.update({ where: { id }, data: { deletedAt: new Date(), status: AdminRecordStatus.ARCHIVED, updatedById: me.sub } });
-    await this.audit(me, 'DELETE', 'Parametros', 'ParameterCategory', id, before, updated);
+    await this.audit(me, 'DELETE', 'Parâmetros', 'ParameterCategory', id, before, updated);
     return updated;
   }
 
   async createItem(me: AuthPayload, body: any) {
-    if (!body.categoryId || !body.code || !body.name) throw new BadRequestException('Categoria, código e nome sao obrigatorios');
+    if (!body.categoryId || !body.code || !body.name) throw new BadRequestException('Categoria, código e nome são obrigatórios');
     const category = await this.getCategoryOrThrow(body.categoryId, me.companyId);
     if (body.parentId) await this.ensureParameterParent(body.parentId, category.id);
     const created = await this.prisma.parameterItem.create({
@@ -368,7 +368,7 @@ export class AdminService {
         createdById: me.sub,
       },
     });
-    await this.audit(me, 'CREATE', 'Parametros', 'ParameterItem', created.id, null, created);
+    await this.audit(me, 'CREATE', 'Parâmetros', 'ParameterItem', created.id, null, created);
     return created;
   }
 
@@ -391,21 +391,21 @@ export class AdminService {
         updatedById: me.sub,
       },
     });
-    await this.audit(me, 'UPDATE', 'Parametros', 'ParameterItem', id, before, updated);
+    await this.audit(me, 'UPDATE', 'Parâmetros', 'ParameterItem', id, before, updated);
     return updated;
   }
 
   async removeItem(me: AuthPayload, id: string) {
     const before = await this.getItemOrThrow(id, me.companyId);
     const children = await this.prisma.parameterItem.count({ where: { parentId: id, deletedAt: null } });
-    if (children > 0) throw new ConflictException('Parametro possui itens filhos. Remova os vínculos antes.');
+    if (children > 0) throw new ConflictException('Parâmetro possui itens filhos. Remova os vínculos antes.');
     const updated = await this.prisma.parameterItem.update({ where: { id }, data: { deletedAt: new Date(), status: AdminRecordStatus.ARCHIVED, updatedById: me.sub } });
-    await this.audit(me, 'DELETE', 'Parametros', 'ParameterItem', id, before, updated);
+    await this.audit(me, 'DELETE', 'Parâmetros', 'ParameterItem', id, before, updated);
     return updated;
   }
 
   async createProfile(me: AuthPayload, body: any) {
-    if (!body.code || !body.name) throw new BadRequestException('Código e nome sao obrigatorios');
+    if (!body.code || !body.name) throw new BadRequestException('Código e nome são obrigatórios');
     if (me.role !== UserRoleEnum.SUPER_ADMIN && body.role === UserRoleEnum.SUPER_ADMIN) {
       throw new BadRequestException('O papel Super Admin não pode ser usado em perfis da empresa.');
     }
@@ -421,7 +421,7 @@ export class AdminService {
       },
     });
     await this.setProfilePermissions(me, created.id, body.permissionKeys ?? []);
-    await this.audit(me, 'CREATE', 'Seguranca', 'AccessProfile', created.id, null, created);
+    await this.audit(me, 'CREATE', 'Segurança', 'AccessProfile', created.id, null, created);
     return this.getProfile(created.id, me.companyId, me.role === UserRoleEnum.SUPER_ADMIN);
   }
 
@@ -453,7 +453,7 @@ export class AdminService {
       },
     });
     if (body.permissionKeys) await this.setProfilePermissions(me, id, body.permissionKeys);
-    await this.audit(me, 'UPDATE', 'Seguranca', 'AccessProfile', id, before, updated);
+    await this.audit(me, 'UPDATE', 'Segurança', 'AccessProfile', id, before, updated);
     return this.getProfile(id, me.companyId, allowGlobal);
   }
 
@@ -466,7 +466,7 @@ export class AdminService {
       this.prisma.profilePermission.deleteMany({ where: { profileId: id } }),
       ...permissions.map((permission) => this.prisma.profilePermission.create({ data: { profileId: id, permissionId: permission.id } })),
     ]);
-    await this.audit(me, 'PERMISSION_CHANGE', 'Seguranca', 'AccessProfile', id, null, { permissionKeys });
+    await this.audit(me, 'PERMISSION_CHANGE', 'Segurança', 'AccessProfile', id, null, { permissionKeys });
     return this.getProfile(id, me.companyId, allowGlobal);
   }
 
@@ -475,12 +475,12 @@ export class AdminService {
     const users = await this.prisma.user.count({ where: { accessProfileId: id, deletedAt: null } });
     if (users > 0) throw new ConflictException('Perfil em uso por usuários. Remova os vínculos antes.');
     const updated = await this.prisma.accessProfile.update({ where: { id }, data: { deletedAt: new Date(), status: AdminRecordStatus.ARCHIVED, updatedById: me.sub } });
-    await this.audit(me, 'DELETE', 'Seguranca', 'AccessProfile', id, before, updated);
+    await this.audit(me, 'DELETE', 'Segurança', 'AccessProfile', id, before, updated);
     return updated;
   }
 
   async upsertSetting(me: AuthPayload, body: any) {
-    if (!body.key) throw new BadRequestException('Chave obrigatoria');
+    if (!body.key) throw new BadRequestException('Chave obrigatória');
     const companyId = me.companyId;
     const before = await this.prisma.appSetting.findUnique({ where: { companyId_key: { companyId, key: body.key } } }).catch(swallow(null, 'admin.readAppSettingBefore', 'debug'));
     const saved = await this.prisma.appSetting.upsert({
@@ -522,32 +522,32 @@ export class AdminService {
   }
 
   private async ensureParameterParent(parentId: string, categoryId: string, currentId?: string) {
-    if (parentId === currentId) throw new ConflictException('Um parametro nao pode ser pai dele mesmo');
+    if (parentId === currentId) throw new ConflictException('Um parâmetro não pode ser pai dele mesmo');
     const parent = await this.prisma.parameterItem.findFirst({ where: { id: parentId, categoryId, deletedAt: null }, select: { id: true } });
-    if (!parent) throw new NotFoundException('Parametro pai nao encontrado na categoria informada');
+    if (!parent) throw new NotFoundException('Parâmetro pai não encontrado na categoria informada');
   }
 
   private async getCompanyOrThrow(id: string) {
     const company = await this.prisma.company.findFirst({ where: { id, deletedAt: null } });
-    if (!company) throw new NotFoundException('Empresa nao encontrada');
+    if (!company) throw new NotFoundException('Empresa não encontrada');
     return company;
   }
 
   private async getBranchOrThrow(id: string) {
     const branch = await this.prisma.branch.findFirst({ where: { id, deletedAt: null } });
-    if (!branch) throw new NotFoundException('Filial nao encontrada');
+    if (!branch) throw new NotFoundException('Filial não encontrada');
     return branch;
   }
 
   private async getCategoryOrThrow(id: string, companyId: string) {
     const category = await this.prisma.parameterCategory.findFirst({ where: { id, deletedAt: null, OR: [{ companyId }, { companyId: null }] } });
-    if (!category) throw new NotFoundException('Categoria nao encontrada');
+    if (!category) throw new NotFoundException('Categoria não encontrada');
     return category;
   }
 
   private async getItemOrThrow(id: string, companyId: string) {
     const item = await this.prisma.parameterItem.findFirst({ where: { id, deletedAt: null, OR: [{ companyId }, { companyId: null }] } });
-    if (!item) throw new NotFoundException('Parametro nao encontrado');
+    if (!item) throw new NotFoundException('Parâmetro não encontrado');
     return item;
   }
 
@@ -556,7 +556,7 @@ export class AdminService {
       where: { id, deletedAt: null, ...(allowGlobal ? { OR: [{ companyId }, { companyId: null }] } : { companyId }) },
       include: { permissions: { include: { permission: true } }, _count: { select: { users: true } } },
     });
-    if (!profile) throw new NotFoundException('Perfil nao encontrado');
+    if (!profile) throw new NotFoundException('Perfil não encontrado');
     return profile;
   }
 
@@ -575,7 +575,7 @@ export class AdminService {
       where: { deletedAt: null, id: ignoreId ? { not: ignoreId } : undefined, OR: [{ name }, ...(cnpj ? [{ cnpj }] : [])] },
       select: { id: true },
     });
-    if (found) throw new ConflictException('Empresa com nome ou CNPJ ja cadastrada');
+    if (found) throw new ConflictException('Empresa com nome ou CNPJ já cadastrada');
   }
 
   private async assertBranchUnique(companyId: string, name: string, code?: string | null, ignoreId?: string) {
@@ -588,7 +588,7 @@ export class AdminService {
       },
       select: { id: true },
     });
-    if (found) throw new ConflictException('Filial com nome ou código ja cadastrada');
+    if (found) throw new ConflictException('Filial com nome ou código já cadastrada');
   }
 
   private async audit(me: AuthPayload, action: string, module: string, entity: string, entityId: string, beforeValue: unknown, afterValue: unknown) {

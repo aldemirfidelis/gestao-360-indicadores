@@ -294,15 +294,15 @@ const TYPE_LABEL: Record<string, string> = {
   FORM: 'Formulário',
   CHECKLIST: 'Lista de verificação',
   OPERATIONAL_RECORD: 'Registro operacional',
-  INSPECTION: 'Inspecao',
+  INSPECTION: 'Inspeção',
   AUDIT_CHECKLIST: 'Lista de verificação de auditoria',
   PROCESS_CHECKLIST: 'Lista de verificação de processo',
-  DAILY_RECORD: 'Registro diario',
+  DAILY_RECORD: 'Registro diário',
   SHIFT_LOG: 'Passagem de turno',
   OCCURRENCE: 'Ocorrência',
   ROUND: 'Ronda',
   MAINTENANCE: 'Manutenção',
-  SAFETY: 'Seguranca',
+  SAFETY: 'Segurança',
   QUALITY: 'Qualidade',
   ENVIRONMENT: 'Meio ambiente',
   HR: 'RH',
@@ -346,19 +346,19 @@ const FIELD_LABEL: Record<string, string> = {
   CONFORMITY: 'Conformidade',
   SELECT: 'Seleção',
   MULTISELECT: 'Múltipla seleção',
-  RADIO: 'Radio',
+  RADIO: 'Botões de opção',
   CHECKBOX: 'Checkbox',
   PHOTO: 'Foto',
   ATTACHMENT: 'Anexo',
   SIGNATURE: 'Assinatura',
   LOCATION: 'Localização',
-  FORMULA: 'Formula',
+  FORMULA: 'Fórmula',
   CALCULATED: 'Calculado',
 };
 
 const SUBMISSION_LABEL: Record<string, string> = {
   DRAFT: 'Rascunho',
-  ASSIGNED: 'Atribuido',
+  ASSIGNED: 'Atribuído',
   IN_PROGRESS: 'Em preenchimento',
   SUBMITTED: 'Enviado',
   WAITING_CORRECTION: 'Aguardando correção',
@@ -372,7 +372,7 @@ const SUBMISSION_LABEL: Record<string, string> = {
 
 const EXECUTION_LABEL: Record<string, string> = {
   PLANNED: 'Planejada',
-  ASSIGNED: 'Atribuida',
+  ASSIGNED: 'Atribuída',
   IN_PROGRESS: 'Em execução',
   WAITING_APPROVAL: 'Aguardando aprovação',
   COMPLETED: 'Concluída',
@@ -1067,7 +1067,7 @@ export default function FormsPage() {
                 {(options?.approvalDecisions ?? ['APPROVED', 'REJECTED', 'ADJUSTMENTS_REQUESTED']).map((decision) => <option key={decision} value={decision}>{decision}</option>)}
               </NativeSelect>
             </Field>
-            <Field label="Comentario"><Textarea value={approvalForm.comment} onChange={(e) => setApprovalForm({ ...approvalForm, comment: e.target.value })} rows={3} /></Field>
+            <Field label="Comentário"><Textarea value={approvalForm.comment} onChange={(e) => setApprovalForm({ ...approvalForm, comment: e.target.value })} rows={3} /></Field>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setApprovalOpen(false)}>Cancelar</Button><Button onClick={() => approveSubmission.mutate()} disabled={approveSubmission.isPending}><ShieldCheck className="mr-2 h-4 w-4" /> Registrar</Button></DialogFooter>
         </DialogContent>
@@ -1291,7 +1291,7 @@ function ExecutionRow({ execution, onResponses, onComplete }: { execution: FormE
         <div className="grid gap-2 md:grid-cols-4">
           <MiniStat label="Respostas" value={execution.responsesCount ?? execution.responseItems?.length ?? 0} />
           <MiniStat label="Registros" value={execution.recordsCount ?? 0} />
-          <MiniStat label="Submissoes" value={execution.submissionsCount ?? 0} />
+          <MiniStat label="Submissões" value={execution.submissionsCount ?? 0} />
           <MiniStat label="Pendências" value={execution.openIssues ?? 0} />
         </div>
       </CardContent>
@@ -1911,7 +1911,7 @@ function FieldPreview({ field }: { field: FormField }) {
         <span className="font-medium">{field.order}. {field.label}</span>
         <Badge variant="secondary">{label(FIELD_LABEL, field.type)}</Badge>
         {field.code ? <Badge variant="outline">{field.code}</Badge> : null}
-        {field.required ? <Badge variant="outline" className="border-red-300 text-red-700">Obrigatorio</Badge> : null}
+        {field.required ? <Badge variant="outline" className="border-red-300 text-red-700">Obrigatório</Badge> : null}
         {field.evidenceRequired ? <Badge variant="outline" className="border-amber-300 text-amber-700">Evidência</Badge> : null}
         {isScorable(field) && fieldNote(field) !== null ? <Badge variant="outline" className="border-blue-300 text-blue-700">Nota {formatNumber(fieldNote(field))}</Badge> : null}
       </div>
@@ -1953,7 +1953,7 @@ function AnswerInput({ field, value, onChange }: { field: FormField; value: stri
   if (['BOOLEAN', 'YES_NO'].includes(field.type)) return <NativeSelect value={value} onChange={(e) => onChange(e.target.value)}><option value="">Selecione</option><option value="Sim">Sim</option><option value="Nao">Não</option></NativeSelect>;
   if (field.type === 'CONFORMITY') return <NativeSelect value={value} onChange={(e) => onChange(e.target.value)}><option value="">Selecione</option><option value="Conforme">Conforme</option><option value="Nao conforme">Não conforme</option><option value="Nao aplicavel">Não aplicável</option></NativeSelect>;
   if (['SELECT', 'RADIO', 'STATUS'].includes(field.type) && options.length) return <NativeSelect value={value} onChange={(e) => onChange(e.target.value)}><option value="">Selecione</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</NativeSelect>;
-  return <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={['MULTISELECT', 'CHECKBOX'].includes(field.type) ? 'Separe valores por virgula' : field.helpText ?? undefined} />;
+  return <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={['MULTISELECT', 'CHECKBOX'].includes(field.type) ? 'Separe valores por vírgula' : field.helpText ?? undefined} />;
 }
 
 function templatePayload(form: TemplateForm) {

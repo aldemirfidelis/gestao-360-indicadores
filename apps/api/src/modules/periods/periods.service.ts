@@ -99,7 +99,7 @@ export class PeriodsService {
         where: { companyId_year: { companyId: me.companyId, year: nextYear } },
       });
       if (existingNext?.status === WorkPeriodStatus.CLOSED && !existingNext.deletedAt) {
-        throw new ConflictException(`O período ${nextYear} ja esta fechado.`);
+        throw new ConflictException(`O período ${nextYear} já está fechado.`);
       }
       const next = await tx.workPeriod.upsert({
         where: { companyId_year: { companyId: me.companyId, year: nextYear } },
@@ -183,7 +183,7 @@ export class PeriodsService {
       where: { companyId_year: { companyId: me.companyId, year: nextYear } },
     });
     if (existing && !existing.deletedAt) {
-      if (existing.status !== WorkPeriodStatus.OPEN) throw new ConflictException(`O período ${nextYear} nao esta aberto.`);
+      if (existing.status !== WorkPeriodStatus.OPEN) throw new ConflictException(`O período ${nextYear} não está aberto.`);
       return this.setCurrent(me, existing.id);
     }
     const next = await this.create(me, nextYear);
@@ -192,7 +192,7 @@ export class PeriodsService {
 
   private async findCompanyPeriodOrThrow(companyId: string, id: string) {
     const period = await this.prisma.workPeriod.findFirst({ where: { id, companyId, deletedAt: null } });
-    if (!period) throw new NotFoundException('Período nao encontrado.');
+    if (!period) throw new NotFoundException('Período não encontrado.');
     return period;
   }
 

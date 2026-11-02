@@ -35,7 +35,7 @@ export class WorkflowQueueAdapter {
         this.logger.log(`Enfileirado (BullMQ) ${type} para empresa ${companyId}${delayMs > 0 ? ` (+${delayMs}ms)` : ''}`);
         return;
       }
-      this.logger.warn('WORKERS_ENABLED=true mas fila automations indisponivel; usando fallback em processo.');
+      this.logger.warn('WORKERS_ENABLED=true mas fila automations indisponível; usando fallback em processo.');
     }
 
     if (delayMs > 0) {

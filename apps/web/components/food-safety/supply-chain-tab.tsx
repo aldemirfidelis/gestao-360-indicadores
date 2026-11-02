@@ -350,7 +350,7 @@ function SuppliersTable({ rows, loading, canManage, onEdit }: { rows: Supplier[]
 
 function MaterialsTable({ rows, loading, canManage, onEdit }: { rows: Material[]; loading: boolean; canManage: boolean; onEdit: (row: Material) => void }) {
   return (
-    <DataCard title="Materias-primas e materiais de embalagem">
+    <DataCard title="Matérias-primas e materiais de embalagem">
       <TableShell loading={loading} empty="Nenhum material cadastrado." colSpan={7}>
         {rows.map((m) => (
           <tr key={m.id}>
@@ -613,9 +613,9 @@ function MaterialDialog({ record, programId, suppliers, canManage, onClose, onSa
           <div><Label>Unidade</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} disabled={!canManage} /></div>
           <div><Label>Status</Label><NativeSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as MaterialStatus })} disabled={!canManage}>{Object.entries(MATERIAL_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></div>
           <div><Label>Vida útil (dias)</Label><Input type="number" value={form.shelfLifeDays} onChange={(e) => setForm({ ...form, shelfLifeDays: e.target.value })} disabled={!canManage} /></div>
-          <div><Label>Alergenicos</Label><Input value={form.allergens} onChange={(e) => setForm({ ...form, allergens: e.target.value })} disabled={!canManage} /></div>
+          <div><Label>Alergênicos</Label><Input value={form.allergens} onChange={(e) => setForm({ ...form, allergens: e.target.value })} disabled={!canManage} /></div>
           <div className="md:col-span-2"><Label>Especificação</Label><Textarea rows={2} value={form.specification} onChange={(e) => setForm({ ...form, specification: e.target.value })} disabled={!canManage} /></div>
-          <div className="md:col-span-2"><Label>Condicao de armazenamento</Label><Input value={form.storageCondition} onChange={(e) => setForm({ ...form, storageCondition: e.target.value })} disabled={!canManage} /></div>
+          <div className="md:col-span-2"><Label>Condição de armazenamento</Label><Input value={form.storageCondition} onChange={(e) => setForm({ ...form, storageCondition: e.target.value })} disabled={!canManage} /></div>
           <div className="md:col-span-2"><Label>Perigos associados</Label><Input value={form.hazards} onChange={(e) => setForm({ ...form, hazards: e.target.value })} disabled={!canManage} /></div>
           <div className="md:col-span-2"><Label>Documentos obrigatórios</Label><Input value={form.requiredDocuments} onChange={(e) => setForm({ ...form, requiredDocuments: e.target.value })} disabled={!canManage} /></div>
         </div>

@@ -175,7 +175,7 @@ export function ActionDetailView({
   const deleteTask = useMutation({
     mutationFn: (taskId: string) => api(`/actions/tasks/${taskId}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Tarefa excluida');
+      toast.success('Tarefa excluída');
       qc.invalidateQueries({ queryKey: ['action', id] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir a tarefa'),
@@ -378,7 +378,7 @@ export function ActionDetailView({
                 </div>
               )}
             </SectionCard>
-            <SectionCard title="Prontidao da ação" description="Lacunas antes de considerar o plano robusto.">
+            <SectionCard title="Prontidão da ação" description="Lacunas antes de considerar o plano robusto.">
               <div className="mb-3 text-2xl font-semibold">{a.aiReadiness.score}%</div>
               <Progress value={a.aiReadiness.score} />
               <div className="mt-3 space-y-2">

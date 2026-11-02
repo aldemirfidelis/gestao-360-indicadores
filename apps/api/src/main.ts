@@ -64,7 +64,7 @@ async function bootstrap() {
   const isWildcard = corsOrigin === '*';
   if (isWildcard && process.env.NODE_ENV === 'production') {
     logger.warn(
-      'AVISO DE SEGURANCA: API_CORS_ORIGIN="*" em producao. Defina o dominio explicito (ex.: https://gestao360.org).',
+      'AVISO DE SEGURANÇA: API_CORS_ORIGIN="*" em produção. Defina o domínio explícito (ex.: https://gestao360.org).',
     );
   }
   app.enableCors({
@@ -87,6 +87,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((err) => {
-  rootLogger.fatal({ err }, 'bootstrap falhou — processo nao iniciou');
+  rootLogger.fatal({ err }, 'bootstrap falhou — processo não iniciou');
   process.exit(1);
 });

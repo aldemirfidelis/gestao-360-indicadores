@@ -38,7 +38,7 @@ export class ProjectsService {
       where: { id, companyId, deletedAt: null },
       include: { indicator: { select: { ownerNodeId: true } } },
     });
-    if (!project) throw new NotFoundException('Projeto nao encontrado');
+    if (!project) throw new NotFoundException('Projeto não encontrado');
     return project;
   }
 
@@ -228,7 +228,7 @@ export class ProjectsService {
         },
       },
     });
-    if (!proj) throw new NotFoundException('Projeto nao encontrado');
+    if (!proj) throw new NotFoundException('Projeto não encontrado');
     // Restrição por área (leitura): projeto vinculado a indicador de área não permitida.
     const area = proj.indicator?.ownerNodeId ?? null;
     if (area) {
@@ -247,7 +247,7 @@ export class ProjectsService {
         where: { id: body.indicatorId, companyId: me.companyId, deletedAt: null },
         select: { ownerNodeId: true },
       });
-      if (!ind) throw new NotFoundException('Indicador nao encontrado');
+      if (!ind) throw new NotFoundException('Indicador não encontrado');
       area = ind.ownerNodeId;
     }
     await this.assertWriteArea(me, area, 'create');
@@ -280,7 +280,7 @@ export class ProjectsService {
         where: { id: data.indicatorId, companyId: me.companyId, deletedAt: null },
         select: { ownerNodeId: true },
       });
-      if (!ind) throw new NotFoundException('Indicador nao encontrado');
+      if (!ind) throw new NotFoundException('Indicador não encontrado');
       await this.assertWriteArea(me, ind.ownerNodeId, 'edit');
     }
     return this.prisma.project.update({ where: { id }, data });
@@ -318,7 +318,7 @@ export class ProjectsService {
       where: { id, project: { companyId: me.companyId, deletedAt: null } },
       include: { project: { select: { indicator: { select: { ownerNodeId: true } } } } },
     });
-    if (!ms) throw new NotFoundException('Marco nao encontrado');
+    if (!ms) throw new NotFoundException('Marco não encontrado');
     await this.assertWriteArea(me, ms.project.indicator?.ownerNodeId ?? null, 'edit');
     return this.prisma.projectMilestone.update({ where: { id }, data: { done } });
   }
@@ -366,7 +366,7 @@ export class ProjectsService {
       where: { id, project: { companyId, deletedAt: null } },
       include: { project: { select: { indicator: { select: { ownerNodeId: true } } } } },
     });
-    if (!task) throw new NotFoundException('Tarefa nao encontrada');
+    if (!task) throw new NotFoundException('Tarefa não encontrada');
     return task;
   }
 }

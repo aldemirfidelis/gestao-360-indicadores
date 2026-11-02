@@ -26,15 +26,15 @@ export interface InsightItem {
 
 const CAUSE_LIBRARY: Record<string, string[]> = {
   default: [
-    'Variabilidade do processo nao controlada',
+    'Variabilidade do processo não controlada',
     'Falta de procedimento padronizado',
     'Equipe sub-dimensionada para o período',
     'Demanda atipica acima do plano',
   ],
-  HR: ['Clima organizacional impactado', 'Concorrencia regional por mao de obra'],
-  SAFETY: ['Reciclagem de NRs em atraso', 'Equipamento de protecao individual nao padronizado'],
-  PRODUCTION: ['Manutenção corretiva acima da media', 'Materia-prima fora de especificacao'],
-  QUALITY: ['Calibracao de instrumentos em atraso', 'Treinamento de inspetores defasado'],
+  HR: ['Clima organizacional impactado', 'Concorrência regional por mão de obra'],
+  SAFETY: ['Reciclagem de NRs em atraso', 'Equipamento de proteção individual não padronizado'],
+  PRODUCTION: ['Manutenção corretiva acima da média', 'Materia-prima fora de especificação'],
+  QUALITY: ['Calibração de instrumentos em atraso', 'Treinamento de inspetores defasado'],
 };
 
 const ACTION_LIBRARY: Record<string, string[]> = {
@@ -43,10 +43,10 @@ const ACTION_LIBRARY: Record<string, string[]> = {
     'Revisar procedimento operacional padrão',
     'Definir plano de comunicação semanal',
   ],
-  HR: ['Programa de retencao para os 6 meses iniciais', 'Realizar pesquisa de clima focal'],
-  SAFETY: ['Reforcar DSS - dialogo diário de seguranca', 'Auditoria comportamental nas frentes críticas'],
-  PRODUCTION: ['Revisar plano de manutenção preventiva', 'Bloquear materia-prima fora de spec'],
-  QUALITY: ['Cronograma de calibracao trimestral', 'Reciclagem dos inspetores'],
+  HR: ['Programa de retenção para os 6 meses iniciais', 'Realizar pesquisa de clima focal'],
+  SAFETY: ['Reforcar DSS - diálogo diário de segurança', 'Auditoria comportamental nas frentes críticas'],
+  PRODUCTION: ['Revisar plano de manutenção preventiva', 'Bloquear matéria-prima fora de spec'],
+  QUALITY: ['Cronograma de calibração trimestral', 'Reciclagem dos inspetores'],
 };
 
 interface GeminiInsightsResponse {
@@ -134,7 +134,7 @@ export class InsightsService {
         `Do total de ${total} indicadores ativos, ${greenRate}% estão no verde, ${counts.YELLOW ?? 0} em atenção e ${counts.RED ?? 0} críticos. ` +
         `Existem ${overdue} ações atrasadas e ${criticalDev} desvios críticos abertos. ` +
         (greenRate >= 70
-          ? 'O cenario geral e positivo, mantenha cadencia nas revisoes.'
+          ? 'O cenário geral e positivo, mantenha cadência nas revisões.'
           : 'Prioridade: atacar os indicadores críticos e destravar ações atrasadas nas próximas reuniões.'),
       severity: greenRate >= 70 ? 'info' : counts.RED ?? 0 > 3 ? 'critical' : 'warning',
     };
@@ -191,7 +191,7 @@ export class InsightsService {
           id: `cause-${d.id}`,
           kind: 'CAUSE_SUGGESTION',
           title: `Sugestão de causas: desvio #${d.number}`,
-          body: `Considere as seguintes hipoteses para "${d.indicator.name}":\n- ${lib.slice(0, 3).join('\n- ')}`,
+          body: `Considere as seguintes hipóteses para "${d.indicator.name}":\n- ${lib.slice(0, 3).join('\n- ')}`,
           refs: [{ type: 'deviation', id: d.id, label: `#${d.number}` }],
           severity: 'info',
         } as InsightItem;
@@ -212,7 +212,7 @@ export class InsightsService {
         id: `action-${r.indicator.id}`,
         kind: 'ACTION_SUGGESTION',
         title: `Ações recomendadas: ${r.indicator.name}`,
-        body: `Como o indicador esta no vermelho (${pct(r.attainment ?? 0)}), avalie:\n- ${lib.slice(0, 3).join('\n- ')}`,
+        body: `Como o indicador está no vermelho (${pct(r.attainment ?? 0)}), avalie:\n- ${lib.slice(0, 3).join('\n- ')}`,
         refs: [{ type: 'indicator', id: r.indicator.id, label: r.indicator.name }],
         severity: 'critical',
       } as InsightItem;
@@ -235,7 +235,7 @@ export class InsightsService {
       maxOutputTokens: 1800,
     });
     if (!response) {
-      this.logger.warn('Gemini nao retornou insights validos - usando regras.');
+      this.logger.warn('Gemini não retornou insights válidos - usando regras.');
       return null;
     }
 
@@ -371,31 +371,31 @@ export class InsightsService {
       indicator: { id: d.indicator.id, name: d.indicator.name, type: d.indicator.type },
     }));
 
-    return `Voce e um consultor senior de gestao de performance. Analise os indicadores abaixo
-e produza insights acionaveis em portugues do Brasil. Use linguagem objetiva, foco em decisao gerencial.
+    return `Você é um consultor sênior de gestão de performance. Analise os indicadores abaixo
+e produza insights acionáveis em português do Brasil. Use linguagem objetiva, foco em decisão gerencial.
 
-Calcule tendencia observando os ultimos 3 periodos com dado (do mais recente para o mais antigo). Considere
-"direction" do indicador: HIGHER_BETTER = maior e melhor, LOWER_BETTER = menor e melhor.
+Calcule tendência observando os últimos 3 períodos com dado (do mais recente para o mais antigo). Considere
+"direction" do indicador: HIGHER_BETTER = maior é melhor, LOWER_BETTER = menor é melhor.
 
 Responda no schema JSON:
 {
-  "summary": "Resumo executivo do periodo em 3-5 frases.",
+  "summary": "Resumo executivo do período em 3-5 frases.",
   "trends": [
-    { "indicatorId": "...", "title": "Tendencia de piora: <nome>", "body": "Explicacao 2-3 frases com numeros." }
+    { "indicatorId": "...", "title": "Tendência de piora: <nome>", "body": "Explicação 2-3 frases com números." }
   ],
   "causes": [
-    { "deviationId": "...", "title": "Causas para desvio #X", "body": "3 hipoteses praticas com bullet points." }
+    { "deviationId": "...", "title": "Causas para desvio #X", "body": "3 hipóteses práticas com bullet points." }
   ],
   "actions": [
-    { "indicatorId": "...", "title": "Acoes recomendadas: <nome>", "body": "3 acoes 5W2H curtas com bullet points." }
+    { "indicatorId": "...", "title": "Ações recomendadas: <nome>", "body": "3 ações 5W2H curtas com bullet points." }
   ]
 }
 
 Regras:
-- Limite trends, causes e actions a no maximo 4 itens cada.
-- Inclua trends apenas para indicadores com queda real do atingimento em 3+ periodos.
+- Limite trends, causes e actions a no máximo 4 itens cada.
+- Inclua trends apenas para indicadores com queda real do atingimento em 3+ períodos.
 - Inclua causes apenas para os desvios fornecidos.
-- Inclua actions para os 3-4 indicadores em pior situacao.
+- Inclua actions para os 3-4 indicadores em pior situação.
 
 INDICADORES (JSON):
 ${JSON.stringify(indicatorsSnap, null, 2)}

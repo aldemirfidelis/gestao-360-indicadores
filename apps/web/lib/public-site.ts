@@ -427,7 +427,7 @@ export const solutionPages: PublicPage[] = ([
       {
         question: 'A plataforma possui análise de causa?',
         answer:
-          'Sim. O ecossistema inclui recursos para FCA, 5 Porques, Ishikawa, MASP e planos de ação relacionados.',
+          'Sim. O ecossistema inclui recursos para FCA, 5 Porquês, Ishikawa, MASP e planos de ação relacionados.',
       },
       {
         question: 'Posso acompanhar reincidências?',
@@ -527,7 +527,7 @@ export const segmentPages: PublicPage[] = [
     summary:
       'Para empresas que precisam unir segurança dos alimentos, qualidade, evidências e melhoria contínua.',
     problem:
-      'O setor exige evidências confiaveis, rastreabilidade e resposta rápida a desvios sem depender de controles isolados.',
+      'O setor exige evidências confiáveis, rastreabilidade e resposta rápida a desvios sem depender de controles isolados.',
     benefits: ['Apoia rastreabilidade.', 'Organiza evidências.', 'Integra NC e CAPA.', 'Controla documentos e auditorias.'],
     features: ['Rastreabilidade', 'Documentos', 'Listas de verificação', 'Auditorias', 'Planos corretivos'],
     useCases: ['Controle de lotes.', 'Tratativa de desvios.', 'Listas de verificação de qualidade e segurança dos alimentos.'],
@@ -741,13 +741,13 @@ export const articlePages: ArticlePage[] = [
     updatedAt: '2026-06-09',
     readingTime: '8 min',
     intro:
-      'Indicadores bons reduzem discussão subjetiva e aumentam clareza sobre prioridade. O desafio e desenhar uma estrutura que possa ser acompanhada e auditada ao longo do tempo.',
+      'Indicadores bons reduzem discussão subjetiva e aumentam clareza sobre prioridade. O desafio é desenhar uma estrutura que possa ser acompanhada e auditada ao longo do tempo.',
     sections: [
       {
         title: 'Comece pelo objetivo de gestão',
         body: [
           'Um indicador deve responder a uma pergunta de gestão. Antes de escolher gráficos, defina qual decisão ele precisa apoiar, quem decide e com qual frequência.',
-          'Esse ponto evita excesso de KPIs e ajuda a separar indicadores estratégicos, taticos e operacionais.',
+          'Esse ponto evita excesso de KPIs e ajuda a separar indicadores estratégicos, táticos e operacionais.',
         ],
       },
       {

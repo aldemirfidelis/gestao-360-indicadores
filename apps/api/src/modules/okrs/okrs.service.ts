@@ -183,7 +183,7 @@ export class OkrsService {
       where: { id: cycleId, companyId },
       select: { id: true, startsAt: true, endsAt: true },
     });
-    if (!cycle) throw new NotFoundException('Ciclo OKR nao encontrado');
+    if (!cycle) throw new NotFoundException('Ciclo OKR não encontrado');
     return cycle;
   }
 
@@ -193,7 +193,7 @@ export class OkrsService {
       where: { id, deletedAt: null, cycle: { companyId } },
       select: { id: true, cycleId: true },
     });
-    if (!obj) throw new NotFoundException('Objetivo OKR nao encontrado');
+    if (!obj) throw new NotFoundException('Objetivo OKR não encontrado');
     return obj;
   }
 
@@ -202,35 +202,35 @@ export class OkrsService {
     const ok = await this.prisma.strategicObjective.count({
       where: { id: strategicObjId, deletedAt: null, map: { companyId, deletedAt: null } },
     });
-    if (!ok) throw new NotFoundException('Objetivo estrategico nao encontrado');
+    if (!ok) throw new NotFoundException('Objetivo estratégico não encontrado');
   }
 
   /** Garante que a area (OrgNode) pertence a empresa. */
   private async assertOrgNode(companyId: string, nodeId: string) {
     const ok = await this.prisma.orgNode.count({ where: { id: nodeId, companyId, deletedAt: null } });
-    if (!ok) throw new NotFoundException('Area nao encontrada');
+    if (!ok) throw new NotFoundException('Área não encontrada');
   }
 
   /** Garante que o usuario dono pertence a empresa. */
   private async assertUser(companyId: string, userId: string) {
     const ok = await this.prisma.user.count({ where: { id: userId, companyId, deletedAt: null } });
-    if (!ok) throw new NotFoundException('Usuario nao encontrado');
+    if (!ok) throw new NotFoundException('Usuário não encontrado');
   }
 
   /** Garante que o indicador vinculado ao KR pertence a empresa. */
   private async assertIndicator(companyId: string, indicatorId: string) {
     const ok = await this.prisma.indicator.count({ where: { id: indicatorId, companyId, deletedAt: null } });
-    if (!ok) throw new NotFoundException('Indicador nao encontrado');
+    if (!ok) throw new NotFoundException('Indicador não encontrado');
   }
 
   /** Garante que o objetivo pai pertence ao mesmo ciclo do OKR. */
   private async assertParentInCycle(companyId: string, parentId: string, cycleId: string, currentId?: string) {
-    if (parentId === currentId) throw new NotFoundException('Objetivo pai invalido');
+    if (parentId === currentId) throw new NotFoundException('Objetivo pai inválido');
     const parent = await this.prisma.oKRObjective.findFirst({
       where: { id: parentId, cycleId, deletedAt: null, cycle: { companyId } },
       select: { id: true },
     });
-    if (!parent) throw new NotFoundException('Objetivo pai nao encontrado neste ciclo');
+    if (!parent) throw new NotFoundException('Objetivo pai não encontrado neste ciclo');
   }
 
   /** Garante que o resultado-chave pertence a empresa (via objetivo -> ciclo). */
@@ -239,7 +239,7 @@ export class OkrsService {
       where: { id: krId, objective: { deletedAt: null, cycle: { companyId } } },
       select: { id: true },
     });
-    if (!kr) throw new NotFoundException('Resultado-chave nao encontrado');
+    if (!kr) throw new NotFoundException('Resultado-chave não encontrado');
   }
 
   async listObjectives(me: AuthPayload, cycleId: string) {
@@ -257,7 +257,7 @@ export class OkrsService {
       where: { id, deletedAt: null, cycle: { companyId: me.companyId } },
       include: { ...this.objectiveInclude(), cycle: { select: { startsAt: true, endsAt: true } } },
     });
-    if (!obj) throw new NotFoundException('Objetivo OKR nao encontrado');
+    if (!obj) throw new NotFoundException('Objetivo OKR não encontrado');
     return this.enrich(obj, (obj as any).cycle);
   }
 

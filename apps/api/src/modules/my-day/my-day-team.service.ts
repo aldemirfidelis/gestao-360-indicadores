@@ -1,3 +1,4 @@
+import { formatQuantity } from '@g360/shared';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
@@ -211,18 +212,18 @@ export class MyDayTeamService {
     const workload = await this.computeWorkload(me, scope);
     // Sobrecarga: membros com mais itens vencidos.
     for (const w of workload.filter((x) => x.overdue >= 3).slice(0, 3)) {
-      out.push({ type: 'OVERLOAD', label: `${w.name} acumula ${w.overdue} item(ns) vencido(s)`, count: w.overdue, userId: w.userId, userName: w.name });
+      out.push({ type: 'OVERLOAD', label: `${w.name} acumula ${formatQuantity(w.overdue, 'item vencido', 'itens vencidos')}`, count: w.overdue, userId: w.userId, userName: w.name });
     }
     // Aprovacoes paradas (vencidas).
     const stuckApprovals = await this.prisma.workItemIndex.count({
       where: { companyId: me.companyId, assignedUserId: { in: scope.memberIds }, itemType: 'APPROVAL', overdueDays: { gt: 0 } },
     });
-    if (stuckApprovals > 0) out.push({ type: 'STUCK_APPROVALS', label: `${stuckApprovals} aprovação(ões) parada(s) (vencidas) na equipe`, count: stuckApprovals });
+    if (stuckApprovals > 0) out.push({ type: 'STUCK_APPROVALS', label: `${formatQuantity(stuckApprovals, 'aprovação vencida', 'aprovações vencidas')} na equipe`, count: stuckApprovals });
     // Itens bloqueantes.
     const blocking = await this.prisma.workItemIndex.count({
       where: { companyId: me.companyId, assignedUserId: { in: scope.memberIds }, isBlocking: true },
     });
-    if (blocking > 0) out.push({ type: 'BLOCKING', label: `${blocking} item(ns) bloqueante(s) aguardando ação`, count: blocking });
+    if (blocking > 0) out.push({ type: 'BLOCKING', label: `${formatQuantity(blocking, 'item que bloqueia o fluxo', 'itens que bloqueiam o fluxo')} aguardando ação`, count: blocking });
 
     // Acoes sem responsavel / sem prazo no escopo gerenciado (consulta direta na origem).
     if (!scope.allCompany && scope.nodeIds.length) {

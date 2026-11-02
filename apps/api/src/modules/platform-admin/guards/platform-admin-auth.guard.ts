@@ -34,10 +34,10 @@ export class PlatformAdminAuthGuard implements CanActivate {
     try {
       payload = await this.jwt.verifyAsync<PlatformJwt>(token, { secret: requireSecret('JWT_ACCESS_SECRET') });
     } catch {
-      throw new UnauthorizedException('Token do Portal Admin Global invalido ou expirado.');
+      throw new UnauthorizedException('Token do Portal Admin Global inválido ou expirado.');
     }
     if (payload.kind !== 'platform-admin') {
-      throw new UnauthorizedException('Token nao pertence ao Portal Admin Global.');
+      throw new UnauthorizedException('Token não pertence ao Portal Admin Global.');
     }
 
     const session = await this.prisma.platformAdminSession.findUnique({
@@ -65,7 +65,7 @@ export class PlatformAdminAuthGuard implements CanActivate {
       session.user.deletedAt ||
       session.user.status !== 'ACTIVE'
     ) {
-      throw new UnauthorizedException('Sessao interna invalida, expirada ou revogada.');
+      throw new UnauthorizedException('Sessão interna inválida, expirada ou revogada.');
     }
 
     const roles = session.user.roles.map((item) => item.role.code);
@@ -87,14 +87,14 @@ export class PlatformAdminAuthGuard implements CanActivate {
             userEmail: session.user.email,
             action: 'DENIED',
             result: 'DENIED',
-            message: `Permissao requerida: ${required.join(', ')}`,
+            message: `Permissão requerida: ${required.join(', ')}`,
             path: req.originalUrl,
             ip: req.ip,
             userAgent: req.headers['user-agent'],
           },
         })
         .catch(swallow(undefined, 'platformAdmin.guard.accessLogDenied', 'debug'));
-      throw new ForbiddenException('Permissao insuficiente no Portal Admin Global.');
+      throw new ForbiddenException('Permissão insuficiente no Portal Admin Global.');
     }
 
     req.platformAdmin = {

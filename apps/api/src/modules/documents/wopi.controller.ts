@@ -29,7 +29,7 @@ export class WopiController {
   private authorize(fileId: string, accessToken?: string): WopiTokenPayload {
     const token = this.editor.verifyToken(accessToken);
     if (!token || token.fileId !== fileId) {
-      throw new UnauthorizedException('access_token invalido ou expirado.');
+      throw new UnauthorizedException('access_token inválido ou expirado.');
     }
     return token;
   }

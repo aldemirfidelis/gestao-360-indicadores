@@ -14,7 +14,7 @@ const DEFAULT_TYPES: Array<{
 }> = [
   {
     code: 'FORM',
-    name: 'Formulario',
+    name: 'Formulário',
     category: FormTemplateType.FORM,
     color: '#2563eb',
     icon: 'FileText',
@@ -27,7 +27,7 @@ const DEFAULT_TYPES: Array<{
     category: FormTemplateType.CHECKLIST,
     color: '#16a34a',
     icon: 'ClipboardCheck',
-    purpose: 'Verificacao de itens, requisitos e etapas.',
+    purpose: 'Verificação de itens, requisitos e etapas.',
     retentionDays: 1825,
   },
   {
@@ -36,23 +36,23 @@ const DEFAULT_TYPES: Array<{
     category: FormTemplateType.OPERATIONAL_RECORD,
     color: '#f59e0b',
     icon: 'NotebookTabs',
-    purpose: 'Registro recorrente rastreavel de rotinas operacionais.',
+    purpose: 'Registro recorrente rastreável de rotinas operacionais.',
     retentionDays: 3650,
   },
 ];
 
 const DEFAULT_CATEGORIES = [
-  ['Operacoes', '#2563eb'],
+  ['Operações', '#2563eb'],
   ['Qualidade', '#16a34a'],
-  ['Seguranca', '#dc2626'],
+  ['Segurança', '#dc2626'],
   ['Meio ambiente', '#059669'],
-  ['Manutencao', '#7c3aed'],
+  ['Manutenção', '#7c3aed'],
   ['RH', '#db2777'],
 ] as const;
 
 const DEFAULT_FOLDERS = ['Biblioteca corporativa', 'Operacional', 'Auditorias e compliance', 'Publicos e externos'] as const;
 const DEFAULT_TAGS = [
-  ['Critico', '#dc2626'],
+  ['Crítico', '#dc2626'],
   ['Recorrente', '#f59e0b'],
   ['Externo', '#2563eb'],
   ['Offline', '#7c3aed'],

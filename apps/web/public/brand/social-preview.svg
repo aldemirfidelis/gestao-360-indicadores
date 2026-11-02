@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
-  <title id="title">Gestao 360 - plataforma de gestao corporativa integrada</title>
-  <desc id="desc">Preview institucional do Gestao 360 com blocos de indicadores, planos de acao e rastreabilidade.</desc>
+  <title id="title">Gestão 360 - plataforma de gestão corporativa integrada</title>
+  <desc id="desc">Prévia institucional do Gestão 360 com blocos de indicadores, planos de ação e rastreabilidade.</desc>
   <rect width="1200" height="630" fill="#0f172a"/>
   <rect x="72" y="78" width="1056" height="474" fill="#111827" stroke="#334155" stroke-width="2"/>
   <circle cx="148" cy="150" r="36" fill="#10b981"/>
   <path d="M148 122a28 28 0 1 0 22 45" fill="none" stroke="#0f172a" stroke-width="8" stroke-linecap="round"/>
   <circle cx="148" cy="150" r="7" fill="#0f172a"/>
-  <text x="204" y="147" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="44" font-weight="700">Gestao 360</text>
-  <text x="204" y="184" fill="#cbd5e1" font-family="Inter, Arial, sans-serif" font-size="22">Indicadores, estrategia e planos de acao conectados</text>
+  <text x="204" y="147" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="44" font-weight="700">Gestão 360</text>
+  <text x="204" y="184" fill="#cbd5e1" font-family="Inter, Arial, sans-serif" font-size="22">Indicadores, estratégia e planos de ação conectados</text>
   <g transform="translate(96 250)">
     <rect width="300" height="180" fill="#0f172a" stroke="#334155"/>
     <text x="24" y="44" fill="#6ee7b7" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Indicadores</text>
@@ -18,7 +18,7 @@
   </g>
   <g transform="translate(450 250)">
     <rect width="300" height="180" fill="#0f172a" stroke="#334155"/>
-    <text x="24" y="44" fill="#93c5fd" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Planos de acao</text>
+    <text x="24" y="44" fill="#93c5fd" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Planos de ação</text>
     <rect x="24" y="72" width="252" height="28" fill="#1e293b"/>
     <rect x="24" y="112" width="214" height="28" fill="#1e293b"/>
     <rect x="24" y="152" width="170" height="12" fill="#38bdf8"/>

@@ -332,7 +332,7 @@ export default function IndicatorsPage() {
         : api('/indicators', { method: 'POST', json: payload });
     },
     onSuccess: () => {
-      toast.success(form.id ? 'Indicador atualizado' : 'Indicador incluido');
+      toast.success(form.id ? 'Indicador atualizado' : 'Indicador incluído');
       setFormOpen(false);
       setForm(EMPTY_INDICATOR_FORM);
       qc.invalidateQueries({ queryKey: ['indicators'] });

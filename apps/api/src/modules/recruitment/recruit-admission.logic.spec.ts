@@ -20,7 +20,7 @@ describe('recruit-admission.logic', () => {
     });
     expect(result.ready).toBe(false);
     expect(result.blocks).toContain('Proposta precisa estar aceita.');
-    expect(result.blocks).toContain('Pre-admissao precisa estar liberada pelo ASO.');
+    expect(result.blocks).toContain('Pré-admissão precisa estar liberada pelo ASO.');
   });
 
   it('bloqueia ASO inapto mesmo quando a pre-admissao foi marcada indevidamente', () => {
@@ -31,7 +31,7 @@ describe('recruit-admission.logic', () => {
       asoResult: 'INAPTO',
     });
     expect(result.ready).toBe(false);
-    expect(result.blocks).toEqual(['ASO nao liberou a admissao.']);
+    expect(result.blocks).toEqual(['ASO não liberou a admissão.']);
   });
 
   it('calcula marcos de experiencia de 45 e 90 dias', () => {

@@ -64,11 +64,11 @@ export class RegistryService implements OnModuleInit {
     }
     await this.prisma.portalPage.updateMany({
       where: { code: { in: DEPRECATED_PAGE_CODES } },
-      data: { status: 'HIDDEN', menuOrder: 9999, updateReason: 'Substituida pela tela unica de Processos.' },
+      data: { status: 'HIDDEN', menuOrder: 9999, updateReason: 'Substituída pela tela única de Processos.' },
     });
     await this.prisma.portalPage.updateMany({
       where: { code: { in: DEPRECATED_COMMUNICATION_PAGE_CODES } },
-      data: { status: 'HIDDEN', menuOrder: 9999, updateReason: 'Substituida pela central de Publicacoes da Comunicacao.' },
+      data: { status: 'HIDDEN', menuOrder: 9999, updateReason: 'Substituída pela central de Publicações da Comunicação.' },
     });
     for (const f of CATALOG_FEATURES) {
       const exists = await this.prisma.portalFeature.findUnique({ where: { code: f.code } });

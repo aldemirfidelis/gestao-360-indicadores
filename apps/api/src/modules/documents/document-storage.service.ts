@@ -63,7 +63,7 @@ export class DocumentStorageService {
   private resolveKey(storageKey: string) {
     const target = resolve(this.root, storageKey);
     if (!target.startsWith(this.root)) {
-      throw new Error('Storage key invalida.');
+      throw new Error('Storage key inválida.');
     }
     return target;
   }

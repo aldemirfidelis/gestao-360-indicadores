@@ -229,7 +229,7 @@ const STATUS_LABEL: Record<string, string> = {
   ON_TRACK: 'No prazo',
   AT_RISK: 'Em risco',
   OFF_TRACK: 'Fora da meta',
-  DONE: 'Concluido',
+  DONE: 'Concluído',
   CANCELLED: 'Cancelado',
 };
 
@@ -273,7 +273,7 @@ interface RelationKindMeta {
 const RELATION_KINDS: RelationKindMeta[] = [
   { kind: 'contribui', label: 'Contribui para', description: 'A entrega de A contribui positivamente para B', color: '#16a34a' },
   { kind: 'impacta', label: 'Impacta', description: 'A altera direta ou indiretamente o resultado de B', color: '#2563eb' },
-  { kind: 'depende', label: 'Depende de', description: 'A so avanca quando B avanca', color: '#9333ea' },
+  { kind: 'depende', label: 'Depende de', description: 'A só avança quando B avança', color: '#9333ea' },
   { kind: 'medido_por', label: 'E medido por', description: 'A e mensurado pelo indicador/objetivo B', color: '#0ea5e9' },
   { kind: 'gera_acao', label: 'Gera ação', description: 'A motiva um plano de ação em B', color: '#f97316' },
   { kind: 'vinculado', label: 'Está vinculado a', description: 'Ligação livre entre A e B', color: '#64748b' },
@@ -1981,7 +1981,7 @@ function StrategyMapPageInner() {
               </div>
             </div>
             <div>
-              <Label>Icone ou sigla</Label>
+              <Label>Ícone ou sigla</Label>
               <Input maxLength={3} value={perspectiveForm.icon} onChange={(event) => setPerspectiveForm({ ...perspectiveForm, icon: event.target.value })} />
             </div>
             <div>
@@ -2382,10 +2382,10 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
       </div>
 
       <div>
-        <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Ligacoes estratégicas</div>
+        <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Ligações estratégicas</div>
         <div className="space-y-1 text-xs">
           {objective.outRelations.length === 0 && objective.inRelations.length === 0 && (
-            <div className="text-muted-foreground">Sem ligacoes cadastradas.</div>
+            <div className="text-muted-foreground">Sem ligações cadastradas.</div>
           )}
           {objective.outRelations.map((rel) => (
             <div key={rel.id} className="flex items-center gap-2 rounded-md border bg-muted/20 px-2 py-1">

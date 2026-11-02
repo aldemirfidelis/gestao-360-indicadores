@@ -84,10 +84,10 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
 
       {data && (
         <>
-          <SectionCard title="Identificacao da tabela" description="Catalogo funcional usado pelo Portal Administrativo Global.">
+          <SectionCard title="Identificação da tabela" description="Catálogo funcional usado pelo Portal Administrativo Global.">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <CatalogInfo label="Modulo" value={catalog.module} />
-              <CatalogInfo label="Rotulo amigavel" value={catalog.label} />
+              <CatalogInfo label="Módulo" value={catalog.module} />
+              <CatalogInfo label="Rótulo amigável" value={catalog.label} />
               <CatalogInfo label="Origem" value={catalog.origin} />
               <CatalogInfo label="Impacto" value={catalog.impact} />
             </div>
@@ -150,7 +150,7 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
                     <tr>
                       <th className="text-left">Nome</th>
                       <th className="text-left">Tipo</th>
-                      <th className="text-left">Definicao</th>
+                      <th className="text-left">Definição</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -173,7 +173,7 @@ export function TableDetailContent({ table, onBack }: { table: string; onBack?: 
                     <tr>
                       <th className="text-left">Nome</th>
                       <th className="text-left">Colunas</th>
-                      <th className="text-left">Unico</th>
+                      <th className="text-left">Único</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -214,8 +214,8 @@ function fallbackTableCatalog(table: string): TableSchema['catalog'] {
     moduleKey: 'other',
     label: humanizeTableName(table),
     origin: 'Schema public',
-    purpose: 'Tabela fisica do banco sem classificacao especifica no catalogo retornado pela API.',
-    impact: 'Pode impactar telas, relatorios, integracoes ou rotinas que dependam diretamente desses dados.',
+    purpose: 'Tabela física do banco sem classificação específica no catálogo retornado pela API.',
+    impact: 'Pode impactar telas, relatórios, integrações ou rotinas que dependam diretamente desses dados.',
   };
 }
 

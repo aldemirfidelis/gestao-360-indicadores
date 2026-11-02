@@ -31,7 +31,7 @@ interface SyncSummary {
 const ACTUAL_STATUS_LABEL: Record<string, string> = {
   IN_FILLING: 'Em preenchimento',
   PENDING: 'Pendente',
-  IN_VALIDATION: 'Em validacao',
+  IN_VALIDATION: 'Em validação',
   PRE_CLOSE: 'Pre-fechamento',
   CORRECTED: 'Corrigido',
   CLOSED: 'Fechado',

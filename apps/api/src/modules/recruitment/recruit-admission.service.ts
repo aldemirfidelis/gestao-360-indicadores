@@ -53,8 +53,8 @@ export class RecruitAdmissionService {
 
     const profileData = objectRecord(ctx.candidate.profileData);
     const cpf = normalizeCpfRequired(body?.cpf ?? profileData.cpf);
-    if (!cpf) throw new BadRequestException('CPF valido e obrigatorio para autorizar a admissao.');
-    const admissionDate = parseDate(body?.admissionDate ?? offer.startDate ?? pre.admissionTargetDate, 'Data de admissao e obrigatoria.');
+    if (!cpf) throw new BadRequestException('CPF válido é obrigatório para autorizar a admissão.');
+    const admissionDate = parseDate(body?.admissionDate ?? offer.startDate ?? pre.admissionTargetDate, 'Data de admissão é obrigatória.');
     const requisition = await this.requisitionFor(me.companyId, ctx.posting.requisitionId);
     const opening = await this.nextOpening(me.companyId, requisition.id);
     const plannedPositionId = opening?.positionId ?? requisition.positionId ?? null;
@@ -89,7 +89,7 @@ export class RecruitAdmissionService {
         bankAccount: body?.bankAccount ?? profileData.bankAccount,
         bankAccountDigit: body?.bankAccountDigit ?? profileData.bankAccountDigit,
         pixKey: body?.pixKey ?? profileData.pixKey,
-        notes: text(body?.notes) ?? 'Admissao originada pelo recrutamento.',
+        notes: text(body?.notes) ?? 'Admissão originada pelo recrutamento.',
       },
     });
 
@@ -114,7 +114,7 @@ export class RecruitAdmissionService {
           jobCatalogId: requisition.jobCatalogId,
           currentSalary: salary,
           effectiveFrom: admissionDate,
-          reason: 'Admissao via recrutamento',
+          reason: 'Admissão via recrutamento',
           createdById: me.sub,
         },
       });
@@ -188,7 +188,7 @@ export class RecruitAdmissionService {
       entity: 'RecruitAdmission',
       entityId: admission.id,
       action: 'AUTHORIZE',
-      message: `Admissao autorizada para ${ctx.candidate.name}`,
+      message: `Admissão autorizada para ${ctx.candidate.name}`,
       after: { applicationId, employeeId },
     });
     // Cria o acesso ao portal (login por CPF) para o novo colaborador bater ponto/autoatendimento.
@@ -196,7 +196,7 @@ export class RecruitAdmissionService {
     try {
       await this.employees.createPortalUser(me, employeeId, { loginType: 'CPF' });
     } catch (err) {
-      this.logger.warn(`Acesso ao portal nao criado na admissao de ${employeeId}: ${(err as Error)?.message ?? err}`);
+      this.logger.warn(`Acesso ao portal não criado na admissão de ${employeeId}: ${(err as Error)?.message ?? err}`);
     }
     const companyName = await resolveCompanyDisplayName(this.prisma, me.companyId);
     void this.communication.sendEvent(me.companyId, 'ADMISSION_AUTHORIZED', ctx.candidate.email, {
@@ -212,8 +212,8 @@ export class RecruitAdmissionService {
       where: { id, companyId: me.companyId },
       include: { admission: true },
     });
-    if (!review) throw new NotFoundException('Avaliacao de experiencia nao encontrada.');
-    if (review.status !== 'PENDING') throw new ConflictException('Esta avaliacao ja foi encerrada.');
+    if (!review) throw new NotFoundException('Avaliação de experiência não encontrada.');
+    if (review.status !== 'PENDING') throw new ConflictException('Esta avaliação já foi encerrada.');
     const recommendation = text(body?.recommendation) ?? 'CONTINUAR';
     const saved = await this.prisma.recruitProbationReview.update({
       where: { id },
@@ -230,7 +230,7 @@ export class RecruitAdmissionService {
       entity: 'RecruitProbationReview',
       entityId: id,
       action: 'COMPLETE',
-      message: `Avaliacao de experiencia D+${review.cycleDay}: ${recommendation}`,
+      message: `Avaliação de experiência D+${review.cycleDay}: ${recommendation}`,
     });
     return saved;
   }
@@ -279,7 +279,7 @@ export class RecruitAdmissionService {
         },
       },
     });
-    if (!app) throw new NotFoundException('Candidatura nao encontrada.');
+    if (!app) throw new NotFoundException('Candidatura não encontrada.');
     return app;
   }
 
@@ -293,21 +293,21 @@ export class RecruitAdmissionService {
     const pre = preAdmissionId
       ? app.preAdmissions.find((item) => item.id === preAdmissionId)
       : app.preAdmissions.find((item) => item.offerId === offerId && item.status === 'ASO_CLEARED') ?? app.preAdmissions.find((item) => item.status === 'ASO_CLEARED');
-    if (!pre) throw new ConflictException('Pre-admissao liberada pelo ASO nao encontrada.');
+    if (!pre) throw new ConflictException('Pré-admissão liberada pelo ASO não encontrada.');
     return pre;
   }
 
   private clearedAso(pre: { occupationalExamRequests?: Array<{ status: string; asoRecord: any }> }) {
     const record = (pre.occupationalExamRequests ?? []).find((item) => item.status === 'COMPLETED' && item.asoRecord)?.asoRecord;
     if (!record || !['APTO', 'APTO_COM_RESTRICAO'].includes(record.result)) {
-      throw new ConflictException('ASO admissional precisa estar apto para autorizar a admissao.');
+      throw new ConflictException('ASO admissional precisa estar apto para autorizar a admissão.');
     }
     return record;
   }
 
   private async requisitionFor(companyId: string, id: string) {
     const req = await this.prisma.recruitRequisition.findFirst({ where: { id, companyId, deletedAt: null } });
-    if (!req) throw new NotFoundException('Requisicao da vaga nao encontrada.');
+    if (!req) throw new NotFoundException('Requisição da vaga não encontrada.');
     return req;
   }
 
@@ -323,8 +323,8 @@ export class RecruitAdmissionService {
       where: { id: positionId, companyId, deletedAt: null },
       select: { id: true, currentEmployeeId: true },
     });
-    if (!position) throw new NotFoundException('Posicao nao encontrada.');
-    if (position.currentEmployeeId) throw new ConflictException('Posicao ja ocupada por outro colaborador.');
+    if (!position) throw new NotFoundException('Posição não encontrada.');
+    if (position.currentEmployeeId) throw new ConflictException('Posição já ocupada por outro colaborador.');
   }
 
   private async occupyOrCreatePosition(tx: Prisma.TransactionClient, me: AuthPayload, input: {
@@ -354,7 +354,7 @@ export class RecruitAdmissionService {
           updatedById: me.sub,
         },
       });
-      if (result.count === 0) throw new ConflictException('Posicao nao esta disponivel para ocupacao.');
+      if (result.count === 0) throw new ConflictException('Posição não está disponível para ocupação.');
       await this.allocationHistory(tx, me, input.plannedPositionId, input.employeeId, null, input.employeeJobId, input.admissionDate);
       return input.plannedPositionId;
     }
@@ -431,7 +431,7 @@ export class RecruitAdmissionService {
         sizeBytes: doc.candidateDocument.sizeBytes,
         hashSha256: doc.candidateDocument.hashSha256,
         storageKey: doc.candidateDocument.storageKey,
-        note: 'Documento validado na pre-admissao.',
+        note: 'Documento validado na pré-admissão.',
         createdById: userId,
       })),
     });
@@ -448,7 +448,7 @@ export class RecruitAdmissionService {
         toJobId,
         toPositionId: positionId,
         reason: 'ADMISSAO_RECRUTAMENTO',
-        justification: 'Admissao autorizada pelo ATS.',
+        justification: 'Admissão autorizada pelo ATS.',
         effectiveAt,
         changedById: me.sub,
       },
@@ -477,7 +477,7 @@ export class RecruitAdmissionService {
 
   private async applicationExists(companyId: string, applicationId: string) {
     const exists = await this.prisma.recruitApplication.findFirst({ where: { id: applicationId, companyId }, select: { id: true } });
-    if (!exists) throw new NotFoundException('Candidatura nao encontrada.');
+    if (!exists) throw new NotFoundException('Candidatura não encontrada.');
   }
 }
 

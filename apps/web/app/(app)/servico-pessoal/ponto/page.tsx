@@ -870,7 +870,7 @@ export default function TimeClockPage() {
               <Fingerprint className="h-8 w-8 text-sky-500" />
               <div className="text-sm font-semibold">Seu ponto agora fica em Minha Vida Funcional</div>
               <p className="max-w-md text-xs text-muted-foreground">
-                Para bater ponto, ver seu espelho e solicitar ajustes, acesse Minha Vida Funcional. Esta area e do Servico Pessoal.
+                Para bater ponto, ver seu espelho e solicitar ajustes, acesse Minha Vida Funcional. Esta área é do Serviço Pessoal.
               </p>
               <Button asChild variant="outline" size="sm">
                 <Link href="/servico-pessoal/meu-holerite">Ir para Minha Vida Funcional</Link>

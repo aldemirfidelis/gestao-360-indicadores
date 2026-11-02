@@ -1313,10 +1313,10 @@ export class MonthlyResultsService {
         key: PRESENTATION_HEADER_KEY,
         value,
         valueType: 'json',
-        group: 'Reuniao Mensal',
-        description: 'Cabecalho (faixa PNG) da apresentacao da Reuniao Mensal',
+        group: 'Reunião Mensal',
+        description: 'Cabeçalho (faixa PNG) da apresentação da Reunião Mensal',
       },
-      update: { value, valueType: 'json', group: 'Reuniao Mensal' },
+      update: { value, valueType: 'json', group: 'Reunião Mensal' },
       select: { updatedAt: true },
     });
     return { ...branding, updatedAt: saved.updatedAt };

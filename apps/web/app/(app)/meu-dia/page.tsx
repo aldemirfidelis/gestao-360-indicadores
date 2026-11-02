@@ -1,5 +1,5 @@
 'use client';
-import { isProductModuleActive } from '@g360/shared';
+import { formatQuantity, isProductModuleActive } from '@g360/shared';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -333,9 +333,9 @@ export default function MeuDiaPage() {
   const digestHeadline = !s
     ? 'Carregando seu dia…'
     : s.overdue > 0
-      ? `${s.overdue} item(ns) vencido(s) exigem atenção`
+      ? formatQuantity(s.overdue, 'item vencido exige atenção', 'itens vencidos exigem atenção')
       : s.dueToday > 0
-        ? `${s.dueToday} item(ns) vencendo hoje`
+        ? formatQuantity(s.dueToday, 'item vencendo hoje', 'itens vencendo hoje')
         : s.pending > 0
           ? 'Nenhum item vencido — mantenha o ritmo'
           : 'Tudo em dia! Nenhuma pendência atribuída a você.';
@@ -382,7 +382,7 @@ export default function MeuDiaPage() {
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {(s?.pending ?? 0) > 0
-                ? `Você possui ${s?.pending} item(ns) para tratar — ${s?.overdue ?? 0} vencido(s).`
+                ? `Você possui ${formatQuantity(s?.pending ?? 0, 'item', 'itens')} para tratar — ${formatQuantity(s?.overdue ?? 0, 'item vencido', 'itens vencidos')}.`
                 : 'Tudo em dia! Nenhuma pendência atribuída a você.'}
               {' · '}{formatDate(new Date().toISOString())}
             </p>
@@ -398,7 +398,7 @@ export default function MeuDiaPage() {
               </Button>
             )}
             <Button variant="outline" size="sm" disabled={user?.isDemo} onClick={() => setDelegationsOpen(true)}>
-              <UserPlus className="mr-2 h-4 w-4" />Delegacoes
+              <UserPlus className="mr-2 h-4 w-4" />Delegações
             </Button>
             <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={user?.isDemo || refresh.isPending}>
               <RefreshCw className={cn('mr-2 h-4 w-4', refresh.isPending && 'animate-spin')} />Atualizar
@@ -968,7 +968,7 @@ function ActNowDialog({ item, onClose, onDone, onOpen, onVision }: {
         ) : isDocumentEditApproval ? (
           <div className="space-y-3">
             <div>
-              <Label>Justificativa <span className="text-xs text-muted-foreground">(obrigatoria para rejeitar)</span></Label>
+              <Label>Justificativa <span className="text-xs text-muted-foreground">(obrigatória para rejeitar)</span></Label>
               <Textarea rows={3} value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="Oriente o solicitante, quando necessário." />
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1120,7 +1120,7 @@ function ItemsCalendar({ rows, onAct, onFollow, onPin }: { rows: WorkItem[]; onA
           <CardContent className="p-3">
             <div className="mb-2 flex items-center justify-between text-sm font-semibold">
               <span>{key === 'Sem prazo' ? key : formatDate(key)}</span>
-              <span className="text-xs text-muted-foreground">{items.length} item(ns)</span>
+              <span className="text-xs text-muted-foreground">{formatQuantity(items.length, 'item', 'itens')}</span>
             </div>
             <div className="space-y-2">
               {items.map((it) => <MiniWorkItem key={it.id} item={it} onAct={onAct} onFollow={onFollow} onPin={onPin} />)}
@@ -1192,7 +1192,7 @@ function DelegationsDialog({ data, loading, creating, revoking, onClose, onCreat
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl">
-        <DialogHeader><DialogTitle>Delegacoes e substituicoes</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Delegações e substituições</DialogTitle></DialogHeader>
         {loading ? (
           <div className="h-32 animate-pulse rounded-md bg-muted/40" />
         ) : (
@@ -1221,10 +1221,10 @@ function DelegationsDialog({ data, loading, creating, revoking, onClose, onCreat
                 )}
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div><Label>Inicio</Label><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></div>
+                <div><Label>Início</Label><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></div>
                 <div><Label>Fim</Label><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></div>
               </div>
-              <div><Label>Motivo</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ferias, ausencia, cobertura operacional..." /></div>
+              <div><Label>Motivo</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Férias, ausência, cobertura operacional..." /></div>
               <Button disabled={!delegateUserId || creating} onClick={() => onCreate({ delegateUserId, startsAt, endsAt: endsAt || null, reason })}>Criar delegação</Button>
             </div>
             <div className="space-y-3">
@@ -1244,7 +1244,7 @@ function DelegationsDialog({ data, loading, creating, revoking, onClose, onCreat
               <div>
                 <div className="text-sm font-semibold">Recebidas</div>
                 <div className="mt-2 space-y-2">
-                  {(data?.received ?? []).length === 0 ? <p className="text-xs text-muted-foreground">Nenhuma substituicao recebida.</p> : data!.received.map((d) => (
+                  {(data?.received ?? []).length === 0 ? <p className="text-xs text-muted-foreground">Nenhuma substituição recebida.</p> : data!.received.map((d) => (
                     <div key={d.id} className="rounded-md border p-2 text-sm">
                       <div className="font-medium">{d.delegator.name}</div>
                       <div className="text-xs text-muted-foreground">{formatDate(d.startsAt)} até {d.endsAt ? formatDate(d.endsAt) : 'sem fim'} - {d.status}</div>

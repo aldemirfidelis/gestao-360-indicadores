@@ -87,6 +87,25 @@ describe('MyDayService - Fase 4 inc.2', () => {
     await expect(svc.createDelegation(me, { delegateUserId: 'u1' })).rejects.toThrow('substituto');
   });
 
+  it.each([1, 2])('redige a recomendação crítica com acentos e concordância para %i item(ns)', async (count) => {
+    const items = Array.from({ length: count }, (_, index) => ({ id: `wi${index}`, priority: 'CRITICAL', itemType: 'TASK' }));
+    const { svc, prisma } = makeService({ items });
+    prisma.workItemIndex.count.mockImplementation(({ where }: any) => Promise.resolve(where.overdueDays ? count : 0));
+
+    const result = await svc.getAssistantSummary(me);
+    const critical = result.recommendations.find((recommendation) => recommendation.key === 'critical-first');
+    expect(critical?.title).toBe('Prioridade crítica no topo');
+    expect(critical?.explanation).toBe(count === 1
+      ? '1 item crítico exige atenção antes dos demais por risco, prazo ou impacto.'
+      : '2 itens críticos exigem atenção antes dos demais por risco, prazo ou impacto.');
+    expect(critical?.suggestion).toBe('Abra a Visão 360 dos itens críticos antes de executar uma ação irreversível e registre a justificativa quando houver uma decisão.');
+    expect(result.summary).toContain(count === 1 ? '1 item vencido' : '2 itens vencidos');
+    expect(result.summary).toContain('decisões que liberam outras pessoas');
+    expect(prisma.myDayAssistantLog.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      update: expect.objectContaining({ suggestion: critical?.suggestion }),
+    }));
+  });
+
   it('getAssistantSummary gera recomendacao e registra auditoria', async () => {
     const { svc, prisma } = makeService();
     const result = await svc.getAssistantSummary(me);

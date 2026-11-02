@@ -1,3 +1,4 @@
+import { formatQuantity } from '@g360/shared';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   FormApprovalDecision,
@@ -219,7 +220,7 @@ export class FormsService {
     if (!area) return;
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     if (permitted && !permitted.includes(area)) {
-      throw new ForbiddenException('Voce nao tem acesso aos formularios desta area.');
+      throw new ForbiddenException('Você não tem acesso aos formulários desta área.');
     }
   }
 
@@ -277,7 +278,7 @@ export class FormsService {
 
   private requiredText(value: unknown, field: string) {
     const text = String(value ?? '').trim();
-    if (!text) throw new BadRequestException(`${field} e obrigatorio.`);
+    if (!text) throw new BadRequestException(`${field} é obrigatório.`);
     return text;
   }
 
@@ -290,7 +291,7 @@ export class FormsService {
   private optionalDate(value: unknown) {
     if (value === undefined || value === null || value === '') return undefined;
     const date = new Date(String(value));
-    if (Number.isNaN(date.getTime())) throw new BadRequestException('Data invalida.');
+    if (Number.isNaN(date.getTime())) throw new BadRequestException('Data inválida.');
     return date;
   }
 
@@ -331,37 +332,37 @@ export class FormsService {
 
   private parseTemplateType(value?: string): FormTemplateType | undefined {
     if (!value) return undefined;
-    if (!Object.values(FormTemplateType).includes(value as FormTemplateType)) throw new BadRequestException('Tipo de formulario invalido.');
+    if (!Object.values(FormTemplateType).includes(value as FormTemplateType)) throw new BadRequestException('Tipo de formulário inválido.');
     return value as FormTemplateType;
   }
 
   private parseTemplateStatus(value?: string): FormTemplateStatus | undefined {
     if (!value) return undefined;
-    if (!Object.values(FormTemplateStatus).includes(value as FormTemplateStatus)) throw new BadRequestException('Status de formulario invalido.');
+    if (!Object.values(FormTemplateStatus).includes(value as FormTemplateStatus)) throw new BadRequestException('Status de formulário inválido.');
     return value as FormTemplateStatus;
   }
 
   private parseFieldType(value?: string): FormFieldType | undefined {
     if (!value) return undefined;
-    if (!Object.values(FormFieldType).includes(value as FormFieldType)) throw new BadRequestException('Tipo de campo invalido.');
+    if (!Object.values(FormFieldType).includes(value as FormFieldType)) throw new BadRequestException('Tipo de campo inválido.');
     return value as FormFieldType;
   }
 
   private parseSubmissionStatus(value?: string): FormSubmissionStatus | undefined {
     if (!value) return undefined;
-    if (!Object.values(FormSubmissionStatus).includes(value as FormSubmissionStatus)) throw new BadRequestException('Status de preenchimento invalido.');
+    if (!Object.values(FormSubmissionStatus).includes(value as FormSubmissionStatus)) throw new BadRequestException('Status de preenchimento inválido.');
     return value as FormSubmissionStatus;
   }
 
   private parseExecutionStatus(value?: string): FormExecutionStatus | undefined {
     if (!value) return undefined;
-    if (!Object.values(FormExecutionStatus).includes(value as FormExecutionStatus)) throw new BadRequestException('Status de execucao invalido.');
+    if (!Object.values(FormExecutionStatus).includes(value as FormExecutionStatus)) throw new BadRequestException('Status de execução inválido.');
     return value as FormExecutionStatus;
   }
 
   private parseApprovalDecision(value?: string): FormApprovalDecision {
     if (!value) return FormApprovalDecision.PENDING;
-    if (!Object.values(FormApprovalDecision).includes(value as FormApprovalDecision)) throw new BadRequestException('Decisao de aprovacao invalida.');
+    if (!Object.values(FormApprovalDecision).includes(value as FormApprovalDecision)) throw new BadRequestException('Decisão de aprovação inválida.');
     return value as FormApprovalDecision;
   }
 
@@ -394,7 +395,7 @@ export class FormsService {
       where: { id, companyId, deletedAt: null },
       include: this.templateInclude(),
     });
-    if (!template) throw new NotFoundException('Formulario nao encontrado');
+    if (!template) throw new NotFoundException('Formulário não encontrado');
     return template;
   }
 
@@ -403,7 +404,7 @@ export class FormsService {
       where: { id, companyId, deletedAt: null },
       include: this.submissionInclude(),
     });
-    if (!submission) throw new NotFoundException('Preenchimento nao encontrado');
+    if (!submission) throw new NotFoundException('Preenchimento não encontrado');
     return submission;
   }
 
@@ -412,7 +413,7 @@ export class FormsService {
       where: { id, companyId, deletedAt: null },
       include: this.executionInclude(),
     });
-    if (!execution) throw new NotFoundException('Execucao nao encontrada');
+    if (!execution) throw new NotFoundException('Execução não encontrada');
     return execution;
   }
 
@@ -437,7 +438,7 @@ export class FormsService {
 
     if (ids.orgNodeId) {
       const orgNode = await this.prisma.orgNode.findFirst({ where: { id: ids.orgNodeId, companyId, deletedAt: null }, select: { id: true } });
-      if (!orgNode) throw new NotFoundException('Area ou processo nao encontrado');
+      if (!orgNode) throw new NotFoundException('Área ou processo não encontrado');
       areas.push(orgNode.id);
     }
     if (ids.processId) {
@@ -445,22 +446,22 @@ export class FormsService {
         where: { id: ids.processId, companyId, deletedAt: null },
         select: { orgNodeId: true, indicator: { select: { ownerNodeId: true } } },
       });
-      if (!process) throw new NotFoundException('Processo nao encontrado');
+      if (!process) throw new NotFoundException('Processo não encontrado');
       if (process.orgNodeId) areas.push(process.orgNodeId);
       if (process.indicator?.ownerNodeId) areas.push(process.indicator.ownerNodeId);
     }
     if (ids.indicatorId) {
       const indicator = await this.prisma.indicator.findFirst({ where: { id: ids.indicatorId, companyId, deletedAt: null }, select: { ownerNodeId: true } });
-      if (!indicator) throw new NotFoundException('Indicador nao encontrado');
+      if (!indicator) throw new NotFoundException('Indicador não encontrado');
       if (indicator.ownerNodeId) areas.push(indicator.ownerNodeId);
     }
     if (ownerUserId) {
       const user = await this.prisma.user.findFirst({ where: { id: ownerUserId, companyId, deletedAt: null, active: true }, select: { id: true } });
-      if (!user) throw new NotFoundException('Responsavel nao encontrado');
+      if (!user) throw new NotFoundException('Responsável não encontrado');
     }
 
     const uniqueAreas = Array.from(new Set(areas.filter(Boolean)));
-    if (uniqueAreas.length > 1) throw new ConflictException('Vinculos do formulario pertencem a areas diferentes.');
+    if (uniqueAreas.length > 1) throw new ConflictException('Vínculos do formulário pertencem a áreas diferentes.');
     return { ids, ownerUserId, area: uniqueAreas[0] ?? null };
   }
 
@@ -472,15 +473,15 @@ export class FormsService {
     };
     if (ids.typeConfigId) {
       const item = await this.prisma.formTypeConfig.findFirst({ where: { id: ids.typeConfigId, companyId, deletedAt: null }, select: { id: true } });
-      if (!item) throw new NotFoundException('Tipo de formulario nao encontrado');
+      if (!item) throw new NotFoundException('Tipo de formulário não encontrado');
     }
     if (ids.categoryId) {
       const item = await this.prisma.formCategory.findFirst({ where: { id: ids.categoryId, companyId, deletedAt: null }, select: { id: true } });
-      if (!item) throw new NotFoundException('Categoria de formulario nao encontrada');
+      if (!item) throw new NotFoundException('Categoria de formulário não encontrada');
     }
     if (ids.folderId) {
       const item = await this.prisma.formFolder.findFirst({ where: { id: ids.folderId, companyId, deletedAt: null }, select: { id: true } });
-      if (!item) throw new NotFoundException('Pasta de formulario nao encontrada');
+      if (!item) throw new NotFoundException('Pasta de formulário não encontrada');
     }
     return ids;
   }
@@ -528,7 +529,7 @@ export class FormsService {
     return sortSections(
       items.map((section: any, index) => ({
         code: this.nullableText(section?.code) ?? null,
-        title: this.requiredText(section?.title, 'Titulo da secao'),
+        title: this.requiredText(section?.title, 'Título da seção'),
         description: this.nullableText(section?.description) ?? null,
         position: Number.isFinite(Number(section?.position)) ? Math.max(0, Math.round(Number(section.position))) : index,
         columns: Math.min(4, Math.max(1, this.int(section?.columns) ?? 1)),
@@ -546,7 +547,7 @@ export class FormsService {
         sectionId: this.id(field?.sectionId),
         /** Vínculo lógico com a seção: no create os ids ainda não existem. */
         sectionCode: this.nullableText(field?.sectionCode) ?? null,
-        label: this.requiredText(field?.label, 'Rotulo do campo'),
+        label: this.requiredText(field?.label, 'Rótulo do campo'),
         type: this.parseFieldType(field?.type) ?? FormFieldType.TEXT,
         required: Boolean(field?.required),
         readOnly: Boolean(field?.readOnly),
@@ -831,7 +832,7 @@ export class FormsService {
   }
 
   async create(me: AuthPayload, body: any) {
-    const title = this.requiredText(body?.title, 'Titulo');
+    const title = this.requiredText(body?.title, 'Título');
     const type = this.parseTemplateType(body?.type) ?? FormTemplateType.FORM;
     const status = this.parseTemplateStatus(body?.status) ?? FormTemplateStatus.DRAFT;
     const links = await this.validateLinks(me.companyId, {
@@ -904,7 +905,7 @@ export class FormsService {
       eventType: TraceEventType.CREATED,
       entityType: TraceEntityType.FORM_TEMPLATE,
       entityId: template.id,
-      title: `Formulario #${template.number} criado`,
+      title: `Formulário #${template.number} criado`,
       description: template.title,
       statusTo: template.status,
       metadata: { type: template.type, fields: fields.length },
@@ -939,7 +940,7 @@ export class FormsService {
       ...catalog,
       updatedById: me.sub,
     };
-    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Titulo');
+    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Título');
     if ('code' in (patch ?? {})) data.code = this.nullableText(patch.code);
     if ('description' in (patch ?? {})) data.description = this.nullableText(patch.description);
     if ('purpose' in (patch ?? {})) data.purpose = this.nullableText(patch.purpose);
@@ -980,7 +981,7 @@ export class FormsService {
       const latest = await tx.formTemplate.findUniqueOrThrow({ where: { id }, include: this.templateInclude() });
       if (Array.isArray(patch?.fields) || patch?.createVersion) {
         await this.createVersionInTx(tx, latest, me.sub, {
-          changeReason: patch?.changeReason ?? 'Atualizacao do formulario',
+          changeReason: patch?.changeReason ?? 'Atualização do formulário',
           changeSummary: patch?.changeSummary,
           status: this.codes.versionStatus((data.status as FormTemplateStatus | undefined) ?? latest.status),
           versionLabel: patch?.version,
@@ -996,7 +997,7 @@ export class FormsService {
       eventType: statusChanged && before.status !== updated.status ? TraceEventType.STATUS_CHANGED : TraceEventType.UPDATED,
       entityType: TraceEntityType.FORM_TEMPLATE,
       entityId: updated.id,
-      title: statusChanged && before.status !== updated.status ? `Status do formulario #${updated.number} alterado` : `Formulario #${updated.number} atualizado`,
+      title: statusChanged && before.status !== updated.status ? `Status do formulário #${updated.number} alterado` : `Formulário #${updated.number} atualizado`,
       description: updated.title,
       statusFrom: before.status,
       statusTo: updated.status,
@@ -1017,7 +1018,7 @@ export class FormsService {
       eventType: TraceEventType.UPDATED,
       entityType: TraceEntityType.FORM_TEMPLATE,
       entityId: template.id,
-      title: `Formulario #${template.number} excluido`,
+      title: `Formulário #${template.number} excluído`,
       description: template.title,
       statusFrom: template.status,
       statusTo: 'DELETED',
@@ -1036,7 +1037,7 @@ export class FormsService {
       eventType: TraceEventType.UPDATED,
       entityType: TraceEntityType.FORM_TEMPLATE,
       entityId: template.id,
-      title: `Nova versao do formulario #${template.number}`,
+      title: `Nova versão do formulário #${template.number}`,
       description: version.versionLabel,
       metadata: { versionNumber: version.versionNumber },
     });
@@ -1051,7 +1052,7 @@ export class FormsService {
       const version = await this.createVersionInTx(tx, template, me.sub, {
         ...body,
         status: FormTemplateStatus.PUBLISHED,
-        changeReason: body?.changeReason ?? 'Publicacao do template',
+        changeReason: body?.changeReason ?? 'Publicação do template',
       });
       return tx.formTemplate.update({
         where: { id },
@@ -1075,7 +1076,7 @@ export class FormsService {
       eventType: TraceEventType.STATUS_CHANGED,
       entityType: TraceEntityType.FORM_TEMPLATE,
       entityId: template.id,
-      title: `Formulario #${template.number} publicado`,
+      title: `Formulário #${template.number} publicado`,
       description: template.title,
       statusFrom: template.status,
       statusTo: FormTemplateStatus.PUBLISHED,
@@ -1268,7 +1269,7 @@ export class FormsService {
     return (template.fields ?? []).map((field: any) => {
       const answer = byField.get(field.id) ?? byField.get(field.code ?? '');
       const parsed = this.answerValue(answer);
-      if (field.required && !parsed.value) throw new BadRequestException(`Campo obrigatorio nao preenchido: ${field.label}`);
+      if (field.required && !parsed.value) throw new BadRequestException(`Campo obrigatório não preenchido: ${field.label}`);
       const critical = Boolean(answer?.critical) || String(field.criticality ?? '').toUpperCase() === 'CRITICAL';
       return {
         fieldId: field.id,
@@ -1356,7 +1357,7 @@ export class FormsService {
           userId: me.sub,
           action: 'NC_CREATED',
           title: `Não conformidade #${nc.number} gerada automaticamente`,
-          description: `${failed.length} item(ns) reprovado(s) geraram a NC #${nc.number}: ${nc.title}`,
+          description: `${formatQuantity(failed.length, 'item reprovado gerou', 'itens reprovados geraram')} a NC #${nc.number}: ${nc.title}`,
         },
       });
     } catch (error) {
@@ -1409,7 +1410,7 @@ export class FormsService {
   async createSubmission(me: AuthPayload, templateId: string, body: any) {
     const template = await this.loadTemplate(templateId, me.companyId);
     await this.assertViewArea(me, template);
-    if (!EXECUTABLE_TEMPLATE_STATUSES.has(template.status)) throw new BadRequestException('Apenas formularios publicados, aprovados ou ativos podem receber preenchimentos.');
+    if (!EXECUTABLE_TEMPLATE_STATUSES.has(template.status)) throw new BadRequestException('Apenas formulários publicados, aprovados ou ativos podem receber preenchimentos.');
 
     const links = await this.validateLinks(me.companyId, {
       orgNodeId: 'orgNodeId' in (body ?? {}) ? this.id(body.orgNodeId) : template.orgNodeId,
@@ -1518,7 +1519,7 @@ export class FormsService {
       entityId: submission.id,
       relatedType: TraceEntityType.FORM_TEMPLATE,
       relatedId: templateId,
-      title: `Formulario #${template.number} preenchido`,
+      title: `Formulário #${template.number} preenchido`,
       description: submission.title ?? template.title,
       statusTo: submission.status,
       metadata: { templateTitle: template.title, answers: answers.length, versionId: submission.templateVersionId },
@@ -1626,7 +1627,7 @@ export class FormsService {
       entityId: updated.id,
       relatedType: TraceEntityType.FORM_TEMPLATE,
       relatedId: updated.templateId,
-      title: 'Preenchimento de formulario atualizado',
+      title: 'Preenchimento de formulário atualizado',
       description: updated.title ?? updated.template.title,
       statusFrom: before.status,
       statusTo: updated.status,
@@ -1724,9 +1725,9 @@ export class FormsService {
   }
 
   async createExecution(me: AuthPayload, body: any) {
-    const template = await this.loadTemplate(this.requiredText(body?.templateId, 'Formulario'), me.companyId);
+    const template = await this.loadTemplate(this.requiredText(body?.templateId, 'Formulário'), me.companyId);
     await this.assertViewArea(me, template);
-    if (!EXECUTABLE_TEMPLATE_STATUSES.has(template.status)) throw new BadRequestException('Publique o formulario antes de criar execucoes.');
+    if (!EXECUTABLE_TEMPLATE_STATUSES.has(template.status)) throw new BadRequestException('Publique o formulário antes de criar execuções.');
     const links = await this.validateLinks(me.companyId, {
       orgNodeId: this.id(body?.orgNodeId) ?? template.orgNodeId,
       processId: this.id(body?.processId) ?? template.processId,
@@ -1764,7 +1765,7 @@ export class FormsService {
         include: this.executionInclude(),
       });
       await tx.formRecordTimeline.create({
-        data: { companyId: me.companyId, executionId: created.id, entityType: 'FORM_EXECUTION', entityId: created.id, userId: me.sub, action: 'CREATED', title: 'Execucao criada', description: created.title },
+        data: { companyId: me.companyId, executionId: created.id, entityType: 'FORM_EXECUTION', entityId: created.id, userId: me.sub, action: 'CREATED', title: 'Execução criada', description: created.title },
       });
       return created;
     });
@@ -1787,7 +1788,7 @@ export class FormsService {
               executionId: id,
               fieldId: this.id(item?.fieldId),
               fieldCode: this.nullableText(item?.fieldCode) ?? null,
-              fieldLabel: this.requiredText(item?.fieldLabel ?? item?.label, 'Rotulo da resposta'),
+              fieldLabel: this.requiredText(item?.fieldLabel ?? item?.label, 'Rótulo da resposta'),
               valueText: parsed.value,
               valueJson: parsed.valueJson,
               valueNumber: parsed.valueNumber,
@@ -1856,7 +1857,7 @@ export class FormsService {
       await tx.formExecutionResponseItem.updateMany({ where: { executionId: id }, data: { submissionId: submission.id } });
       await this.createRecordForSubmission(tx, submission, template, me.sub);
       await tx.formExecution.update({ where: { id }, data: { status: FormExecutionStatus.COMPLETED, progress: 100, completedAt: new Date(), updatedById: me.sub } });
-      await tx.formRecordTimeline.create({ data: { companyId: me.companyId, executionId: id, submissionId: submission.id, entityType: 'FORM_EXECUTION', entityId: id, userId: me.sub, action: 'COMPLETED', title: 'Execucao concluida' } });
+      await tx.formRecordTimeline.create({ data: { companyId: me.companyId, executionId: id, submissionId: submission.id, entityType: 'FORM_EXECUTION', entityId: id, userId: me.sub, action: 'COMPLETED', title: 'Execução concluída' } });
       return tx.formExecution.findUniqueOrThrow({ where: { id }, include: this.executionInclude() });
     });
     return this.enrichExecution(completed);
@@ -1877,7 +1878,7 @@ export class FormsService {
    */
   async lookupParticipant(me: AuthPayload, registrationId: string) {
     const matricula = String(registrationId ?? '').trim();
-    if (!matricula) throw new BadRequestException('Informe a matricula.');
+    if (!matricula) throw new BadRequestException('Informe a matrícula.');
 
     const employee = await this.prisma.orgEmployee.findFirst({
       where: { companyId: me.companyId, registrationId: matricula, status: 'ACTIVE' },
@@ -1889,7 +1890,7 @@ export class FormsService {
         superior: { select: { name: true } },
       },
     });
-    if (!employee) throw new NotFoundException(`Nenhum colaborador ativo com a matricula ${matricula}.`);
+    if (!employee) throw new NotFoundException(`Nenhum colaborador ativo com a matrícula ${matricula}.`);
 
     return {
       employeeId: employee.id,
@@ -1921,7 +1922,7 @@ export class FormsService {
       where: { id: evidenceId, companyId: me.companyId },
       select: { storageKey: true, mimeType: true, fileName: true },
     });
-    if (!evidence?.storageKey) throw new NotFoundException('Evidencia nao encontrada.');
+    if (!evidence?.storageKey) throw new NotFoundException('Evidência não encontrada.');
     return {
       buffer: await this.storage.readPhoto(evidence.storageKey),
       mimeType: evidence.mimeType ?? 'application/octet-stream',
@@ -1944,7 +1945,7 @@ export class FormsService {
           ...evidenceInput,
         },
       });
-      await tx.formRecordTimeline.create({ data: { companyId: me.companyId, submissionId, recordId: submission.operationalRecord?.id, entityType: 'FORM_EVIDENCE', entityId: created.id, userId: me.sub, action: 'EVIDENCE_ADDED', title: 'Evidencia adicionada', description: created.description ?? created.fileName } });
+      await tx.formRecordTimeline.create({ data: { companyId: me.companyId, submissionId, recordId: submission.operationalRecord?.id, entityType: 'FORM_EVIDENCE', entityId: created.id, userId: me.sub, action: 'EVIDENCE_ADDED', title: 'Evidência adicionada', description: created.description ?? created.fileName } });
       return created;
     });
     await this.traceability.record({
@@ -1954,7 +1955,7 @@ export class FormsService {
       eventType: TraceEventType.EVIDENCE_ADDED,
       entityType: TraceEntityType.FORM_SUBMISSION,
       entityId: submission.id,
-      title: 'Evidencia adicionada ao formulario',
+      title: 'Evidência adicionada ao formulário',
       description: evidence.description ?? evidence.fileName ?? evidence.code,
     });
     return evidence;
@@ -2019,7 +2020,7 @@ export class FormsService {
         },
         include: this.submissionInclude(),
       });
-      await tx.formRecordTimeline.create({ data: { companyId: me.companyId, submissionId, recordId: submission.operationalRecord?.id, entityType: 'FORM_APPROVAL', entityId: approval.id, userId: me.sub, action: 'APPROVAL_DECIDED', title: 'Aprovacao registrada', description: decision, beforeValue: { status: submission.status } as Prisma.InputJsonValue, afterValue: { status: statusTo } as Prisma.InputJsonValue } });
+      await tx.formRecordTimeline.create({ data: { companyId: me.companyId, submissionId, recordId: submission.operationalRecord?.id, entityType: 'FORM_APPROVAL', entityId: approval.id, userId: me.sub, action: 'APPROVAL_DECIDED', title: 'Aprovação registrada', description: decision, beforeValue: { status: submission.status } as Prisma.InputJsonValue, afterValue: { status: statusTo } as Prisma.InputJsonValue } });
       return { approval, submission: updated };
     });
     return { approval: result.approval, submission: this.enrichSubmission(result.submission) };
@@ -2037,7 +2038,7 @@ export class FormsService {
           executionId: submission.executionId,
           recordId: submission.operationalRecord?.id,
           code: this.nullableText(body?.code) ?? (await this.codes.nextIssueCode(tx as any, me.companyId)),
-          title: this.requiredText(body?.title, 'Titulo da pendencia'),
+          title: this.requiredText(body?.title, 'Título da pendência'),
           description: this.nullableText(body?.description) ?? null,
           status: FormIssueStatus.OPEN,
           severity: this.nullableText(body?.severity) ?? null,
@@ -2049,7 +2050,7 @@ export class FormsService {
           createdById: me.sub,
         },
       });
-      await tx.formRecordTimeline.create({ data: { companyId: me.companyId, submissionId, recordId: submission.operationalRecord?.id, issueId: created.id, entityType: 'FORM_ISSUE', entityId: created.id, userId: me.sub, action: 'ISSUE_CREATED', title: 'Pendencia criada', description: created.title } });
+      await tx.formRecordTimeline.create({ data: { companyId: me.companyId, submissionId, recordId: submission.operationalRecord?.id, issueId: created.id, entityType: 'FORM_ISSUE', entityId: created.id, userId: me.sub, action: 'ISSUE_CREATED', title: 'Pendência criada', description: created.title } });
       return created;
     });
     return issue;
@@ -2058,7 +2059,7 @@ export class FormsService {
   async createAiSuggestions(me: AuthPayload, body: any) {
     const templateId = this.id(body?.templateId);
     const submissionId = this.id(body?.submissionId);
-    if (!templateId && !submissionId) throw new BadRequestException('Informe um template ou preenchimento para gerar sugestoes.');
+    if (!templateId && !submissionId) throw new BadRequestException('Informe um template ou preenchimento para gerar sugestões.');
     let template: any = null;
     let submission: any = null;
     if (submissionId) {
@@ -2072,18 +2073,18 @@ export class FormsService {
     const fallbackSuggestions = [
       {
         suggestionType: 'QUALITY_REVIEW',
-        title: 'Revisar campos obrigatorios e evidencias',
-        content: 'Verifique se itens criticos exigem evidencia, comentario e responsavel por pendencia.',
+        title: 'Revisar campos obrigatórios e evidências',
+        content: 'Verifique se itens críticos exigem evidência, comentário e responsável por pendência.',
       },
       {
         suggestionType: 'AUTOMATION',
-        title: 'Criar regra de pendencia automatica',
-        content: 'Respostas nao conformes podem abrir pendencia vinculada a plano de acao sem criar nao conformidade automaticamente.',
+        title: 'Criar regra de pendência automática',
+        content: 'Respostas não conformes podem abrir pendência vinculada a plano de ação sem criar não conformidade automaticamente.',
       },
       {
         suggestionType: 'VERSIONING',
-        title: 'Publicar versao controlada antes de execucoes recorrentes',
-        content: 'Use uma versao publicada para preservar o desenho exato usado nos registros operacionais.',
+        title: 'Publicar versão controlada antes de execuções recorrentes',
+        content: 'Use uma versão publicada para preservar o desenho exato usado nos registros operacionais.',
       },
     ];
     const aiSuggestions = await this.tryGeminiFormSuggestions(template, submission, fallbackSuggestions);
@@ -2110,9 +2111,9 @@ export class FormsService {
     fallbackSuggestions: Array<{ suggestionType: string; title: string; content: string }>,
   ): Promise<Array<{ suggestionType: string; title: string; content: string }> | null> {
     if (!this.gemini?.isEnabled) return null;
-    const prompt = `Voce e um especialista senior em formularios corporativos, checklist operacional, qualidade e compliance.
-Gere sugestoes assistivas para melhorar o template ou o preenchimento informado.
-Nao altere dados, nao aprove registros e nao crie pendencias automaticamente.
+    const prompt = `Você é um especialista sênior em formulários corporativos, checklist operacional, qualidade e compliance.
+Gere sugestões assistivas para melhorar o template ou o preenchimento informado.
+Não altere dados, não aprove registros e não crie pendências automaticamente.
 
 Responda apenas JSON no schema:
 {

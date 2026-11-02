@@ -29,20 +29,20 @@ interface IndicatorSeed {
 }
 
 const indicatorSeeds: IndicatorSeed[] = [
-  { name: 'Absenteismo', code: 'RH-001', type: IndicatorType.HR, unit: IndicatorUnit.PERCENT, direction: Direction.LOWER_BETTER, description: 'Faltas e atrasos sobre horas trabalhadas', baseTarget: 2.5, noisePct: 25, badBiasPct: 8, ownerAreaName: 'RH', perspective: PerspectiveKind.PEOPLE, weight: 2 },
+  { name: 'Absenteísmo', code: 'RH-001', type: IndicatorType.HR, unit: IndicatorUnit.PERCENT, direction: Direction.LOWER_BETTER, description: 'Faltas e atrasos sobre horas trabalhadas', baseTarget: 2.5, noisePct: 25, badBiasPct: 8, ownerAreaName: 'RH', perspective: PerspectiveKind.PEOPLE, weight: 2 },
   { name: 'Turnover', code: 'RH-002', type: IndicatorType.HR, unit: IndicatorUnit.PERCENT, direction: Direction.LOWER_BETTER, description: 'Rotatividade mensal de pessoal', baseTarget: 1.8, noisePct: 30, badBiasPct: 10, ownerAreaName: 'RH', perspective: PerspectiveKind.PEOPLE, weight: 2 },
-  { name: 'Horas de Treinamento por Colaborador', code: 'RH-003', type: IndicatorType.HR, unit: IndicatorUnit.HOURS, direction: Direction.HIGHER_BETTER, description: 'Horas medias de capacitacao', baseTarget: 6, noisePct: 35, ownerAreaName: 'RH', perspective: PerspectiveKind.LEARNING_GROWTH },
-  { name: 'Acidentes com Afastamento', code: 'SST-001', type: IndicatorType.SAFETY, unit: IndicatorUnit.QUANTITY, unitLabel: 'ocorr.', direction: Direction.LOWER_BETTER, description: 'Numero de acidentes com afastamento no mes', baseTarget: 0, noisePct: 100, badBiasPct: 15, ownerAreaName: 'Seguranca do Trabalho', perspective: PerspectiveKind.SAFETY, weight: 3 },
-  { name: 'Produtividade Industrial', code: 'PROD-001', type: IndicatorType.PRODUCTION, unit: IndicatorUnit.PERCENT, direction: Direction.HIGHER_BETTER, description: 'Eficiencia de producao planejada x realizada', baseTarget: 92, noisePct: 6, ownerAreaName: 'Producao', perspective: PerspectiveKind.PRODUCTIVITY, weight: 3 },
-  { name: 'Eficiencia Operacional (OEE)', code: 'PROD-002', type: IndicatorType.PRODUCTION, unit: IndicatorUnit.PERCENT, direction: Direction.HIGHER_BETTER, description: 'Disponibilidade x performance x qualidade', baseTarget: 78, noisePct: 8, badBiasPct: -3, ownerAreaName: 'Producao', perspective: PerspectiveKind.PRODUCTIVITY },
-  { name: 'Custo por Tonelada', code: 'FIN-001', type: IndicatorType.FINANCE, unit: IndicatorUnit.CURRENCY, unitLabel: 'R$/t', direction: Direction.LOWER_BETTER, description: 'Custo de transformacao por tonelada produzida', baseTarget: 540, noisePct: 6, ownerAreaName: 'Producao', perspective: PerspectiveKind.COSTS, weight: 2 },
-  { name: 'Consumo de Energia por Tonelada', code: 'PROD-003', type: IndicatorType.PRODUCTION, unit: IndicatorUnit.QUANTITY, unitLabel: 'kWh/t', direction: Direction.LOWER_BETTER, description: 'Eficiencia energetica do processo', baseTarget: 120, noisePct: 8, ownerAreaName: 'Producao', perspective: PerspectiveKind.ESG },
-  { name: 'Cumprimento do Plano de Manutencao', code: 'MAN-001', type: IndicatorType.MAINTENANCE, unit: IndicatorUnit.PERCENT, direction: Direction.HIGHER_BETTER, description: 'OS preventivas concluídas no prazo', baseTarget: 95, noisePct: 7, ownerAreaName: 'Manutencao', perspective: PerspectiveKind.INTERNAL_PROCESS },
-  { name: 'Atendimento de Requisicoes', code: 'SUP-001', type: IndicatorType.PROCUREMENT, unit: IndicatorUnit.PERCENT, direction: Direction.HIGHER_BETTER, description: 'Requisicoes atendidas no prazo', baseTarget: 90, noisePct: 8, ownerAreaName: 'Suprimentos', perspective: PerspectiveKind.INTERNAL_PROCESS },
-  { name: 'Prazo Medio de Compras', code: 'SUP-002', type: IndicatorType.PROCUREMENT, unit: IndicatorUnit.DAYS, direction: Direction.LOWER_BETTER, description: 'Dias entre requisicao e recebimento', baseTarget: 7, noisePct: 18, badBiasPct: 5, ownerAreaName: 'Suprimentos', perspective: PerspectiveKind.INTERNAL_PROCESS },
-  { name: 'Indice de Qualidade', code: 'QUA-001', type: IndicatorType.QUALITY, unit: IndicatorUnit.PERCENT, direction: Direction.HIGHER_BETTER, description: 'Conformidade dos lotes auditados', baseTarget: 98, noisePct: 2.5, ownerAreaName: 'Qualidade', perspective: PerspectiveKind.QUALITY, weight: 2 },
-  { name: 'Reclamacoes Internas', code: 'QUA-002', type: IndicatorType.QUALITY, unit: IndicatorUnit.QUANTITY, unitLabel: 'casos', direction: Direction.LOWER_BETTER, description: 'Reclamações registradas por outras áreas', baseTarget: 3, noisePct: 60, ownerAreaName: 'Qualidade', perspective: PerspectiveKind.QUALITY },
-  { name: 'Acoes Vencidas', code: 'GES-001', type: IndicatorType.OPERATIONAL, unit: IndicatorUnit.QUANTITY, unitLabel: 'acoes', direction: Direction.LOWER_BETTER, description: 'Quantidade de ações em atraso ao final do mês', baseTarget: 5, noisePct: 50, badBiasPct: 20, ownerAreaName: 'Diretoria', perspective: PerspectiveKind.INTERNAL_PROCESS },
+  { name: 'Horas de Treinamento por Colaborador', code: 'RH-003', type: IndicatorType.HR, unit: IndicatorUnit.HOURS, direction: Direction.HIGHER_BETTER, description: 'Horas médias de capacitação', baseTarget: 6, noisePct: 35, ownerAreaName: 'RH', perspective: PerspectiveKind.LEARNING_GROWTH },
+  { name: 'Acidentes com Afastamento', code: 'SST-001', type: IndicatorType.SAFETY, unit: IndicatorUnit.QUANTITY, unitLabel: 'ocorr.', direction: Direction.LOWER_BETTER, description: 'Número de acidentes com afastamento no mês', baseTarget: 0, noisePct: 100, badBiasPct: 15, ownerAreaName: 'Segurança do Trabalho', perspective: PerspectiveKind.SAFETY, weight: 3 },
+  { name: 'Produtividade Industrial', code: 'PROD-001', type: IndicatorType.PRODUCTION, unit: IndicatorUnit.PERCENT, direction: Direction.HIGHER_BETTER, description: 'Eficiência de produção planejada x realizada', baseTarget: 92, noisePct: 6, ownerAreaName: 'Produção', perspective: PerspectiveKind.PRODUCTIVITY, weight: 3 },
+  { name: 'Eficiência Operacional (OEE)', code: 'PROD-002', type: IndicatorType.PRODUCTION, unit: IndicatorUnit.PERCENT, direction: Direction.HIGHER_BETTER, description: 'Disponibilidade x performance x qualidade', baseTarget: 78, noisePct: 8, badBiasPct: -3, ownerAreaName: 'Produção', perspective: PerspectiveKind.PRODUCTIVITY },
+  { name: 'Custo por Tonelada', code: 'FIN-001', type: IndicatorType.FINANCE, unit: IndicatorUnit.CURRENCY, unitLabel: 'R$/t', direction: Direction.LOWER_BETTER, description: 'Custo de transformação por tonelada produzida', baseTarget: 540, noisePct: 6, ownerAreaName: 'Produção', perspective: PerspectiveKind.COSTS, weight: 2 },
+  { name: 'Consumo de Energia por Tonelada', code: 'PROD-003', type: IndicatorType.PRODUCTION, unit: IndicatorUnit.QUANTITY, unitLabel: 'kWh/t', direction: Direction.LOWER_BETTER, description: 'Eficiência energética do processo', baseTarget: 120, noisePct: 8, ownerAreaName: 'Produção', perspective: PerspectiveKind.ESG },
+  { name: 'Cumprimento do Plano de Manutenção', code: 'MAN-001', type: IndicatorType.MAINTENANCE, unit: IndicatorUnit.PERCENT, direction: Direction.HIGHER_BETTER, description: 'OS preventivas concluídas no prazo', baseTarget: 95, noisePct: 7, ownerAreaName: 'Manutenção', perspective: PerspectiveKind.INTERNAL_PROCESS },
+  { name: 'Atendimento de Requisições', code: 'SUP-001', type: IndicatorType.PROCUREMENT, unit: IndicatorUnit.PERCENT, direction: Direction.HIGHER_BETTER, description: 'Requisições atendidas no prazo', baseTarget: 90, noisePct: 8, ownerAreaName: 'Suprimentos', perspective: PerspectiveKind.INTERNAL_PROCESS },
+  { name: 'Prazo Médio de Compras', code: 'SUP-002', type: IndicatorType.PROCUREMENT, unit: IndicatorUnit.DAYS, direction: Direction.LOWER_BETTER, description: 'Dias entre requisição e recebimento', baseTarget: 7, noisePct: 18, badBiasPct: 5, ownerAreaName: 'Suprimentos', perspective: PerspectiveKind.INTERNAL_PROCESS },
+  { name: 'Índice de Qualidade', code: 'QUA-001', type: IndicatorType.QUALITY, unit: IndicatorUnit.PERCENT, direction: Direction.HIGHER_BETTER, description: 'Conformidade dos lotes auditados', baseTarget: 98, noisePct: 2.5, ownerAreaName: 'Qualidade', perspective: PerspectiveKind.QUALITY, weight: 2 },
+  { name: 'Reclamações Internas', code: 'QUA-002', type: IndicatorType.QUALITY, unit: IndicatorUnit.QUANTITY, unitLabel: 'casos', direction: Direction.LOWER_BETTER, description: 'Reclamações registradas por outras áreas', baseTarget: 3, noisePct: 60, ownerAreaName: 'Qualidade', perspective: PerspectiveKind.QUALITY },
+  { name: 'Ações Vencidas', code: 'GES-001', type: IndicatorType.OPERATIONAL, unit: IndicatorUnit.QUANTITY, unitLabel: 'acoes', direction: Direction.LOWER_BETTER, description: 'Quantidade de ações em atraso ao final do mês', baseTarget: 5, noisePct: 50, badBiasPct: 20, ownerAreaName: 'Diretoria', perspective: PerspectiveKind.INTERNAL_PROCESS },
   { name: 'Projetos no Prazo', code: 'GES-002', type: IndicatorType.PROJECT, unit: IndicatorUnit.PERCENT, direction: Direction.HIGHER_BETTER, description: 'Projetos estratégicos no prazo planejado', baseTarget: 80, noisePct: 12, badBiasPct: -5, ownerAreaName: 'Diretoria', perspective: PerspectiveKind.INTERNAL_PROCESS },
 ];
 
@@ -229,8 +229,8 @@ async function main() {
 
   // ---------------- Filiais ----------------
   const filiais = [
-    { name: 'Unidade Matriz', code: 'MAT', city: 'Sao Paulo', state: 'SP' },
-    { name: 'Unidade Agricola', code: 'AGR', city: 'Ribeirao Preto', state: 'SP' },
+    { name: 'Unidade Matriz', code: 'MAT', city: 'São Paulo', state: 'SP' },
+    { name: 'Unidade Agrícola', code: 'AGR', city: 'Ribeirao Preto', state: 'SP' },
     { name: 'Unidade Industrial', code: 'IND', city: 'Sumare', state: 'SP' },
   ];
   const branches = await Promise.all(
@@ -280,14 +280,14 @@ async function main() {
 
   const areasSpec: Array<{ name: string; code: string; color: string; icon: string }> = [
     { name: 'RH', code: 'RH', color: '#06b6d4', icon: 'Users' },
-    { name: 'Seguranca do Trabalho', code: 'SST', color: '#ef4444', icon: 'ShieldAlert' },
-    { name: 'Producao', code: 'PROD', color: '#f97316', icon: 'Cog' },
-    { name: 'Manutencao', code: 'MAN', color: '#eab308', icon: 'Wrench' },
+    { name: 'Segurança do Trabalho', code: 'SST', color: '#ef4444', icon: 'ShieldAlert' },
+    { name: 'Produção', code: 'PROD', color: '#f97316', icon: 'Cog' },
+    { name: 'Manutenção', code: 'MAN', color: '#eab308', icon: 'Wrench' },
     { name: 'Qualidade', code: 'QUA', color: '#10b981', icon: 'BadgeCheck' },
     { name: 'Suprimentos', code: 'SUP', color: '#0ea5e9', icon: 'Truck' },
     { name: 'Financeiro', code: 'FIN', color: '#22c55e', icon: 'DollarSign' },
     { name: 'TI', code: 'TI', color: '#a855f7', icon: 'Server' },
-    { name: 'Logistica', code: 'LOG', color: '#f59e0b', icon: 'Boxes' },
+    { name: 'Logística', code: 'LOG', color: '#f59e0b', icon: 'Boxes' },
   ];
 
   const areaMap = new Map<string, string>();
@@ -309,16 +309,16 @@ async function main() {
   areaMap.set('Diretoria', directorate.id);
 
   // ---------------- Usuarios ----------------
-  console.log('[seed] criando usuarios...');
+  console.log('[seed] criando usuários...');
   const hash = await bcrypt.hash('123456', 10);
   const demoUser = await prisma.user.create({
     data: {
       companyId: company.id,
       email: 'demo@demo.com',
       passwordHash: hash,
-      name: 'Usuario Demonstracao',
+      name: 'Usuário Demonstração',
       role: UserRoleEnum.MANAGER,
-      jobTitle: 'Gestor de Demonstracao',
+      jobTitle: 'Gestor de Demonstração',
       defaultNodeId: directorate.id,
     },
   });
@@ -369,11 +369,11 @@ async function main() {
   await prisma.orgNode.update({ where: { id: directorate.id }, data: { responsibleUserId: director.id } });
 
   // ---------------- Mapa estrategico ----------------
-  console.log('[seed] criando mapa estrategico...');
+  console.log('[seed] criando mapa estratégico...');
   const map = await prisma.strategicMap.create({
     data: {
       companyId: company.id,
-      name: 'Mapa Estrategico 2026',
+      name: 'Mapa Estratégico 2026',
       startsAt: new Date('2026-01-01'),
       endsAt: new Date('2026-12-31'),
     },
@@ -383,7 +383,7 @@ async function main() {
     { kind: PerspectiveKind.CUSTOMERS, name: 'Clientes', color: '#3b82f6' },
     { kind: PerspectiveKind.INTERNAL_PROCESS, name: 'Processos Internos', color: '#f97316' },
     { kind: PerspectiveKind.LEARNING_GROWTH, name: 'Aprendizado e Crescimento', color: '#a855f7' },
-    { kind: PerspectiveKind.SAFETY, name: 'Seguranca', color: '#ef4444' },
+    { kind: PerspectiveKind.SAFETY, name: 'Segurança', color: '#ef4444' },
     { kind: PerspectiveKind.ESG, name: 'ESG', color: '#10b981' },
   ];
   const perspByKind = new Map<PerspectiveKind, string>();
@@ -396,11 +396,11 @@ async function main() {
   }
 
   const objectivesSpec = [
-    { name: 'Reduzir custo de transformacao', persp: PerspectiveKind.FINANCIAL, status: ObjectiveStatus.AT_RISK },
+    { name: 'Reduzir custo de transformação', persp: PerspectiveKind.FINANCIAL, status: ObjectiveStatus.AT_RISK },
     { name: 'Aumentar produtividade industrial', persp: PerspectiveKind.INTERNAL_PROCESS, status: ObjectiveStatus.ON_TRACK },
     { name: 'Zerar acidentes com afastamento', persp: PerspectiveKind.SAFETY, status: ObjectiveStatus.OFF_TRACK },
-    { name: 'Desenvolver lideranca', persp: PerspectiveKind.LEARNING_GROWTH, status: ObjectiveStatus.ON_TRACK },
-    { name: 'Excelencia em qualidade', persp: PerspectiveKind.CUSTOMERS, status: ObjectiveStatus.ON_TRACK },
+    { name: 'Desenvolver liderança', persp: PerspectiveKind.LEARNING_GROWTH, status: ObjectiveStatus.ON_TRACK },
+    { name: 'Excelência em qualidade', persp: PerspectiveKind.CUSTOMERS, status: ObjectiveStatus.ON_TRACK },
     { name: 'Reduzir consumo energetico', persp: PerspectiveKind.ESG, status: ObjectiveStatus.AT_RISK },
   ];
   const objectivesByName = new Map<string, string>();
@@ -421,11 +421,11 @@ async function main() {
 
   // ---------------- Relacoes entre objetivos ----------------
   const relPairs: Array<[string, string]> = [
-    ['Desenvolver lideranca', 'Aumentar produtividade industrial'],
-    ['Aumentar produtividade industrial', 'Reduzir custo de transformacao'],
-    ['Excelencia em qualidade', 'Reduzir custo de transformacao'],
+    ['Desenvolver liderança', 'Aumentar produtividade industrial'],
+    ['Aumentar produtividade industrial', 'Reduzir custo de transformação'],
+    ['Excelência em qualidade', 'Reduzir custo de transformação'],
     ['Zerar acidentes com afastamento', 'Aumentar produtividade industrial'],
-    ['Reduzir consumo energetico', 'Reduzir custo de transformacao'],
+    ['Reduzir consumo energetico', 'Reduzir custo de transformação'],
   ];
   for (const [from, to] of relPairs) {
     const fromId = objectivesByName.get(from);
@@ -448,10 +448,10 @@ async function main() {
     data: {
       cycleId: okrCycle.id,
       strategicObjId: objectivesByName.get('Aumentar produtividade industrial'),
-      name: 'Bater 95% de eficiencia industrial no Q2',
+      name: 'Bater 95% de eficiência industrial no Q2',
       description: 'Elevar performance operacional para melhorar margem.',
       ownerName: 'Diretoria Industrial',
-      team: 'Producao',
+      team: 'Produção',
       weight: 3,
       confidence: 0.6,
       status: ObjectiveStatus.ON_TRACK,
@@ -459,9 +459,9 @@ async function main() {
   });
   await prisma.keyResult.createMany({
     data: [
-      { objectiveId: okrObj1.id, metric: 'Eficiencia operacional', unit: IndicatorUnit.PERCENT, startValue: 78, currentValue: 84, targetValue: 95, direction: Direction.HIGHER_BETTER },
-      { objectiveId: okrObj1.id, metric: 'Horas paradas no mes', unit: IndicatorUnit.HOURS, startValue: 120, currentValue: 95, targetValue: 60, direction: Direction.LOWER_BETTER },
-      { objectiveId: okrObj1.id, metric: 'Producao mensal (t)', unit: IndicatorUnit.TONS, startValue: 8000, currentValue: 8600, targetValue: 9500, direction: Direction.HIGHER_BETTER },
+      { objectiveId: okrObj1.id, metric: 'Eficiência operacional', unit: IndicatorUnit.PERCENT, startValue: 78, currentValue: 84, targetValue: 95, direction: Direction.HIGHER_BETTER },
+      { objectiveId: okrObj1.id, metric: 'Horas paradas no mês', unit: IndicatorUnit.HOURS, startValue: 120, currentValue: 95, targetValue: 60, direction: Direction.LOWER_BETTER },
+      { objectiveId: okrObj1.id, metric: 'Produção mensal (t)', unit: IndicatorUnit.TONS, startValue: 8000, currentValue: 8600, targetValue: 9500, direction: Direction.HIGHER_BETTER },
     ],
   });
 
@@ -469,9 +469,9 @@ async function main() {
     data: {
       cycleId: okrCycle.id,
       strategicObjId: objectivesByName.get('Zerar acidentes com afastamento'),
-      name: 'Cultura de seguranca em todas as plantas',
+      name: 'Cultura de segurança em todas as plantas',
       ownerName: 'Diretoria SST',
-      team: 'Seguranca',
+      team: 'Segurança',
       weight: 2,
       confidence: 0.45,
       status: ObjectiveStatus.AT_RISK,
@@ -488,7 +488,7 @@ async function main() {
   const weeks = ['2026-W15', '2026-W16', '2026-W17', '2026-W18'];
   for (let i = 0; i < weeks.length; i++) {
     await prisma.oKRCheckin.create({
-      data: { objectiveId: okrObj1.id, weekRef: weeks[i], confidence: 0.5 + i * 0.05, progress: 0.3 + i * 0.1, note: i === 0 ? 'Comeco firme do trimestre' : null },
+      data: { objectiveId: okrObj1.id, weekRef: weeks[i], confidence: 0.5 + i * 0.05, progress: 0.3 + i * 0.1, note: i === 0 ? 'Começo firme do trimestre' : null },
     });
     await prisma.oKRCheckin.create({
       data: { objectiveId: okrObj2.id, weekRef: weeks[i], confidence: 0.4 + (i % 2) * 0.05, progress: 0.2 + i * 0.08 },
@@ -508,9 +508,9 @@ async function main() {
         : spec.ownerAreaName === 'Seguranca do Trabalho'
           ? objectivesByName.get('Zerar acidentes com afastamento')
           : spec.ownerAreaName === 'Qualidade'
-            ? objectivesByName.get('Excelencia em qualidade')
+            ? objectivesByName.get('Excelência em qualidade')
             : spec.ownerAreaName === 'RH'
-              ? objectivesByName.get('Desenvolver lideranca')
+              ? objectivesByName.get('Desenvolver liderança')
               : undefined;
 
     const indicator = await prisma.indicator.create({
@@ -583,7 +583,7 @@ async function main() {
   }
 
   // ---------------- Relacoes arvore de indicadores ----------------
-  console.log('[seed] criando relacoes entre indicadores...');
+  console.log('[seed] criando relações entre indicadores...');
   const byCode = new Map<string, string>();
   const inds = await prisma.indicator.findMany({ where: { companyId: company.id }, select: { id: true, code: true } });
   inds.forEach((i) => byCode.set(i.code ?? '', i.id));
@@ -607,7 +607,7 @@ async function main() {
   await rel('SST-001', 'RH-001');
 
   // ---------------- Desvios + acoes a partir de indicadores vermelhos ----------------
-  console.log('[seed] criando desvios e acoes...');
+  console.log('[seed] criando desvios e ações...');
   const reds = await prisma.indicatorResult.findMany({
     where: { indicator: { companyId: company.id }, light: 'RED' },
     orderBy: { periodDate: 'desc' },
@@ -633,17 +633,17 @@ async function main() {
           'Falta de procedimento padronizado',
           'Equipe sub-dimensionada',
           'Equipamento obsoleto',
-          'Variacao na materia-prima',
+          'Variação na matéria-prima',
         ]),
-        impact: 'Risco de nao cumprimento do objetivo estrategico vinculado',
+        impact: 'Risco de não cumprimento do objetivo estratégico vinculado',
         responsibleUserId: red.indicator.responsibleUserId,
         dueDate: new Date(Date.now() + randInt(7, 30) * 24 * 60 * 60 * 1000),
       },
     });
     await prisma.deviationCause.createMany({
       data: [
-        { deviationId: dev.id, category: 'Metodo', description: 'Procedimento operacional desatualizado' },
-        { deviationId: dev.id, category: 'Mao de obra', description: 'Falta de treinamento especifico' },
+        { deviationId: dev.id, category: 'Método', description: 'Procedimento operacional desatualizado' },
+        { deviationId: dev.id, category: 'Mão de obra', description: 'Falta de treinamento específico' },
       ],
     });
     await prisma.actionPlan.create({
@@ -653,7 +653,7 @@ async function main() {
         responsibleUserId: red.indicator.responsibleUserId,
         createdById: admin.id,
         title: `Plano corretivo para ${red.indicator.name}`,
-        description: 'Acao aberta automaticamente a partir do desvio.',
+        description: 'Ação aberta automaticamente a partir do desvio.',
         origin: ActionOrigin.DEVIATION,
         originRefId: dev.id,
         deviationId: dev.id,
@@ -667,7 +667,7 @@ async function main() {
   }
 
   // Algumas acoes "manuais"
-  console.log('[seed] criando acoes manuais avulsas...');
+  console.log('[seed] criando ações manuais avulsas...');
   const areasArr = Array.from(areaMap.entries());
   for (let i = 0; i < 12; i++) {
     const [areaName, nodeId] = pick(areasArr);
@@ -685,15 +685,15 @@ async function main() {
         responsibleUserId: managers[areaName]?.id ?? admin.id,
         createdById: admin.id,
         title: pick([
-          'Padronizar checklist diario',
+          'Padronizar checklist diário',
           'Auditoria de 5S',
           'Treinamento NR-12',
           'Reduzir setup da linha 3',
-          'Plano de comunicacao trimestral',
-          'Revisao de fornecedores criticos',
-          'Implantar reuniao diaria',
+          'Plano de comunicação trimestral',
+          'Revisão de fornecedores críticos',
+          'Implantar reunião diária',
         ]) + ` - ${areaName}`,
-        description: 'Acao planejada na revisao mensal.',
+        description: 'Ação planejada na revisão mensal.',
         origin: ActionOrigin.MANUAL,
         priority: pick([ActionPriority.LOW, ActionPriority.MEDIUM, ActionPriority.HIGH]),
         status,
@@ -710,18 +710,18 @@ async function main() {
   const projeto = await prisma.project.create({
     data: {
       companyId: company.id,
-      name: 'Implantacao de OEE - Linha 3',
+      name: 'Implantação de OEE - Linha 3',
       status: 'IN_PROGRESS',
       startsAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
       endsAt: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000),
-      responsible: 'Producao',
+      responsible: 'Produção',
       budget: 280_000,
     },
   });
   await prisma.projectMilestone.createMany({
     data: [
-      { projectId: projeto.id, name: 'Diagnostico', dueDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), done: true },
-      { projectId: projeto.id, name: 'Aquisicao sensores', dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000) },
+      { projectId: projeto.id, name: 'Diagnóstico', dueDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), done: true },
+      { projectId: projeto.id, name: 'Aquisição sensores', dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000) },
       { projectId: projeto.id, name: 'Go-live', dueDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) },
     ],
   });
@@ -734,7 +734,7 @@ async function main() {
       startDate: dDays(-60),
       endDate: dDays(-40),
       progress: 100,
-      responsible: 'Producao',
+      responsible: 'Produção',
       position: 0,
     },
   });
@@ -753,11 +753,11 @@ async function main() {
   await prisma.projectTask.create({
     data: {
       projectId: projeto.id,
-      name: 'Instalacao e calibracao',
+      name: 'Instalação e calibração',
       startDate: dDays(20),
       endDate: dDays(60),
       progress: 0,
-      responsible: 'Manutencao',
+      responsible: 'Manutenção',
       dependencyId: t2.id,
       position: 2,
     },
@@ -778,10 +778,10 @@ async function main() {
   const meeting = await prisma.meeting.create({
     data: {
       companyId: company.id,
-      title: 'Reuniao Mensal de Indicadores - Maio/26',
+      title: 'Reunião Mensal de Indicadores - Maio/26',
       kind: 'INDICATORS',
       startsAt: new Date(),
-      notes: 'Discussao dos indicadores em vermelho do mes.',
+      notes: 'Discussão dos indicadores em vermelho do mês.',
     },
   });
   await prisma.meetingParticipant.createMany({
@@ -793,14 +793,14 @@ async function main() {
   });
   await prisma.meetingAgendaItem.createMany({
     data: [
-      { meetingId: meeting.id, topic: 'Revisao do Mapa Estrategico', position: 0 },
+      { meetingId: meeting.id, topic: 'Revisão do Mapa Estratégico', position: 0 },
       { meetingId: meeting.id, topic: 'Indicadores em vermelho', position: 1 },
-      { meetingId: meeting.id, topic: 'Status acoes prioritarias', position: 2 },
+      { meetingId: meeting.id, topic: 'Status ações prioritárias', position: 2 },
     ],
   });
 
   // ---------------- Notificacoes iniciais ----------------
-  console.log('[seed] criando notificacoes...');
+  console.log('[seed] criando notificações...');
   const redInds = await prisma.indicator.findMany({
     where: { companyId: company.id, results: { some: { light: 'RED' } } },
     take: 3,
@@ -813,8 +813,8 @@ async function main() {
         companyId: company.id,
         userId: r.responsibleUserId,
         kind: 'INDICATOR_OFF_TARGET',
-        title: `Indicador critico: ${r.name}`,
-        body: 'Atingimento abaixo da faixa amarela no ultimo periodo.',
+        title: `Indicador crítico: ${r.name}`,
+        body: 'Atingimento abaixo da faixa amarela no último período.',
         link: `/indicators/${r.id}`,
       },
     });
@@ -824,14 +824,14 @@ async function main() {
       companyId: company.id,
       userId: admin.id,
       kind: 'MEETING_UPCOMING',
-      title: 'Reuniao mensal de indicadores hoje',
-      body: 'Reuniao mensal de indicadores - Maio/26 inicia em breve.',
+      title: 'Reunião mensal de indicadores hoje',
+      body: 'Reunião mensal de indicadores - Maio/26 inicia em breve.',
       link: '/meetings',
     },
   });
 
   // ---------------- Permissoes basicas ----------------
-  console.log('[seed] criando permissoes de catalogo...');
+  console.log('[seed] criando permissões de catálogo...');
   await prisma.permission.createMany({
     skipDuplicates: true,
     data: PERMISSION_CATALOG.map(([key, description, module, action]) => ({
@@ -914,7 +914,7 @@ async function main() {
     data: {
       email: 'platform@demo.com',
       passwordHash: await bcrypt.hash('admin123', 10),
-      name: 'Gestao 360 Platform Owner',
+      name: 'Gestão 360 Platform Owner',
       jobTitle: 'Platform Owner',
       status: 'ACTIVE',
     },
@@ -939,7 +939,7 @@ async function main() {
       technicalOwner: module.technicalOwner,
       experimental: module.experimental,
       documentation: module.route ? `docs:${module.route}` : null,
-      changelog: JSON.stringify([{ version: module.version, note: 'Catalogo inicial' }]),
+      changelog: JSON.stringify([{ version: module.version, note: 'Catálogo inicial' }]),
     })),
   });
 
@@ -973,8 +973,8 @@ async function main() {
       internalCode: 'G360-0001',
       lifecycleStatus: 'IMPLEMENTATION',
       planCode: demoPlan.code,
-      commercialOwner: 'Comercial Gestao 360',
-      implementationOwner: 'Implantacao Gestao 360',
+      commercialOwner: 'Comercial Gestão 360',
+      implementationOwner: 'Implantação Gestão 360',
       primaryContactName: admin.name,
       primaryContactEmail: admin.email,
       contractStartAt: new Date('2026-06-01'),
@@ -1010,7 +1010,7 @@ async function main() {
       status: demoPlanModules.has(module.code) ? 'HERDADO_DO_PLANO' : 'BLOQUEADO',
       inheritedFromPlan: true,
       manuallyOverridden: false,
-      note: demoPlanModules.has(module.code) ? null : 'Modulo fora do plano Profissional.',
+      note: demoPlanModules.has(module.code) ? null : 'Módulo fora do plano Profissional.',
       updatedBy: platformOwner.id,
       updatedByEmail: platformOwner.email,
     })),
@@ -1020,8 +1020,8 @@ async function main() {
     skipDuplicates: true,
     data: [
       { code: 'development', name: 'Desenvolvimento', currentVersion: '0.1.0', owner: 'Engineering' },
-      { code: 'staging', name: 'Homologacao', currentVersion: '0.1.0', owner: 'QA' },
-      { code: 'production', name: 'Producao', currentVersion: '0.1.0', owner: 'SRE' },
+      { code: 'staging', name: 'Homologação', currentVersion: '0.1.0', owner: 'QA' },
+      { code: 'production', name: 'Produção', currentVersion: '0.1.0', owner: 'SRE' },
     ],
   });
   await prisma.platformRelease.create({
@@ -1050,15 +1050,15 @@ async function main() {
     skipDuplicates: true,
     data: [
       { code: 'smtp', name: 'SMTP Transacional', environmentCode: 'production', status: 'ACTIVE', owner: 'SRE', maskedSecret: 'smtp-****-demo' },
-      { code: 'gemini', name: 'Servico de IA', environmentCode: 'production', status: 'ACTIVE', owner: 'Engineering', maskedSecret: 'AIza****demo' },
-      { code: 'calendar-google', name: 'Google Calendar', companyId: company.id, environmentCode: 'production', status: 'PENDING', owner: 'Implantacao' },
+      { code: 'gemini', name: 'Serviço de IA', environmentCode: 'production', status: 'ACTIVE', owner: 'Engineering', maskedSecret: 'AIza****demo' },
+      { code: 'calendar-google', name: 'Google Calendar', companyId: company.id, environmentCode: 'production', status: 'PENDING', owner: 'Implantação' },
     ],
   });
   await prisma.platformHealthCheck.createMany({
     data: [
       { code: 'api', name: 'API NestJS', category: 'application', status: 'ONLINE', latencyMs: 35, message: 'OK' },
       { code: 'database', name: 'PostgreSQL', category: 'database', status: 'ONLINE', latencyMs: 12, message: 'OK' },
-      { code: 'jobs', name: 'Processamentos', category: 'jobs', status: 'UNKNOWN', message: 'Fila ainda nao configurada no seed' },
+      { code: 'jobs', name: 'Processamentos', category: 'jobs', status: 'UNKNOWN', message: 'Fila ainda não configurada no seed' },
     ],
   });
 

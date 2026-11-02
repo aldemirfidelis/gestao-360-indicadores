@@ -41,26 +41,26 @@ export class QueryController {
   @Get('history')
   history(@CurrentUser() user: AuthPayload) {
     void user;
-    throw new ForbiddenException('Historico SQL indisponivel no escopo empresarial.');
+    throw new ForbiddenException('Histórico SQL indisponível no escopo empresarial.');
   }
 
   @Get('favorites')
   favorites(@CurrentUser() user: AuthPayload) {
     void user;
-    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
+    throw new ForbiddenException('Consultas SQL indisponíveis no escopo empresarial.');
   }
 
   @Post('favorites')
   saveFavorite(@Body() body: { name: string; sql: string }, @CurrentUser() user: AuthPayload) {
     void body;
     void user;
-    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
+    throw new ForbiddenException('Consultas SQL indisponíveis no escopo empresarial.');
   }
 
   @Delete('favorites/:id')
   deleteFavorite(@Param('id') id: string, @CurrentUser() user: AuthPayload) {
     void id;
     void user;
-    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
+    throw new ForbiddenException('Consultas SQL indisponíveis no escopo empresarial.');
   }
 }

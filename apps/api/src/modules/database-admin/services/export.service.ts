@@ -47,7 +47,7 @@ export class ExportService {
     void format;
     void user;
     void meta;
-    throw new ForbiddenException('Exportacao por SQL livre foi desativada para garantir o escopo por empresa.');
+    throw new ForbiddenException('Exportação por SQL livre foi desativada para garantir o escopo por empresa.');
   }
 
   private async build(name: string, columns: string[], rows: Record<string, unknown>[], format: ExportFormat): Promise<ExportPayload> {

@@ -73,7 +73,7 @@ Para políticas e procedimentos críticos, exija **confirmação de leitura**: c
       slug: 'edicao-online-e-liberacao-de-edicao',
       title: 'Edição online e liberação de edição de documentos',
       summary: 'Edite Word no navegador e controle quem pode editar via fluxo de liberação.',
-      tags: ['edicao online', 'editor', 'word', 'collabora', 'liberar edicao', 'editar documento'],
+      tags: ['edição online', 'editor', 'word', 'collabora', 'liberar edição', 'editar documento'],
       body: `## Edição online
 Documentos Word (.docx) podem ser editados **direto no navegador**, sem instalar nada — com salvamento automático. Abra o documento e use a opção de **editar online**.
 
@@ -155,7 +155,7 @@ Criar, editar, publicar e copiar modelo é do analista (permissões \`forms:crea
       slug: 'checklist-reprovado-gera-nc',
       title: 'Checklist reprovado gera Não Conformidade automática',
       summary: 'Configure o modelo para abrir NC quando houver resposta não conforme.',
-      tags: ['nc automatica', 'checklist', 'reprovado', 'nao conforme', 'automacao'],
+      tags: ['nc automática', 'checklist', 'reprovado', 'não conforme', 'automacao'],
       body: `Modelos de checklist podem abrir uma **Não Conformidade automaticamente** quando o preenchimento tem respostas reprovadas.
 
 ## Como configurar
@@ -174,7 +174,7 @@ Assim, nenhuma inspeção reprovada "morre" no papel: ela vira tratativa rastre�
       slug: 'como-abrir-uma-nao-conformidade',
       title: 'Como abrir uma não conformidade?',
       summary: 'O ciclo CAPA completo: abertura, contenção, causa raiz, ação e eficácia.',
-      tags: ['nao conformidade', 'nc', 'capa', 'corretiva', 'abrir nc', 'iso 9001'],
+      tags: ['não conformidade', 'nc', 'capa', 'corretiva', 'abrir nc', 'iso 9001'],
       body: `1. Acesse **Qualidade e Compliance > Não Conformidades** e clique em **Nova NC**.
 2. Preencha:
    - Descrição do problema;
@@ -261,7 +261,7 @@ Processos documentados alimentam auditorias, treinamentos e a análise de impact
       slug: 'analise-de-impacto-visao-360',
       title: 'Análise de Impacto (Visão 360°)',
       summary: 'Vincule entidades e simule: "se eu mexer aqui, o que é afetado?".',
-      tags: ['impacto', 'visao 360', 'vinculo', 'simulacao', 'dependencia', 'central de impactos'],
+      tags: ['impacto', 'visão 360', 'vinculo', 'simulacao', 'dependencia', 'central de impactos'],
       body: `A **Análise de Impacto** (Qualidade e Compliance > Análise de Impacto) mostra a teia de relacionamentos entre tudo que existe na plataforma.
 
 ## Recursos

@@ -1,3 +1,4 @@
+import { formatQuantity } from '@g360/shared';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuthPayload } from '../../auth/auth.types';
@@ -37,7 +38,7 @@ export class NavigationService {
         create: { itemKey: it.itemKey, order: it.order, updatedBy: user.sub },
       });
     }
-    await this.audit.record({ user, tab: 'navigation', action: 'REORDER', targetType: 'nav', message: `${items.length} item(ns) reordenado(s).` });
+    await this.audit.record({ user, tab: 'navigation', action: 'REORDER', targetType: 'nav', message: `${formatQuantity(items.length, 'item reordenado', 'itens reordenados')}.` });
     return { ok: true };
   }
 

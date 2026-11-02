@@ -531,13 +531,13 @@ export class DashboardService {
         value: conclusion,
         valueType: 'text',
         group: 'Dashboard',
-        description: `Conclusao executiva mensal da area ${node.name}`,
+        description: `Conclusão executiva mensal da área ${node.name}`,
       },
       update: {
         value: conclusion,
         valueType: 'text',
         group: 'Dashboard',
-        description: `Conclusao executiva mensal da area ${node.name}`,
+        description: `Conclusão executiva mensal da área ${node.name}`,
         active: true,
       },
       select: { value: true, updatedAt: true },
@@ -750,15 +750,15 @@ export class DashboardService {
   }
 
   private async resolveConclusionArea(me: AuthPayload, ownerNodeId?: string) {
-    if (!ownerNodeId) throw new BadRequestException('Selecione uma area para registrar a conclusao executiva.');
+    if (!ownerNodeId) throw new BadRequestException('Selecione uma área para registrar a conclusão executiva.');
     const node = await this.prisma.orgNode.findFirst({
       where: { id: ownerNodeId, companyId: me.companyId, deletedAt: null },
       select: { id: true, name: true },
     });
-    if (!node) throw new BadRequestException('Area invalida para esta empresa.');
+    if (!node) throw new BadRequestException('Área inválida para esta empresa.');
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     if (permitted && !permitted.includes(node.id)) {
-      throw new ForbiddenException('Voce nao tem acesso ao painel executivo desta area.');
+      throw new ForbiddenException('Você não tem acesso ao painel executivo desta área.');
     }
     return node;
   }

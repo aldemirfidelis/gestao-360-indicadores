@@ -52,7 +52,7 @@ export class HelpService implements OnModuleInit {
       where: { slug },
       include: { category: { select: { id: true, slug: true, title: true, icon: true } } },
     });
-    if (!article || article.status !== 'PUBLISHED') throw new NotFoundException('Artigo de ajuda nao encontrado.');
+    if (!article || article.status !== 'PUBLISHED') throw new NotFoundException('Artigo de ajuda não encontrado.');
     const updated = await this.prisma.helpArticle.update({
       where: { id: article.id },
       data: { viewCount: { increment: 1 } },
@@ -63,7 +63,7 @@ export class HelpService implements OnModuleInit {
 
   async feedback(slug: string, userId: string, input: { helpful?: boolean; comment?: string | null }) {
     const article = await this.prisma.helpArticle.findUnique({ where: { slug }, select: { id: true } });
-    if (!article) throw new NotFoundException('Artigo de ajuda nao encontrado.');
+    if (!article) throw new NotFoundException('Artigo de ajuda não encontrado.');
     const helpful = !!input.helpful;
     await this.prisma.$transaction([
       this.prisma.helpFeedback.create({
@@ -93,7 +93,7 @@ export class HelpService implements OnModuleInit {
 
   async upsertCategory(input: Record<string, unknown>, user: AuthPayload) {
     this.requireSuperAdmin(user);
-    const title = requiredString(input.title, 'Titulo da categoria');
+    const title = requiredString(input.title, 'Título da categoria');
     const slug = slugify(optionalString(input.slug) || title);
     const data = {
       slug,
@@ -111,8 +111,8 @@ export class HelpService implements OnModuleInit {
 
   async upsertArticle(input: Record<string, unknown>, user: AuthPayload) {
     this.requireSuperAdmin(user);
-    const title = requiredString(input.title, 'Titulo do artigo');
-    const body = requiredString(input.body, 'Conteudo do artigo');
+    const title = requiredString(input.title, 'Título do artigo');
+    const body = requiredString(input.body, 'Conteúdo do artigo');
     const slug = slugify(optionalString(input.slug) || title);
     const tags = normalizeJsonArray(input.tags);
     const data: Prisma.HelpArticleUncheckedCreateInput = {
@@ -252,7 +252,7 @@ export class HelpService implements OnModuleInit {
   } satisfies Prisma.HelpArticleSelect;
 
   private requireSuperAdmin(user: AuthPayload) {
-    if (user.role !== UserRoleEnum.SUPER_ADMIN) throw new NotFoundException('Recurso nao encontrado.');
+    if (user.role !== UserRoleEnum.SUPER_ADMIN) throw new NotFoundException('Recurso não encontrado.');
   }
 }
 
@@ -298,7 +298,7 @@ function normalizeJsonArray(value: unknown) {
 
 function requiredString(value: unknown, label: string) {
   const text = optionalString(value);
-  if (!text) throw new NotFoundException(`${label} nao informado.`);
+  if (!text) throw new NotFoundException(`${label} não informado.`);
   return text;
 }
 

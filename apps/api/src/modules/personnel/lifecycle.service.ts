@@ -1,3 +1,4 @@
+import { formatQuantity } from '@g360/shared';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWriterService } from '../../common/audit/audit-writer.service';
@@ -162,7 +163,7 @@ export class LifecycleService {
       where: { processId: id, companyId: me.companyId, required: true, doneAt: null },
     });
     if (pendingRequired > 0) {
-      throw new ConflictException(`Há ${pendingRequired} item(ns) obrigatório(s) pendente(s) no checklist.`);
+      throw new ConflictException(`Há ${formatQuantity(pendingRequired, 'item obrigatório pendente', 'itens obrigatórios pendentes')} no checklist.`);
     }
     const note = text(body?.note);
     await this.prisma.employeeProcess.update({

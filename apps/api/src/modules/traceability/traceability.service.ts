@@ -228,7 +228,7 @@ export class TraceabilityService {
         eventType: r.light === 'RED' ? TraceEventType.OFF_TARGET_ALERT : TraceEventType.RESULT_RECORDED,
         entityType: TraceEntityType.INDICATOR_RESULT,
         entityId: r.id,
-        title: r.light === 'RED' ? 'Resultado fora da meta' : 'Resultado lancado',
+        title: r.light === 'RED' ? 'Resultado fora da meta' : 'Resultado lançado',
         description: `${r.periodRef}: realizado ${r.value}`,
         statusFrom: null,
         statusTo: r.light,

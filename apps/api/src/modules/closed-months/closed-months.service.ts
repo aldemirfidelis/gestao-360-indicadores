@@ -37,7 +37,7 @@ export class ClosedMonthsService {
       where: { companyId_periodRef: { companyId: me.companyId, periodRef: ref } },
     });
     if (existing && !existing.reopenedAt && !existing.deletedAt) {
-      throw new ConflictException(`O mes ${ref} ja esta fechado.`);
+      throw new ConflictException(`O mês ${ref} já está fechado.`);
     }
     const data = {
       companyId: me.companyId,
@@ -62,9 +62,9 @@ export class ClosedMonthsService {
     const existing = await this.prisma.closedMonth.findFirst({
       where: { id, companyId: me.companyId },
     });
-    if (!existing) throw new NotFoundException('Mês fechado nao encontrado.');
+    if (!existing) throw new NotFoundException('Mês fechado não encontrado.');
     if (existing.reopenedAt || existing.deletedAt) {
-      throw new ConflictException(`O mes ${existing.periodRef} ja esta aberto.`);
+      throw new ConflictException(`O mês ${existing.periodRef} já está aberto.`);
     }
     return this.prisma.closedMonth.update({
       where: { id },

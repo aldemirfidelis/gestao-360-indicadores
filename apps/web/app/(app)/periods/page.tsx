@@ -119,7 +119,7 @@ export default function PeriodsPage() {
       qc.invalidateQueries({ queryKey: ['closed-months'] });
       qc.invalidateQueries({ queryKey: ['results', 'pending'] });
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível fechar o mes'),
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível fechar o mês'),
   });
 
   const reopenMonth = useMutation({
@@ -129,7 +129,7 @@ export default function PeriodsPage() {
       qc.invalidateQueries({ queryKey: ['closed-months'] });
       qc.invalidateQueries({ queryKey: ['results', 'pending'] });
     },
-    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível reabrir o mes'),
+    onError: (error: any) => toast.error(error?.message ?? 'Não foi possível reabrir o mês'),
   });
 
   const handleClose = (period: WorkPeriod) => {
@@ -297,7 +297,7 @@ export default function PeriodsPage() {
 
       <div className="mt-6">
         <SectionCard
-          title="Bloqueio de lançamento por mes"
+          title="Bloqueio de lançamento por mês"
           description="Mês fechado impede o lançamento ou alteração de realizado por todas as áreas. Reabertura sempre disponível ao admin."
         >
           <div className="grid gap-4 md:grid-cols-[1fr,1fr,auto]">
@@ -325,7 +325,7 @@ export default function PeriodsPage() {
                 disabled={!newClosedRef.trim() || closeMonth.isPending}
               >
                 <LockKeyhole className="mr-2 h-4 w-4" />
-                Fechar mes
+                Fechar mês
               </Button>
             </div>
           </div>
@@ -346,7 +346,7 @@ export default function PeriodsPage() {
                 {(closedMonths.data ?? []).length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">
-                      Nenhum mes fechado até o momento.
+                      Nenhum mês fechado até o momento.
                     </td>
                   </tr>
                 )}

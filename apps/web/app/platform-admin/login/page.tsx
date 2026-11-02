@@ -27,7 +27,7 @@ export default function PlatformAdminLoginPage() {
       toast.success('Portal Administrativo Global conectado');
       router.replace('/platform-admin');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Credenciais invalidas');
+      toast.error(err instanceof Error ? err.message : 'Credenciais inválidas');
     } finally {
       setBusy(false);
     }

@@ -79,7 +79,7 @@ const ORIGIN_LABEL: Record<string, string> = {
 };
 
 const TOOL_LABEL: Record<string, string> = {
-  FIVE_WHYS: '5 Porques',
+  FIVE_WHYS: '5 Porquês',
   ISHIKAWA: 'Ishikawa',
   MASP: 'MASP',
   PDCA: 'PDCA',

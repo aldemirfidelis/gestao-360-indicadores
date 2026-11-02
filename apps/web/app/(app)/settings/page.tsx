@@ -202,7 +202,7 @@ const nodeTypeLabels: Record<string, string> = {
   BRANCH: 'Filial',
   UNIT: 'Unidade',
   AREA: 'Área',
-  SUBAREA: 'Subarea',
+  SUBAREA: 'Subárea',
   SECTOR: 'Setor',
   SUBSECTOR: 'Subsetor',
   DEPARTMENT: 'Departamento',
@@ -721,7 +721,7 @@ export default function SettingsPage() {
                   <td>{node.responsibleUser?.name ?? '-'}</td>
                   <td>{node._count?.indicatorsOwned ?? 0}</td>
                   <td><StatusPill status={node.active ? 'ACTIVE' : 'INACTIVE'} /></td>
-                  <td className="text-right"><Button asChild variant="outline" size="sm"><Link href="/org">Gerenciar arvore</Link></Button></td>
+                  <td className="text-right"><Button asChild variant="outline" size="sm"><Link href="/org">Gerenciar árvore</Link></Button></td>
                 </tr>
               ))}
             </DataTable>
@@ -772,7 +772,7 @@ export default function SettingsPage() {
 
       {active === 'security' && canManageProfiles && (
         <SectionCard
-          title={isSuperAdmin ? 'Seguranca' : 'Perfis e permissões'}
+          title={isSuperAdmin ? 'Segurança' : 'Perfis e permissões'}
           description={
             isSuperAdmin
               ? 'Perfis administraveis e permissões por módulo salvas no banco de dados.'
@@ -831,7 +831,7 @@ export default function SettingsPage() {
       {active === 'system' && canViewSettings && (
         <SectionCard
           title="Sistema"
-          description="Regras globais, notificações, aprovações e preferencias da plataforma."
+          description="Regras globais, notificações, aprovações e preferências da plataforma."
           actions={<Button onClick={() => setDialog({ type: 'setting' })}><Plus className="mr-2 h-4 w-4" />Novo parâmetro</Button>}
           contentClassName="p-0"
         >
@@ -880,7 +880,7 @@ function ParameterActions({ view, onNew }: { view: ParamView; onNew: (type: stri
   const map: Record<ParamView, { label: string; type?: string }> = {
     companies: { label: 'Nova empresa', type: 'company' },
     branches: { label: 'Nova filial', type: 'branch' },
-    structure: { label: 'Abrir arvore' },
+    structure: { label: 'Abrir árvore' },
     categories: { label: 'Nova categoria', type: 'category' },
     items: { label: 'Novo item', type: 'item' },
   };

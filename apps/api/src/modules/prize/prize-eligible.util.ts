@@ -106,10 +106,10 @@ export function reconcile(previous: SnapshotLike[], incoming: SnapshotLike[]): R
 }
 
 // ---- Gerador de base ficticia para homologacao (NAO usa dados reais) ----
-const FAKE_FIRST = ['Ana', 'Bruno', 'Carla', 'Diego', 'Elaine', 'Fabio', 'Gabriela', 'Heitor', 'Iara', 'Joao'];
+const FAKE_FIRST = ['Ana', 'Bruno', 'Carla', 'Diego', 'Elaine', 'Fábio', 'Gabriela', 'Heitor', 'Iara', 'João'];
 const FAKE_LAST = ['Silva', 'Souza', 'Oliveira', 'Santos', 'Lima', 'Costa', 'Pereira', 'Almeida'];
-const FAKE_POSITIONS = ['Operador I', 'Operador II', 'Tecnico', 'Analista', 'Supervisor', 'Encarregado'];
-const FAKE_AREAS = ['Producao', 'Manutencao', 'Qualidade', 'Logistica', 'Industrial'];
+const FAKE_POSITIONS = ['Operador I', 'Operador II', 'Técnico', 'Analista', 'Supervisor', 'Encarregado'];
+const FAKE_AREAS = ['Produção', 'Manutenção', 'Qualidade', 'Logística', 'Industrial'];
 const FAKE_CC = ['CC-100', 'CC-200', 'CC-300', 'CC-400'];
 
 /** Base ficticia deterministica (seed) para homologacao. */

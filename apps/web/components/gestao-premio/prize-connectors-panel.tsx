@@ -44,7 +44,7 @@ interface PrizeConnectorsPanelProps {
 }
 
 const KIND_LABEL: Record<string, string> = {
-  APDATA_ELIGIBLE: 'Apdata - Base elegivel',
+  APDATA_ELIGIBLE: 'Apdata - Base elegível',
   APDATA_EVENTS: 'Apdata - Eventos',
   PAYROLL: 'Folha de Pagamento',
 };
@@ -52,7 +52,7 @@ const TYPE_LABEL: Record<string, string> = {
   API: 'API',
   FILE_CSV: 'Arquivo CSV',
   FILE_XLSX: 'Arquivo XLSX',
-  DB_BRIDGE: 'Banco intermediario',
+  DB_BRIDGE: 'Banco intermediário',
   MANUAL: 'Manual',
 };
 const JOB_STATUS: Record<string, any> = {
@@ -64,7 +64,7 @@ const JOB_STATUS: Record<string, any> = {
 };
 const JOB_STATUS_LABEL: Record<string, string> = {
   SUCCESS: 'Sucesso',
-  RUNNING: 'Em execucao',
+  RUNNING: 'Em execução',
   ERROR: 'Erro',
   PARTIAL: 'Parcial',
   PENDING: 'Pendente',
@@ -125,7 +125,7 @@ export function PrizeConnectorsPanel({ embedded = false, canAdmin = true }: Priz
       {embedded ? (
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b pb-4">
           <div>
-            <h2 className="text-base font-semibold">Integracoes do Premio</h2>
+            <h2 className="text-base font-semibold">Integrações do Prêmio</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Conectores Apdata e Folha no contexto da empresa selecionada no Portal Global.
             </p>
@@ -139,11 +139,11 @@ export function PrizeConnectorsPanel({ embedded = false, canAdmin = true }: Priz
         </div>
       ) : (
         <PageHeader
-          title="Integracoes do Premio"
+          title="Integrações do Prêmio"
           eyebrow="Gestao de Premio"
-          description="Conectores desacoplados para Apdata e Folha. Segredos ficam apenas como referencia de ambiente."
+          description="Conectores desacoplados para Apdata e Folha. Segredos ficam apenas como referência de ambiente."
           tone="view"
-          breadcrumbs={[{ label: 'Gestao de Premio', href: '/gestao-premio' }, { label: 'Integracoes' }]}
+          breadcrumbs={[{ label: 'Gestão de Prêmio', href: '/gestao-premio' }, { label: 'Integrações' }]}
           actions={
             canAdmin ? (
               <Button onClick={() => setOpen(true)}>
@@ -162,7 +162,7 @@ export function PrizeConnectorsPanel({ embedded = false, canAdmin = true }: Priz
             <Card>
               <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
                 <Plug className="h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">Nenhum conector configurado. Sem conector, use importacao assistida por arquivo.</p>
+                <p className="text-sm text-muted-foreground">Nenhum conector configurado. Sem conector, use importação assistida por arquivo.</p>
               </CardContent>
             </Card>
           ) : (
@@ -266,16 +266,16 @@ export function PrizeConnectorsPanel({ embedded = false, canAdmin = true }: Priz
             </div>
             <div>
               <Label>Nome *</Label>
-              <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ex.: Apdata Producao" />
+              <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ex.: Apdata Produção" />
             </div>
             <div>
-              <Label>Endereco (se API)</Label>
+              <Label>Endereço (se API)</Label>
               <Input value={form.endpoint} onChange={(event) => setForm({ ...form, endpoint: event.target.value })} placeholder="https://..." />
             </div>
             <div>
-              <Label>Referencia da credencial (variavel de ambiente)</Label>
+              <Label>Referência da credencial (variável de ambiente)</Label>
               <Input value={form.secretRef} onChange={(event) => setForm({ ...form, secretRef: event.target.value })} placeholder="Ex.: APDATA_API_TOKEN" />
-              <p className="mt-1 text-xs text-muted-foreground">O segredo nao e armazenado. Guardamos apenas o nome da variavel.</p>
+              <p className="mt-1 text-xs text-muted-foreground">O segredo não é armazenado. Guardamos apenas o nome da variável.</p>
             </div>
           </div>
           <DialogFooter>

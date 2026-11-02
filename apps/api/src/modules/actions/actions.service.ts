@@ -194,7 +194,7 @@ export class ActionsService {
       where: { id, deletedAt: null, ...(companyId ? { companyId } : {}) },
       include: this.detailInclude(),
     });
-    if (!action) throw new NotFoundException('Ação nao encontrada');
+    if (!action) throw new NotFoundException('Ação não encontrada');
     return {
       ...action,
       originTrail: this.buildOriginTrail(action),
@@ -276,7 +276,7 @@ export class ActionsService {
       where: { id: actionId },
       include: { meeting: true },
     });
-    if (!action || action.deletedAt) throw new NotFoundException('Ação nao encontrada');
+    if (!action || action.deletedAt) throw new NotFoundException('Ação não encontrada');
     if (action.meetingId && action.meeting) return this.getById(actionId);
 
     const startsAt = body.startsAt ? new Date(body.startsAt) : new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -336,7 +336,7 @@ export class ActionsService {
 
   async update(id: string, patch: any, userId?: string) {
     const before = await this.prisma.actionPlan.findUnique({ where: { id } });
-    if (!before || before.deletedAt) throw new NotFoundException('Ação nao encontrada');
+    if (!before || before.deletedAt) throw new NotFoundException('Ação não encontrada');
     if (userId) await this.access.assertCanWrite(userId, before.ownerNodeId, 'action_plans', 'edit');
     const data = this.toActionUpdate(patch, before);
     const updated = await this.prisma.actionPlan.update({ where: { id }, data });
@@ -459,7 +459,7 @@ export class ActionsService {
     userId?: string,
   ) {
     const existing = await this.prisma.actionTask.findUnique({ where: { id: taskId } });
-    if (!existing) throw new NotFoundException('Tarefa nao encontrada');
+    if (!existing) throw new NotFoundException('Tarefa não encontrada');
 
     if (patch.done === true) {
       const nextEnd = patch.endDate !== undefined ? patch.endDate : existing.endDate;
@@ -495,7 +495,7 @@ export class ActionsService {
       entityId: taskId,
       relatedType: TraceEntityType.ACTION_PLAN,
       relatedId: t.actionId,
-      title: patch.done === true ? 'Tarefa concluida' : patch.done === false ? 'Tarefa reaberta' : 'Tarefa atualizada',
+      title: patch.done === true ? 'Tarefa concluída' : patch.done === false ? 'Tarefa reaberta' : 'Tarefa atualizada',
       description: t.title,
       statusTo: patch.done === undefined ? undefined : patch.done ? 'DONE' : 'OPEN',
       metadata: { startDate: t.startDate, endDate: t.endDate, assignedToId: t.assignedToId, dueDate: t.dueDate, completionNote: t.completionNote },
@@ -509,7 +509,7 @@ export class ActionsService {
 
   async deleteTask(taskId: string, userId?: string) {
     const existing = await this.prisma.actionTask.findUnique({ where: { id: taskId } });
-    if (!existing) throw new NotFoundException('Tarefa nao encontrada');
+    if (!existing) throw new NotFoundException('Tarefa não encontrada');
     const ctx = await this.actionTraceContext(existing.actionId);
     await this.prisma.actionTask.delete({ where: { id: taskId } });
     await this.recalcProgress(existing.actionId);
@@ -524,7 +524,7 @@ export class ActionsService {
       entityId: taskId,
       relatedType: TraceEntityType.ACTION_PLAN,
       relatedId: existing.actionId,
-      title: 'Tarefa removida do plano de acao',
+      title: 'Tarefa removida do plano de ação',
       description: existing.title,
     });
     return { ok: true };
@@ -532,11 +532,11 @@ export class ActionsService {
 
   async saveAnalysis(actionId: string, body: any, userId?: string, companyId?: string) {
     const method = body.method as ActionAnalysisTool;
-    if (!method) throw new NotFoundException('Ferramenta de análise obrigatoria');
+    if (!method) throw new NotFoundException('Ferramenta de análise obrigatória');
     const action = await this.prisma.actionPlan.findFirst({
       where: { id: actionId, deletedAt: null, ...(companyId ? { companyId } : {}) },
     });
-    if (!action || action.deletedAt) throw new NotFoundException('Ação nao encontrada');
+    if (!action || action.deletedAt) throw new NotFoundException('Ação não encontrada');
     if (userId) await this.access.assertCanWrite(userId, action.ownerNodeId, 'action_plans', 'edit');
 
     // Sessão e linhas da ferramenta na mesma transação: o upsert trava a linha da
@@ -602,11 +602,11 @@ export class ActionsService {
 
   async addEvidence(actionId: string, body: any, userId?: string) {
     const action = await this.prisma.actionPlan.findUnique({ where: { id: actionId } });
-    if (!action || action.deletedAt) throw new NotFoundException('Ação nao encontrada');
+    if (!action || action.deletedAt) throw new NotFoundException('Ação não encontrada');
     const taskId = body.taskId || null;
     if (taskId) {
       const task = await this.prisma.actionTask.findFirst({ where: { id: taskId, actionId }, select: { id: true } });
-      if (!task) throw new BadRequestException('Tarefa nao pertence a este plano');
+      if (!task) throw new BadRequestException('Tarefa não pertence a este plano');
     }
     const base64 = body.dataBase64 ? String(body.dataBase64).split(',').pop()! : null;
     const buffer = base64 ? Buffer.from(base64, 'base64') : null;
@@ -614,7 +614,7 @@ export class ActionsService {
     if (buffer && buffer.length === 0) throw new BadRequestException('Arquivo vazio');
     if (buffer && buffer.length > MAX_BYTES) throw new BadRequestException('Arquivo excede o limite de 5 MB');
     const title = (body.title ?? body.fileName ?? '').trim();
-    if (!title) throw new BadRequestException('Titulo da evidencia obrigatorio');
+    if (!title) throw new BadRequestException('Título da evidência obrigatório');
     const evidence = await this.prisma.actionEvidence.create({
       data: {
         actionId,
@@ -642,7 +642,7 @@ export class ActionsService {
       eventType: TraceEventType.EVIDENCE_ADDED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: actionId,
-      title: taskId ? 'Evidencia adicionada a tarefa' : 'Evidencia adicionada ao plano',
+      title: taskId ? 'Evidência adicionada à tarefa' : 'Evidência adicionada ao plano',
       description: evidence.title,
       metadata: { evidenceId: evidence.id, taskId, url: evidence.url, fileName: evidence.fileName },
     });
@@ -653,7 +653,7 @@ export class ActionsService {
     const evidence = await this.prisma.actionEvidence.findFirst({
       where: { id: evidenceId, deletedAt: null, action: { is: { companyId, deletedAt: null } } },
     });
-    if (!evidence || !evidence.data) throw new NotFoundException('Anexo nao encontrado');
+    if (!evidence || !evidence.data) throw new NotFoundException('Anexo não encontrado');
     return {
       id: evidence.id,
       fileName: evidence.fileName ?? evidence.title,
@@ -664,7 +664,7 @@ export class ActionsService {
 
   async addComment(actionId: string, body: any, userId?: string, authorName?: string) {
     const action = await this.prisma.actionPlan.findUnique({ where: { id: actionId } });
-    if (!action || action.deletedAt) throw new NotFoundException('Ação nao encontrada');
+    if (!action || action.deletedAt) throw new NotFoundException('Ação não encontrada');
     const comment = await this.prisma.actionComment.create({
       data: { actionId, authorId: userId ?? null, authorName: authorName ?? null, comment: body.comment },
     });
@@ -677,7 +677,7 @@ export class ActionsService {
       eventType: TraceEventType.COMMENT_ADDED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: actionId,
-      title: 'Comentario adicionado ao plano',
+      title: 'Comentário adicionado ao plano',
       description: comment.comment,
     });
     return comment;
@@ -748,7 +748,7 @@ export class ActionsService {
       eventType: body.reopen ? TraceEventType.REOPENED : TraceEventType.CLOSED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: actionId,
-      title: body.effective ? 'Eficacia validada' : 'Plano marcado como ineficaz',
+      title: body.effective ? 'Eficácia validada' : 'Plano marcado como ineficaz',
       description: body.summary ?? updated.title,
       statusFrom: action.status,
       statusTo: updated.status,
@@ -796,14 +796,14 @@ export class ActionsService {
     const action = await this.prisma.actionPlan.findFirst({
       where: { id: actionId, deletedAt: null, ...(companyId ? { companyId } : {}) },
     });
-    if (!action) throw new NotFoundException('Ação nao encontrada');
+    if (!action) throw new NotFoundException('Ação não encontrada');
     if (userId) await this.access.assertCanWrite(userId, action.ownerNodeId, 'action_plans', 'edit');
 
     const cause = await this.prisma.actionIshikawaCause.findFirst({
       where: { id: causeId, session: { actionId } },
       include: { session: true },
     });
-    if (!cause) throw new NotFoundException('Causa nao encontrada');
+    if (!cause) throw new NotFoundException('Causa não encontrada');
 
     if (cause.convertedToTaskId) return this.getById(actionId, companyId);
 
@@ -872,14 +872,14 @@ export class ActionsService {
     const action = await this.prisma.actionPlan.findFirst({
       where: { id: actionId, deletedAt: null, ...(companyId ? { companyId } : {}) },
     });
-    if (!action) throw new NotFoundException('Ação nao encontrada');
+    if (!action) throw new NotFoundException('Ação não encontrada');
     if (userId) await this.access.assertCanWrite(userId, action.ownerNodeId, 'action_plans', 'edit');
 
     const stage = await this.prisma.actionPdcaStep.findFirst({
       where: { id: stageId, session: { actionId } },
       include: { session: true },
     });
-    if (!stage) throw new NotFoundException('Etapa PDCA nao encontrada');
+    if (!stage) throw new NotFoundException('Etapa PDCA não encontrada');
     if (stage.convertedToTaskId) return this.getById(actionId, companyId);
 
     const data = (stage.data && typeof stage.data === 'object' ? stage.data : {}) as Record<string, any>;
@@ -937,7 +937,7 @@ export class ActionsService {
     const action = await this.prisma.actionPlan.findFirst({
       where: { id: actionId, deletedAt: null, ...(companyId ? { companyId } : {}) },
     });
-    if (!action) throw new NotFoundException('Ação nao encontrada');
+    if (!action) throw new NotFoundException('Ação não encontrada');
     if (userId) await this.access.assertCanWrite(userId, action.ownerNodeId, 'action_plans', 'edit');
 
     const type = normalizeFiveW2HType(itemType);
@@ -1009,9 +1009,9 @@ export class ActionsService {
       .filter((line) => !line.endsWith(': '))
       .join('\n');
     const lastResults = action.indicator?.results?.slice?.(-6) ?? [];
-    const prompt = `Voce e um facilitador senior de planejamento 5W2H em empresas industriais brasileiras.
-Gere sugestoes objetivas para preencher os sete campos de um 5W2H dentro de um plano de acao.
-Nao salve nem confirme decisoes. Responda somente JSON valido no schema:
+    const prompt = `Você é um facilitador sênior de planejamento 5W2H em empresas industriais brasileiras.
+Gere sugestões objetivas para preencher os sete campos de um 5W2H dentro de um plano de ação.
+Não salve nem confirme decisões. Responda somente JSON válido no schema:
 {
   "suggestions": [
     { "field": "WHAT", "suggestion": "...", "justification": "..." }
@@ -1021,14 +1021,14 @@ Nao salve nem confirme decisoes. Responda somente JSON valido no schema:
 Campos permitidos: WHAT, WHY, WHERE, WHEN, WHO, HOW, HOW_MUCH.
 
 CONTEXTO DO PLANO:
-- Titulo: ${action.title ?? '-'}
-- Descricao: ${action.description ?? '-'}
+- Título: ${action.title ?? '-'}
+- Descrição: ${action.description ?? '-'}
 - Problema principal: ${action.problemDescription ?? '-'}
 - Causa raiz: ${action.rootCause ?? '-'}
 - Indicador: ${action.indicator?.name ?? '-'}
 - Resultados recentes: ${JSON.stringify(lastResults, null, 2)}
-- Area/setor: ${action.ownerNode?.name ?? '-'}
-- Campos ja preenchidos:
+- Área/setor: ${action.ownerNode?.name ?? '-'}
+- Campos já preenchidos:
 ${current || '- nenhum'}`;
 
     interface GeminiFiveW2HResp {
@@ -1064,7 +1064,7 @@ ${current || '- nenhum'}`;
     const action = await this.prisma.actionPlan.findFirst({
       where: { id: actionId, deletedAt: null, ...(companyId ? { companyId } : {}) },
     });
-    if (!action) throw new NotFoundException('Ação nao encontrada');
+    if (!action) throw new NotFoundException('Ação não encontrada');
     if (userId) await this.access.assertCanWrite(userId, action.ownerNodeId, 'action_plans', 'edit');
 
     const lvl = Math.max(1, Math.round(Number(level) || 1));
@@ -1130,9 +1130,9 @@ ${current || '- nenhum'}`;
       .map((item) => `Nível ${item.level ?? item.position ?? '?'} — P: ${nonEmptyText(item.question) ?? '-'} | R: ${nonEmptyText(item.answer) ?? '-'}`)
       .join('\n');
     const lastResults = action.indicator?.results?.slice?.(-6) ?? [];
-    const prompt = `Voce e um facilitador senior de analise de causa raiz pelo metodo dos 5 Porques em empresas industriais brasileiras.
-Gere sugestoes objetivas para aprofundar a investigacao, encadeando cada porque ao anterior ate chegar a uma causa raiz acionavel.
-Nao confirme a causa raiz nem salve decisoes. Responda somente JSON valido no schema:
+    const prompt = `Você é um facilitador sênior de análise de causa raiz pelo método dos 5 Porquês em empresas industriais brasileiras.
+Gere sugestões objetivas para aprofundar a investigação, encadeando cada porque ao anterior até chegar a uma causa raiz acionável.
+Não confirme a causa raiz nem salve decisões. Responda somente JSON válido no schema:
 {
   "suggestions": [
     { "level": 1, "question": "...", "answer": "...", "justification": "...", "confidence": 70 }
@@ -1140,19 +1140,19 @@ Nao confirme a causa raiz nem salve decisoes. Responda somente JSON valido no sc
 }
 
 Regras:
-- level e um inteiro a partir de 1.
-- confidence e um inteiro de 0 a 100.
-- A pergunta de cada nivel deve questionar a resposta do nivel anterior.
+- level é um inteiro a partir de 1.
+- confidence é um inteiro de 0 a 100.
+- A pergunta de cada nível deve questionar a resposta do nível anterior.
 
 CONTEXTO DO PLANO:
-- Titulo: ${action.title ?? '-'}
-- Descricao: ${action.description ?? '-'}
+- Título: ${action.title ?? '-'}
+- Descrição: ${action.description ?? '-'}
 - Problema principal: ${problem ?? '-'}
-- Causa raiz informada: ${action.rootCause ?? 'nao definida'}
+- Causa raiz informada: ${action.rootCause ?? 'não definida'}
 - Indicador: ${action.indicator?.name ?? '-'}
 - Resultados recentes: ${JSON.stringify(lastResults, null, 2)}
-- Area/setor: ${action.ownerNode?.name ?? '-'}
-- Porques ja preenchidos:
+- Área/setor: ${action.ownerNode?.name ?? '-'}
+- Porquês já preenchidos:
 ${current || '- nenhum'}`;
 
     interface GeminiFiveWhysResp {
@@ -1189,13 +1189,13 @@ ${current || '- nenhum'}`;
       action.problemDescription || action.description || action.deviation?.title || action.indicator?.name || action.title;
     const lastResults = action.indicator?.results?.slice?.(-6) ?? [];
 
-    const prompt = `Voce e um consultor senior em gestao de planos de acao em empresas industriais brasileiras.
-Para o plano abaixo, gere 3 sugestoes objetivas em portugues do Brasil:
+    const prompt = `Você é um consultor sênior em gestão de planos de ação em empresas industriais brasileiras.
+Para o plano abaixo, gere 3 sugestões objetivas em português do Brasil:
 1. Uma pergunta de aprofundamento sobre a causa-raiz (type=QUESTION)
-2. Uma sugestao de acao no formato 5W2H curto (type=ACTION)
-3. Um criterio de eficacia mensuravel (type=EFFECTIVENESS)
+2. Uma sugestão de ação no formato 5W2H curto (type=ACTION)
+3. Um critério de eficácia mensurável (type=EFFECTIVENESS)
 
-Considere o contexto historico, a periodicidade do indicador (se houver) e priorize acoes que atacam a causa-raiz.
+Considere o contexto histórico, a periodicidade do indicador (se houver) e priorize ações que atacam a causa-raiz.
 
 Responda no schema JSON:
 {
@@ -1207,17 +1207,17 @@ Responda no schema JSON:
 }
 
 CONTEXTO DO PLANO:
-- Titulo: ${action.title ?? '-'}
-- Descricao: ${action.description ?? '-'}
+- Título: ${action.title ?? '-'}
+- Descrição: ${action.description ?? '-'}
 - Problema: ${problem ?? '-'}
-- Causa raiz informada: ${rootCause ?? 'nao definida'}
+- Causa raiz informada: ${rootCause ?? 'não definida'}
 - Indicador: ${action.indicator?.name ?? '-'} (tipo ${action.indicator?.type ?? '-'})
-- Objetivo estrategico: ${action.strategicObjective?.name ?? '-'}
-- Area: ${action.ownerNode?.name ?? '-'}
+- Objetivo estratégico: ${action.strategicObjective?.name ?? '-'}
+- Área: ${action.ownerNode?.name ?? '-'}
 - Status atual: ${action.status ?? '-'}
 - Escopo solicitado: ${scope ?? 'general'}
 
-ULTIMOS RESULTADOS DO INDICADOR (mais recentes ao fim):
+ÚLTIMOS RESULTADOS DO INDICADOR (mais recentes ao fim):
 ${JSON.stringify(lastResults, null, 2)}`;
 
     interface GeminiActionResp {
@@ -1248,9 +1248,9 @@ ${JSON.stringify(lastResults, null, 2)}`;
       .filter((line) => !line.endsWith(': '))
       .join('\n');
     const lastResults = action.indicator?.results?.slice?.(-6) ?? [];
-    const prompt = `Voce e um facilitador senior de analise de causa Ishikawa 6M para empresas industriais brasileiras.
-Gere sugestoes objetivas de causas possiveis, separadas nas categorias 6M.
-Nao confirme causa raiz. A resposta deve ser apenas JSON valido no schema:
+    const prompt = `Você é um facilitador sênior de análise de causa Ishikawa 6M para empresas industriais brasileiras.
+Gere sugestões objetivas de causas possíveis, separadas nas categorias 6M.
+Não confirme causa raiz. A resposta deve ser apenas JSON válido no schema:
 {
   "suggestions": [
     { "category": "METHOD", "title": "...", "justification": "...", "priority": "HIGH" }
@@ -1263,13 +1263,13 @@ Prioridades permitidas:
 LOW, MEDIUM, HIGH, CRITICAL.
 
 CONTEXTO DO PLANO:
-- Titulo: ${action.title ?? '-'}
-- Descricao: ${action.description ?? '-'}
+- Título: ${action.title ?? '-'}
+- Descrição: ${action.description ?? '-'}
 - Problema principal: ${problem ?? '-'}
 - Indicador: ${action.indicator?.name ?? '-'}
 - Meta/resultados recentes: ${JSON.stringify(lastResults, null, 2)}
-- Area/setor: ${action.ownerNode?.name ?? '-'}
-- Causas ja cadastradas:
+- Área/setor: ${action.ownerNode?.name ?? '-'}
+- Causas já cadastradas:
 ${existingCauses || '- nenhuma'}`;
 
     interface GeminiIshikawaResp {
@@ -1283,7 +1283,7 @@ ${existingCauses || '- nenhuma'}`;
       ?.map((item) => ({
         category: normalizeIshikawaCategory(item.category),
         title: nonEmptyText(item.title),
-        justification: nonEmptyText(item.justification) ?? 'Sugestao gerada para facilitar a discussao da equipe.',
+        justification: nonEmptyText(item.justification) ?? 'Sugestão gerada para facilitar a discussão da equipe.',
         priority: normalizeActionPriority(item.priority),
       }))
       .filter((item) => item.title);
@@ -1297,9 +1297,9 @@ ${existingCauses || '- nenhuma'}`;
       .filter((line) => !line.endsWith(': '))
       .join('\n');
     const lastResults = action.indicator?.results?.slice?.(-6) ?? [];
-    const prompt = `Voce e um facilitador senior de melhoria continua PDCA em empresas brasileiras.
-Gere sugestoes objetivas para preencher um ciclo PDCA dentro de um plano de acao.
-Nao salve nem confirme decisoes. Responda somente JSON valido no schema:
+    const prompt = `Você é um facilitador sênior de melhoria contínua PDCA em empresas brasileiras.
+Gere sugestões objetivas para preencher um ciclo PDCA dentro de um plano de ação.
+Não salve nem confirme decisões. Responda somente JSON válido no schema:
 {
   "suggestions": [
     { "phase": "PLAN", "field": "objective", "suggestion": "...", "justification": "..." }
@@ -1310,14 +1310,14 @@ Fases permitidas: PLAN, DO, CHECK, ACT.
 Campos sugeridos: objective, description, checklist, risks, evidence, standardization, measurement.
 
 CONTEXTO DO PLANO:
-- Titulo: ${action.title ?? '-'}
-- Descricao: ${action.description ?? '-'}
+- Título: ${action.title ?? '-'}
+- Descrição: ${action.description ?? '-'}
 - Problema principal: ${action.problemDescription ?? '-'}
 - Causa raiz: ${action.rootCause ?? '-'}
 - Indicador: ${action.indicator?.name ?? '-'}
 - Resultados recentes: ${JSON.stringify(lastResults, null, 2)}
-- Area/setor: ${action.ownerNode?.name ?? '-'}
-- Etapas ja preenchidas:
+- Área/setor: ${action.ownerNode?.name ?? '-'}
+- Etapas já preenchidas:
 ${currentStages || '- nenhuma'}`;
 
     interface GeminiPdcaResp {
@@ -1383,7 +1383,7 @@ ${currentStages || '- nenhuma'}`;
 
   async requestDeletionApproval(actionId: string, companyId: string, userId?: string, reason?: string) {
     const action = await this.prisma.actionPlan.findFirst({ where: { id: actionId, companyId, deletedAt: null } });
-    if (!action) throw new NotFoundException('Acao nao encontrada');
+    if (!action) throw new NotFoundException('Ação não encontrada');
 
     const existing = await this.prisma.generalApprovalRequest.findFirst({
       where: {
@@ -1402,13 +1402,13 @@ ${currentStages || '- nenhuma'}`;
         type: 'ACTION_PLAN_DELETION',
         entityType: 'ActionPlan',
         entityId: actionId,
-        title: `Eliminar plano de acao: ${action.title}`,
-        description: 'Solicitacao de eliminacao enviada para validacao da gestao.',
+        title: `Eliminar plano de ação: ${action.title}`,
+        description: 'Solicitação de eliminação enviada para validação da gestão.',
         requesterId: userId ?? null,
         reason: reason ?? null,
       },
     });
-    await this.recordHistory(actionId, userId, 'DELETE_REQUESTED', null, null, reason ?? 'Solicitacao enviada para aprovacao');
+    await this.recordHistory(actionId, userId, 'DELETE_REQUESTED', null, null, reason ?? 'Solicitação enviada para aprovação');
     await this.audit(companyId, userId, 'DELETE_APPROVAL_REQUESTED', 'GeneralApprovalRequest', request.id, null, request);
     await this.traceability.record({
       companyId,
@@ -1417,7 +1417,7 @@ ${currentStages || '- nenhuma'}`;
       eventType: TraceEventType.UPDATED,
       entityType: TraceEntityType.ACTION_PLAN,
       entityId: actionId,
-      title: 'Eliminacao do plano enviada para aprovacao',
+      title: 'Eliminação do plano enviada para aprovação',
       description: reason ?? action.title,
       metadata: { approvalRequestId: request.id },
     });
@@ -1440,11 +1440,11 @@ ${currentStages || '- nenhuma'}`;
 
   async decideGeneralApproval(requestId: string, companyId: string, userId: string | undefined, decision: 'APPROVED' | 'REJECTED', decisionNote?: string) {
     const request = await this.prisma.generalApprovalRequest.findFirst({ where: { id: requestId, companyId } });
-    if (!request) throw new NotFoundException('Solicitacao nao encontrada');
-    if (request.status !== 'PENDING') throw new BadRequestException('Esta solicitacao ja foi decidida.');
+    if (!request) throw new NotFoundException('Solicitação não encontrada');
+    if (request.status !== 'PENDING') throw new BadRequestException('Esta solicitação já foi decidida.');
 
     if (decision === 'APPROVED' && request.type === 'ACTION_PLAN_DELETION' && request.entityType === 'ActionPlan') {
-      await this.remove(request.entityId, userId, request.reason ?? decisionNote ?? 'Eliminacao aprovada pela gestao.');
+      await this.remove(request.entityId, userId, request.reason ?? decisionNote ?? 'Eliminação aprovada pela gestão.');
     }
 
     const updated = await this.prisma.generalApprovalRequest.update({
@@ -1462,7 +1462,7 @@ ${currentStages || '- nenhuma'}`;
 
   async remove(id: string, userId?: string, reason?: string) {
     const before = await this.prisma.actionPlan.findUnique({ where: { id } });
-    if (!before) throw new NotFoundException('Ação nao encontrada');
+    if (!before) throw new NotFoundException('Ação não encontrada');
     if (userId) await this.access.assertCanWrite(userId, before.ownerNodeId, 'action_plans', 'delete');
     const removed = await this.prisma.actionPlan.update({
       where: { id },
@@ -1604,7 +1604,7 @@ ${currentStages || '- nenhuma'}`;
           strategicObj: { select: { ownerNodeId: true } },
         },
       });
-      if (!objective) throw new NotFoundException('Objetivo OKR nao encontrado');
+      if (!objective) throw new NotFoundException('Objetivo OKR não encontrado');
       out.okrObjectiveId = objective.id;
       out.strategicObjectiveId = objective.strategicObjId;
       out.ownerNodeId = objective.ownerNodeId ?? objective.strategicObj?.ownerNodeId ?? null;
@@ -1783,7 +1783,7 @@ ${currentStages || '- nenhuma'}`;
         originRefId: true,
       },
     });
-    if (!action) throw new NotFoundException('Ação nao encontrada');
+    if (!action) throw new NotFoundException('Ação não encontrada');
     let indicatorId = action.indicatorId ?? action.deviation?.indicatorId ?? null;
     if (!indicatorId && action.origin === ActionOrigin.INDICATOR) indicatorId = action.originRefId;
     return { companyId: action.companyId, indicatorId, treatmentId: action.treatmentId };
@@ -1822,11 +1822,11 @@ ${currentStages || '- nenhuma'}`;
 
   private assessActionReadiness(action: any) {
     const gaps = [];
-    if (!action.rootCause && action.analysisSessions.length === 0) gaps.push('Causa raiz ainda nao registrada.');
-    if (!action.responsibleUserId && !action.responsibleEmail) gaps.push('Responsável nao definido.');
+    if (!action.rootCause && action.analysisSessions.length === 0) gaps.push('Causa raiz ainda não registrada.');
+    if (!action.responsibleUserId && !action.responsibleEmail) gaps.push('Responsável não definido.');
     if (!action.dueDate) gaps.push('Prazo final ausente.');
     if (!action.expectedResult) gaps.push('Resultado esperado ausente.');
-    if (action.evidenceRequired && action.evidences.length === 0) gaps.push('Evidencia esperada ainda nao anexada.');
+    if (action.evidenceRequired && action.evidences.length === 0) gaps.push('Evidência esperada ainda não anexada.');
     return {
       score: Math.max(0, 100 - gaps.length * 18),
       gaps,
@@ -1849,22 +1849,22 @@ ${currentStages || '- nenhuma'}`;
         type: 'QUESTION',
         title: 'Pergunta de aprofundamento',
         content: rootCause
-          ? `Confirme se a causa raiz "${rootCause}" possui evidencia objetiva e esta sob controle da area responsável.`
-          : `A causa raiz ainda parece indefinida. Use 5 Porques ou Ishikawa para separar sintoma de causa do problema: "${problem}".`,
+          ? `Confirme se a causa raiz "${rootCause}" possui evidência objetiva e está sob controle da área responsável.`
+          : `A causa raiz ainda parece indefinida. Use 5 Porquês ou Ishikawa para separar sintoma de causa do problema: "${problem}".`,
         context,
       },
       {
         type: 'ACTION',
         title: 'Sugestão de ação estruturada',
-        content: `Defina uma ação em formato 5W2H: o que será feito, por que resolve a causa, quem responde, prazo, local, metodo de execucao, custo estimado e evidencia esperada.`,
+        content: `Defina uma ação em formato 5W2H: o que será feito, por que resolve a causa, quem responde, prazo, local, método de execução, custo estimado e evidência esperada.`,
         context,
       },
       {
         type: 'EFFECTIVENESS',
-        title: 'Criterio de eficacia',
+        title: 'Critério de eficácia',
         content: action.indicator
-          ? `Valide a eficacia comparando o próximo resultado do indicador "${action.indicator.name}" com o resultado que gerou o plano e anexe evidencia da melhoria.`
-          : `Defina um indicador de eficacia antes de concluir o plano, para evitar encerrar a ação apenas por entrega de tarefa.`,
+          ? `Valide a eficácia comparando o próximo resultado do indicador "${action.indicator.name}" com o resultado que gerou o plano e anexe evidência da melhoria.`
+          : `Defina um indicador de eficácia antes de concluir o plano, para evitar encerrar a ação apenas por entrega de tarefa.`,
         context,
       },
     ];
@@ -1935,12 +1935,12 @@ ${currentStages || '- nenhuma'}`;
 function defaultMaspSteps() {
   return [
     { step: 1, title: 'Identificação do problema' },
-    { step: 2, title: 'Observacao' },
+    { step: 2, title: 'Observação' },
     { step: 3, title: 'Análise' },
     { step: 4, title: 'Plano de ação' },
-    { step: 5, title: 'Execucao' },
+    { step: 5, title: 'Execução' },
     { step: 6, title: 'Verificação' },
-    { step: 7, title: 'Padronizacao' },
+    { step: 7, title: 'Padronização' },
     { step: 8, title: 'Conclusão' },
   ];
 }

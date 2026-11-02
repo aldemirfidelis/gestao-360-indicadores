@@ -82,7 +82,7 @@ async function asRequiredDatabaseAuth(prisma: PrismaService, user: PlatformAdmin
   const companyId = requestedCompanyId(req);
   if (!companyId) throw new BadRequestException('Selecione uma empresa antes de acessar o banco de dados.');
   const company = await prisma.company.findFirst({ where: { id: companyId, deletedAt: null }, select: { id: true } });
-  if (!company) throw new BadRequestException('Empresa selecionada nao encontrada.');
+  if (!company) throw new BadRequestException('Empresa selecionada não encontrada.');
   return asAuthPayload(user, company.id);
 }
 
@@ -699,18 +699,18 @@ export class PlatformAdminLegacyDatabaseController {
   @Get('diagnostics')
   @PlatformAdminRequired('platform.database.health')
   getDiagnostics() {
-    throw new ForbiddenException('Diagnostico global indisponivel no escopo empresarial.');
+    throw new ForbiddenException('Diagnóstico global indisponível no escopo empresarial.');
   }
 
   @Post('diagnostics/run')
   @PlatformAdminRequired('platform.database.health')
   runDiagnostics() {
-    throw new ForbiddenException('Diagnostico global indisponivel no escopo empresarial.');
+    throw new ForbiddenException('Diagnóstico global indisponível no escopo empresarial.');
   }
 
   @Get('settings')
   getSettings() {
-    throw new ForbiddenException('Configuracoes globais indisponiveis no escopo empresarial.');
+    throw new ForbiddenException('Configurações globais indisponíveis no escopo empresarial.');
   }
 
   @Put('settings')
@@ -718,7 +718,7 @@ export class PlatformAdminLegacyDatabaseController {
   setSettings(@Body() body: { key: string; value: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity) {
     void body;
     void user;
-    throw new ForbiddenException('Configuracoes globais indisponiveis no escopo empresarial.');
+    throw new ForbiddenException('Configurações globais indisponíveis no escopo empresarial.');
   }
 
   @Get('audit')
@@ -763,13 +763,13 @@ export class PlatformAdminLegacyDatabaseController {
   @Get('query/history')
   queryHistory(@CurrentPlatformAdmin() user: PlatformAdminIdentity) {
     void user;
-    throw new ForbiddenException('Historico SQL indisponivel no escopo empresarial.');
+    throw new ForbiddenException('Histórico SQL indisponível no escopo empresarial.');
   }
 
   @Get('query/favorites')
   queryFavorites(@CurrentPlatformAdmin() user: PlatformAdminIdentity) {
     void user;
-    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
+    throw new ForbiddenException('Consultas SQL indisponíveis no escopo empresarial.');
   }
 
   @Post('query/favorites')
@@ -777,7 +777,7 @@ export class PlatformAdminLegacyDatabaseController {
   saveQueryFavorite(@Body() body: { name: string; sql: string }, @CurrentPlatformAdmin() user: PlatformAdminIdentity) {
     void body;
     void user;
-    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
+    throw new ForbiddenException('Consultas SQL indisponíveis no escopo empresarial.');
   }
 
   @Delete('query/favorites/:id')
@@ -785,7 +785,7 @@ export class PlatformAdminLegacyDatabaseController {
   deleteQueryFavorite(@Param('id') id: string, @CurrentPlatformAdmin() user: PlatformAdminIdentity) {
     void id;
     void user;
-    throw new ForbiddenException('Consultas SQL indisponiveis no escopo empresarial.');
+    throw new ForbiddenException('Consultas SQL indisponíveis no escopo empresarial.');
   }
 
   @Post('structure/preview')
@@ -799,7 +799,7 @@ export class PlatformAdminLegacyDatabaseController {
     void body;
     void user;
     void req;
-    throw new ForbiddenException('Alteracoes estruturais desativadas no escopo empresarial.');
+    throw new ForbiddenException('Alterações estruturais desativadas no escopo empresarial.');
   }
 
   @Get('tables/:table/rows')
@@ -895,7 +895,7 @@ export class PlatformAdminLegacyDatabaseController {
   async downloadBackup(@Param('id') id: string, @CurrentPlatformAdmin() user: PlatformAdminIdentity, @Req() req: Request) {
     const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
     const file = await this.backup.getFile(id, auth.companyId);
-    if (!file) throw new BadRequestException('Backup indisponivel ou arquivo ausente.');
+    if (!file) throw new BadRequestException('Backup indisponível ou arquivo ausente.');
     return file;
   }
 
@@ -928,9 +928,9 @@ export class PlatformAdminLegacyDatabaseController {
     }
     const auth = await asRequiredDatabaseAuth(this.prisma, user, req);
     const file = await this.backup.getFile(id, auth.companyId);
-    if (!file) throw new BadRequestException('Backup indisponivel.');
+    if (!file) throw new BadRequestException('Backup indisponível.');
     const payload = JSON.parse(file.content) as { table: string; rows: Record<string, unknown>[] };
-    if (!payload?.table || !Array.isArray(payload.rows)) throw new BadRequestException('Snapshot invalido.');
+    if (!payload?.table || !Array.isArray(payload.rows)) throw new BadRequestException('Snapshot inválido.');
     const report = await this.importer.commit(payload.table, 'json', JSON.stringify(payload.rows), {}, 'ignoreDuplicates', [], auth, requestMeta(req));
     return { restoredInto: payload.table, ...report };
   }

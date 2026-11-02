@@ -142,7 +142,7 @@ export class SchemaInspectionService {
   async assertCompanyScopedTable(table: string): Promise<void> {
     const allow = await this.getCompanyScopedAllowlist();
     if (!allow.has(table)) {
-      throw new ForbiddenException('Tabela indisponivel: o escopo por empresa nao pode ser garantido.');
+      throw new ForbiddenException('Tabela indisponível: o escopo por empresa não pode ser garantido.');
     }
   }
 

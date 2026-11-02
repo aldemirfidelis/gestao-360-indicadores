@@ -36,7 +36,7 @@ Toda publicação marcada para o feed aparece em **Minha Vida Funcional > Comuni
       slug: 'comunicado-leitura-obrigatoria',
       title: 'Publicação com confirmação de leitura (prova de ciência)',
       summary: 'Garanta e comprove que todos leram políticas e avisos críticos.',
-      tags: ['leitura obrigatoria', 'ciencia', 'confirmacao', 'compliance', 'prova de leitura'],
+      tags: ['leitura obrigatória', 'ciencia', 'confirmacao', 'compliance', 'prova de leitura'],
       body: `Para políticas, normas de segurança (NRs) e avisos críticos, use a **confirmação de leitura**:
 
 1. Na etapa **Publicação**, marque **Exigir confirmação de leitura**;
@@ -74,7 +74,7 @@ Em **Configurações** o administrador cadastra as **categorias** da empresa (Co
       slug: 'comunicacao-interna-do-colaborador',
       title: 'Comunicação Interna (visão do colaborador)',
       summary: 'Onde o colaborador lê os comunicados da empresa.',
-      tags: ['comunicacao interna', 'feed', 'minha vida funcional', 'colaborador', 'mural'],
+      tags: ['comunicação interna', 'feed', 'minha vida funcional', 'colaborador', 'mural'],
       body: `O colaborador acessa **Minha Vida Funcional > Comunicação Interna** e encontra um feed institucional com tudo que foi publicado para ele.
 
 ## O que tem na tela

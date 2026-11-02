@@ -75,7 +75,7 @@ export class PortalConfigService {
           code: m.code, status: effectiveStatus, route: m.route, category: m.category,
           hidden: effectiveStatus === 'HIDDEN', maintenance: effectiveStatus === 'MAINTENANCE',
           unavailable: ['INACTIVE', 'BLOCKED', 'DISCONTINUED', 'MAINTENANCE'].includes(effectiveStatus),
-          unavailableMessage: companyModule?.note ?? (rawStatus === 'BLOQUEADO' ? `Modulo fora do plano ${planCode}.` : m.unavailableMessage),
+          unavailableMessage: companyModule?.note ?? (rawStatus === 'BLOQUEADO' ? `Módulo fora do plano ${planCode}.` : m.unavailableMessage),
           companyModuleStatus: rawStatus,
           companyModuleReadOnly: companyModule?.readOnly ?? false,
           allowedRoles: parseArray(m.allowedRoles),

@@ -1,4 +1,5 @@
 'use client';
+import { formatQuantity } from '@g360/shared';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -115,7 +116,7 @@ export default function PrizePayrollPage() {
                       <Badge variant={BATCH_STATUS[b.status]}>{b.status}</Badge>
                       {b.rejectedCount > 0 && <Badge variant="destructive">{b.rejectedCount} rejeitado(s)</Badge>}
                     </div>
-                    <p className="text-xs text-muted-foreground">{b.totalItems} item(ns) · {money(b.totalValue)}{b.rubric ? ` · rubrica ${b.rubric}` : ''}{b.protocol ? ` · protocolo ${b.protocol}` : ''}</p>
+                    <p className="text-xs text-muted-foreground">{formatQuantity(b.totalItems, 'item', 'itens')} · {money(b.totalValue)}{b.rubric ? ` · rubrica ${b.rubric}` : ''}{b.protocol ? ` · protocolo ${b.protocol}` : ''}</p>
                   </div>
                   {canManage && (
                     <div className="flex flex-wrap gap-2">

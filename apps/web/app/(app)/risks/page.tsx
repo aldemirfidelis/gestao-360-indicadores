@@ -109,11 +109,11 @@ const STATUS_LABEL: Record<RiskStatus, string> = {
 };
 
 const CATEGORY_LABEL: Record<RiskCategory, string> = {
-  STRATEGIC: 'Estrategico',
+  STRATEGIC: 'Estratégico',
   OPERATIONAL: 'Operacional',
   FINANCIAL: 'Financeiro',
   COMPLIANCE: 'Compliance',
-  SAFETY: 'Seguranca',
+  SAFETY: 'Segurança',
   ENVIRONMENTAL: 'Ambiental',
   QUALITY: 'Qualidade',
   PROJECT: 'Projeto',
@@ -239,7 +239,7 @@ export default function RisksPage() {
   const deleteRisk = useMutation({
     mutationFn: (id: string) => api<Risk>(`/risks/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Risco excluido');
+      toast.success('Risco excluído');
       invalidateRisks(qc);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível excluir o risco'),
@@ -306,8 +306,8 @@ export default function RisksPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Riscos abertos" value={formatNumber(summary?.openRisks)} description={`${formatNumber(summary?.totalRisks)} registrados`} icon={<ShieldAlert className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Críticos" value={formatNumber(summary?.criticalRisks)} description="Score acima de 16" icon={<AlertTriangle className="h-4 w-4" />} tone={(summary?.criticalRisks ?? 0) > 0 ? 'red' : 'green'} />
-        <MetricCard title="Mitigacoes vencidas" value={formatNumber(summary?.overdueMitigations)} description="Riscos abertos com prazo expirado" icon={<CalendarClock className="h-4 w-4" />} tone={(summary?.overdueMitigations ?? 0) > 0 ? 'yellow' : 'green'} />
-        <MetricCard title="Score medio" value={formatNumber(summary?.avgScore, { maximumFractionDigits: 1 })} description="Probabilidade x impacto" icon={<CheckCircle2 className="h-4 w-4" />} tone="purple" />
+        <MetricCard title="Mitigações vencidas" value={formatNumber(summary?.overdueMitigations)} description="Riscos abertos com prazo expirado" icon={<CalendarClock className="h-4 w-4" />} tone={(summary?.overdueMitigations ?? 0) > 0 ? 'yellow' : 'green'} />
+        <MetricCard title="Score médio" value={formatNumber(summary?.avgScore, { maximumFractionDigits: 1 })} description="Probabilidade x impacto" icon={<CheckCircle2 className="h-4 w-4" />} tone="purple" />
       </div>
 
       {/* Matriz de risco (heatmap 5x5): inerente x residual */}
@@ -342,14 +342,14 @@ export default function RisksPage() {
           <CardContent className="p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
-                <div className="text-sm font-semibold">Riscos prioritarios</div>
-                <div className="text-xs text-muted-foreground">Maior severidade entre os riscos visiveis para você.</div>
+                <div className="text-sm font-semibold">Riscos prioritários</div>
+                <div className="text-xs text-muted-foreground">Maior severidade entre os riscos visíveis para você.</div>
               </div>
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="space-y-2">
               {(summary?.topRisks ?? []).length === 0 && (
-                <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">Nenhum risco prioritario no momento.</div>
+                <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">Nenhum risco prioritário no momento.</div>
               )}
               {(summary?.topRisks ?? []).map((risk) => (
                 <div key={risk.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
@@ -451,7 +451,7 @@ export default function RisksPage() {
                 <div>Responsável: <span className="text-foreground">{risk.responsibleUser?.name ?? '-'}</span></div>
                 <div>KPI: <span className="text-foreground">{risk.indicator ? `${risk.indicator.code ? `[${risk.indicator.code}] ` : ''}${risk.indicator.name}` : '-'}</span></div>
                 <div>Projeto: <span className="text-foreground">{risk.project?.name ?? '-'}</span></div>
-                <div>Mitigacao até: <span className={cn('text-foreground', risk.isOverdue && 'text-status-yellow')}>{formatDate(risk.dueDate)}</span></div>
+                <div>Mitigação até: <span className={cn('text-foreground', risk.isOverdue && 'text-status-yellow')}>{formatDate(risk.dueDate)}</span></div>
                 <div>Plano vinculado: <span className="text-foreground">{risk.mitigationAction?.title ?? '-'}</span></div>
               </div>
             </CardContent>
@@ -572,7 +572,7 @@ export default function RisksPage() {
               <Textarea rows={3} value={form.mitigationPlan} onChange={(e) => setForm((f) => ({ ...f, mitigationPlan: e.target.value }))} />
             </div>
             <div>
-              <Label>Plano de contingencia</Label>
+              <Label>Plano de contingência</Label>
               <Textarea rows={3} value={form.contingencyPlan} onChange={(e) => setForm((f) => ({ ...f, contingencyPlan: e.target.value }))} />
             </div>
           </div>

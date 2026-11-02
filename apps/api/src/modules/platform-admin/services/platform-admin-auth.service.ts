@@ -28,13 +28,13 @@ export class PlatformAdminAuthService {
     });
 
     if (!user || user.deletedAt || user.status !== 'ACTIVE') {
-      await this.accessLog(null, email, 'LOGIN', 'DENIED', 'Usuario interno inativo ou inexistente.', ctx);
-      throw new UnauthorizedException('Credenciais invalidas');
+      await this.accessLog(null, email, 'LOGIN', 'DENIED', 'Usuário interno inativo ou inexistente.', ctx);
+      throw new UnauthorizedException('Credenciais inválidas');
     }
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
-      await this.accessLog(user.id, user.email, 'LOGIN', 'DENIED', 'Senha invalida.', ctx);
-      throw new UnauthorizedException('Credenciais invalidas');
+      await this.accessLog(user.id, user.email, 'LOGIN', 'DENIED', 'Senha inválida.', ctx);
+      throw new UnauthorizedException('Credenciais inválidas');
     }
 
     const refreshToken = randomBytes(40).toString('hex');
@@ -80,7 +80,7 @@ export class PlatformAdminAuthService {
         },
       },
     });
-    if (!user || user.deletedAt || user.status !== 'ACTIVE') throw new UnauthorizedException('Usuario interno inativo');
+    if (!user || user.deletedAt || user.status !== 'ACTIVE') throw new UnauthorizedException('Usuário interno inativo');
     return this.profileFromUser(user, sessionId);
   }
 
@@ -90,7 +90,7 @@ export class PlatformAdminAuthService {
       include: { user: true },
     });
     if (!session || session.revokedAt || session.expiresAt < new Date() || session.user.deletedAt || session.user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Refresh invalido');
+      throw new UnauthorizedException('Refresh inválido');
     }
     await this.prisma.platformAdminSession.update({
       where: { id: session.id },
@@ -110,7 +110,7 @@ export class PlatformAdminAuthService {
     if (refreshToken) {
       await this.prisma.platformAdminSession
         .update({ where: { refreshTokenHash: hashToken(refreshToken) }, data: { revokedAt: new Date() } })
-        .catch(swallow(undefined, 'platformAdmin.logout(revogar sessao)'));
+        .catch(swallow(undefined, 'platformAdmin.logout(revogar sessão)'));
     }
     await this.accessLog(ctx?.userId ?? null, ctx?.email ?? null, 'LOGOUT', 'SUCCESS', null, ctx);
     return { ok: true };

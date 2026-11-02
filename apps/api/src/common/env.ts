@@ -33,14 +33,14 @@ export function requireSecret(name: string): string {
   const value = process.env[name];
   if (!value || value.trim() === '') {
     throw new Error(
-      `[CONFIG] Variavel de ambiente obrigatoria ausente: ${name}. ` +
+      `[CONFIG] Variável de ambiente obrigatória ausente: ${name}. ` +
         `Defina um segredo forte (ex.: openssl rand -base64 48).`,
     );
   }
   if (isProd() && isWeakSecret(value)) {
     throw new Error(
-      `[CONFIG] ${name} usa um valor fraco/de exemplo em producao. ` +
-        `Gere um segredo unico com >=32 chars (openssl rand -base64 48).`,
+      `[CONFIG] ${name} usa um valor fraco/de exemplo em produção. ` +
+        `Gere um segredo único com >=32 chars (openssl rand -base64 48).`,
     );
   }
   return value;

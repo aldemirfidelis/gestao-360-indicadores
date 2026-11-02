@@ -11,7 +11,7 @@ export const administracao: HelpCatalogCategory = {
       slug: 'usuarios-perfis-e-permissoes',
       title: 'Usuários, perfis de acesso e permissões',
       summary: 'Crie usuários, atribua perfis e controle o que cada um vê e faz.',
-      tags: ['usuario', 'permissao', 'perfil de acesso', 'criar usuario', 'acesso', 'inativar'],
+      tags: ['usuario', 'permissao', 'perfil de acesso', 'criar usuário', 'acesso', 'inativar'],
       body: `Em **Administração > Usuários** você gerencia quem acessa o sistema (requer permissão de gestão de usuários).
 
 ## Criar um usuário
@@ -32,7 +32,7 @@ Perfis agrupam permissões por papel. Prefira ajustar o perfil a dar permissões
       slug: 'central-de-automacoes',
       title: 'Central de Automações (fluxos de trabalho)',
       summary: 'Automatize cobranças, roteamentos e aprovações sem código.',
-      tags: ['automacao', 'workflow', 'fluxo de trabalho', 'gatilho', 'aprovacao automatica'],
+      tags: ['automacao', 'workflow', 'fluxo de trabalho', 'gatilho', 'aprovação automática'],
       body: `A **Central de Automações** (Administração > Central de Automações) é um motor visual de fluxos: **gatilho → condição → ação**.
 
 ## Criar um fluxo
@@ -147,7 +147,7 @@ Os chamados chegam diretamente à equipe de atendimento da plataforma. Para dúv
       slug: 'central-do-portal',
       title: 'Central do Portal (Super Admin)',
       summary: 'Controle módulos, manutenções, integrações e diagnósticos do portal.',
-      tags: ['central do portal', 'super admin', 'configuracoes avancadas', 'manutencao', 'diagnostico'],
+      tags: ['central do portal', 'super admin', 'configurações avançadas', 'manutencao', 'diagnostico'],
       body: `A **Central de Administração do Portal** (Configurações > Avançadas) é restrita ao **Super Admin** da empresa:
 
 - **Módulos e páginas** — controle do que aparece para os usuários;

@@ -16,7 +16,7 @@ export class StructureController {
   @Post('preview')
   preview(@Body() body: { operation: string; params: Record<string, unknown> }) {
     void body;
-    throw new ForbiddenException('Alteracoes estruturais desativadas no escopo empresarial.');
+    throw new ForbiddenException('Alterações estruturais desativadas no escopo empresarial.');
   }
 
   @Post('execute')
@@ -28,6 +28,6 @@ export class StructureController {
     void body;
     void user;
     void req;
-    throw new ForbiddenException('Alteracoes estruturais desativadas no escopo empresarial.');
+    throw new ForbiddenException('Alterações estruturais desativadas no escopo empresarial.');
   }
 }

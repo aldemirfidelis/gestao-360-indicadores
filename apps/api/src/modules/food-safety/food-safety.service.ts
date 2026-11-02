@@ -55,7 +55,7 @@ export class FoodSafetyService {
   // ----------------------------- helpers ------------------------------------
   private requiredText(value: unknown, field: string) {
     const text = String(value ?? '').trim();
-    if (!text) throw new BadRequestException(`${field} e obrigatorio.`);
+    if (!text) throw new BadRequestException(`${field} é obrigatório.`);
     return text;
   }
   private nullableText(value: unknown) {
@@ -71,48 +71,48 @@ export class FoodSafetyService {
     if (value === undefined) return undefined;
     if (value === null || value === '') return null;
     const n = Number(value);
-    if (!Number.isFinite(n)) throw new BadRequestException('Valor numerico invalido.');
+    if (!Number.isFinite(n)) throw new BadRequestException('Valor numérico inválido.');
     return Math.max(min, Math.round(n));
   }
   private optionalFloat(value: unknown): number | null | undefined {
     if (value === undefined) return undefined;
     if (value === null || value === '') return null;
     const n = Number(value);
-    if (!Number.isFinite(n)) throw new BadRequestException('Valor numerico invalido.');
+    if (!Number.isFinite(n)) throw new BadRequestException('Valor numérico inválido.');
     return n;
   }
   private optionalDate(value: unknown): Date | null | undefined {
     if (value === undefined) return undefined;
     if (value === null || value === '') return null;
     const d = new Date(String(value));
-    if (Number.isNaN(d.getTime())) throw new BadRequestException('Data invalida.');
+    if (Number.isNaN(d.getTime())) throw new BadRequestException('Data inválida.');
     return d;
   }
   private parseProgramStatus(v?: string): FoodSafetyProgramStatus | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyProgramStatus).includes(v as FoodSafetyProgramStatus)) throw new BadRequestException('Status de programa invalido.');
+    if (!Object.values(FoodSafetyProgramStatus).includes(v as FoodSafetyProgramStatus)) throw new BadRequestException('Status de programa inválido.');
     return v as FoodSafetyProgramStatus;
   }
   private parseProcessStatus(v?: string): FoodSafetyProcessStatus | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyProcessStatus).includes(v as FoodSafetyProcessStatus)) throw new BadRequestException('Status de processo invalido.');
+    if (!Object.values(FoodSafetyProcessStatus).includes(v as FoodSafetyProcessStatus)) throw new BadRequestException('Status de processo inválido.');
     return v as FoodSafetyProcessStatus;
   }
   private parseStepType(v?: string): FoodSafetyStepType | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyStepType).includes(v as FoodSafetyStepType)) throw new BadRequestException('Tipo de etapa invalido.');
+    if (!Object.values(FoodSafetyStepType).includes(v as FoodSafetyStepType)) throw new BadRequestException('Tipo de etapa inválido.');
     return v as FoodSafetyStepType;
   }
   private async validateOrgNode(companyId: string, orgNodeId: string | null) {
     if (!orgNodeId) return null;
     const node = await this.prisma.orgNode.findFirst({ where: { id: orgNodeId, companyId, deletedAt: null }, select: { id: true } });
-    if (!node) throw new NotFoundException('Unidade/area nao encontrada');
+    if (!node) throw new NotFoundException('Unidade/area não encontrada');
     return node.id;
   }
   private async validateUser(companyId: string, userId: string | null) {
     if (!userId) return null;
     const user = await this.prisma.user.findFirst({ where: { id: userId, companyId, deletedAt: null, active: true }, select: { id: true } });
-    if (!user) throw new NotFoundException('Usuario responsavel nao encontrado');
+    if (!user) throw new NotFoundException('Usuário responsável não encontrado');
     return user.id;
   }
 
@@ -154,7 +154,7 @@ export class FoodSafetyService {
       where: { id, companyId: me.companyId, deletedAt: null },
       include: this.programInclude(),
     });
-    if (!program) throw new NotFoundException('Programa nao encontrado');
+    if (!program) throw new NotFoundException('Programa não encontrado');
     return program;
   }
 
@@ -218,7 +218,7 @@ export class FoodSafetyService {
       where: { id, companyId: me.companyId, deletedAt: null },
       include: this.processInclude(),
     });
-    if (!proc) throw new NotFoundException('Processo nao encontrado');
+    if (!proc) throw new NotFoundException('Processo não encontrado');
     return proc;
   }
 
@@ -256,7 +256,7 @@ export class FoodSafetyService {
     if (proc.orgNodeId) {
       const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
       if (permitted && !permitted.includes(proc.orgNodeId)) {
-        throw new ForbiddenException('Voce nao tem acesso aos processos desta area.');
+        throw new ForbiddenException('Você não tem acesso aos processos desta área.');
       }
     }
     return proc;
@@ -335,7 +335,7 @@ export class FoodSafetyService {
       where: { id: stepId, companyId: me.companyId, deletedAt: null },
       include: { process: { select: { id: true, number: true, name: true, orgNodeId: true } } },
     });
-    if (!step) throw new NotFoundException('Etapa nao encontrada');
+    if (!step) throw new NotFoundException('Etapa não encontrada');
     return step;
   }
 
@@ -368,7 +368,7 @@ export class FoodSafetyService {
     await this.assertProcessWriteArea(me, proc.orgNodeId, 'edit');
     const steps = Array.isArray(body?.steps) ? body.steps : [];
     if (steps.length === 0) throw new BadRequestException('Informe ao menos uma etapa.');
-    if (steps.length > 40) throw new BadRequestException('O limite por importacao e de 40 etapas.');
+    if (steps.length > 40) throw new BadRequestException('O limite por importação e de 40 etapas.');
 
     const startNumber = proc.steps.length
       ? Math.max(...proc.steps.map((step) => step.number)) + 1
@@ -419,7 +419,7 @@ export class FoodSafetyService {
     const template = await this.prisma.foodSafetyFlowTemplate.findFirst({
       where: { id, companyId: me.companyId, deletedAt: null },
     });
-    if (!template) throw new NotFoundException('Modelo de fluxo nao encontrado');
+    if (!template) throw new NotFoundException('Modelo de fluxo não encontrado');
     return template;
   }
 
@@ -476,7 +476,7 @@ export class FoodSafetyService {
   /** Salva o fluxo (etapas) de um processo existente como modelo reutilizavel. */
   async saveProcessAsFlowTemplate(me: AuthPayload, processId: string, body: any) {
     const proc = await this.getProcess(me, processId);
-    if (!proc.steps.length) throw new BadRequestException('O processo nao possui etapas para salvar como modelo.');
+    if (!proc.steps.length) throw new BadRequestException('O processo não possui etapas para salvar como modelo.');
     const steps = proc.steps.map((step) => ({
       name: step.name,
       type: step.type,
@@ -635,7 +635,7 @@ export class FoodSafetyService {
     if ('name' in (patch ?? {})) data.name = this.requiredText(patch.name, 'Nome');
     if ('severityScale' in (patch ?? {})) data.severityScale = this.scale(patch.severityScale, 'Escala de severidade');
     if ('probabilityScale' in (patch ?? {})) data.probabilityScale = this.scale(patch.probabilityScale, 'Escala de probabilidade');
-    if ('detectionScale' in (patch ?? {})) data.detectionScale = this.scale(patch.detectionScale, 'Escala de deteccao');
+    if ('detectionScale' in (patch ?? {})) data.detectionScale = this.scale(patch.detectionScale, 'Escala de detecção');
     if ('useDetection' in (patch ?? {})) data.useDetection = Boolean(patch.useDetection);
     if ('thresholdLow' in (patch ?? {})) data.thresholdLow = this.scale(patch.thresholdLow, 'Limite baixo');
     if ('thresholdModerate' in (patch ?? {})) data.thresholdModerate = this.scale(patch.thresholdModerate, 'Limite moderado');
@@ -649,14 +649,14 @@ export class FoodSafetyService {
 
   private scale(value: unknown, field: string): number {
     const n = Math.round(Number(value));
-    if (!Number.isFinite(n) || n < 1) throw new BadRequestException(`${field} deve ser um numero >= 1.`);
+    if (!Number.isFinite(n) || n < 1) throw new BadRequestException(`${field} deve ser um número >= 1.`);
     return n;
   }
 
   private scaleValue(value: unknown, max: number): number | null {
     if (value === undefined || value === null || value === '') return null;
     const n = Math.round(Number(value));
-    if (!Number.isFinite(n)) throw new BadRequestException('Valor de escala invalido.');
+    if (!Number.isFinite(n)) throw new BadRequestException('Valor de escala inválido.');
     if (n < 1 || n > max) throw new BadRequestException(`Valor deve estar entre 1 e ${max}.`);
     return n;
   }
@@ -681,17 +681,17 @@ export class FoodSafetyService {
   // ----------------------------- perigos / APPCC ----------------------------
   private parseCategory(v?: string): FoodSafetyHazardCategory | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyHazardCategory).includes(v as FoodSafetyHazardCategory)) throw new BadRequestException('Categoria de perigo invalida.');
+    if (!Object.values(FoodSafetyHazardCategory).includes(v as FoodSafetyHazardCategory)) throw new BadRequestException('Categoria de perigo inválida.');
     return v as FoodSafetyHazardCategory;
   }
   private parseControlType(v?: string): FoodSafetyControlType | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyControlType).includes(v as FoodSafetyControlType)) throw new BadRequestException('Tipo de controle invalido.');
+    if (!Object.values(FoodSafetyControlType).includes(v as FoodSafetyControlType)) throw new BadRequestException('Tipo de controle inválido.');
     return v as FoodSafetyControlType;
   }
   private parseHazardStatus(v?: string): FoodSafetyHazardStatus | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyHazardStatus).includes(v as FoodSafetyHazardStatus)) throw new BadRequestException('Status de perigo invalido.');
+    if (!Object.values(FoodSafetyHazardStatus).includes(v as FoodSafetyHazardStatus)) throw new BadRequestException('Status de perigo inválido.');
     return v as FoodSafetyHazardStatus;
   }
 
@@ -708,7 +708,7 @@ export class FoodSafetyService {
       where: { id, companyId: me.companyId, deletedAt: null },
       include: this.hazardInclude(),
     });
-    if (!hazard) throw new NotFoundException('Perigo nao encontrado');
+    if (!hazard) throw new NotFoundException('Perigo não encontrado');
     return hazard;
   }
 
@@ -751,7 +751,7 @@ export class FoodSafetyService {
     const proc = await this.loadProcess(me, processId);
     await this.assertProcessWriteArea(me, proc.orgNodeId, 'create');
     const stepId = this.id(body?.stepId);
-    if (stepId && !proc.steps.some((s) => s.id === stepId)) throw new BadRequestException('Etapa nao pertence ao processo informado.');
+    if (stepId && !proc.steps.some((s) => s.id === stepId)) throw new BadRequestException('Etapa não pertence ao processo informado.');
     const responsibleUserId = await this.validateUser(me.companyId, this.id(body?.responsibleUserId));
     const matrix = await this.getRiskMatrix(me);
     const severity = this.scaleValue(body?.severity, matrix.severityScale);
@@ -800,7 +800,7 @@ export class FoodSafetyService {
       const stepId = this.id(patch.stepId);
       if (stepId) {
         const step = await this.prisma.foodSafetyProcessStep.findFirst({ where: { id: stepId, processId: before.processId, deletedAt: null }, select: { id: true } });
-        if (!step) throw new BadRequestException('Etapa nao pertence ao processo do perigo.');
+        if (!step) throw new BadRequestException('Etapa não pertence ao processo do perigo.');
       }
       data.stepId = stepId;
     }
@@ -842,12 +842,12 @@ export class FoodSafetyService {
   // ----------------------------- controle operacional (PPR/PPRO/PCC) --------
   private parseControlPlanStatus(v?: string): FoodSafetyControlPlanStatus | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyControlPlanStatus).includes(v as FoodSafetyControlPlanStatus)) throw new BadRequestException('Status de plano invalido.');
+    if (!Object.values(FoodSafetyControlPlanStatus).includes(v as FoodSafetyControlPlanStatus)) throw new BadRequestException('Status de plano inválido.');
     return v as FoodSafetyControlPlanStatus;
   }
   private parseResult(v?: string): FoodSafetyMonitoringResult | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyMonitoringResult).includes(v as FoodSafetyMonitoringResult)) throw new BadRequestException('Resultado de monitoramento invalido.');
+    if (!Object.values(FoodSafetyMonitoringResult).includes(v as FoodSafetyMonitoringResult)) throw new BadRequestException('Resultado de monitoramento inválido.');
     return v as FoodSafetyMonitoringResult;
   }
 
@@ -873,7 +873,7 @@ export class FoodSafetyService {
       where: { id, companyId: me.companyId, deletedAt: null },
       include: this.planInclude(),
     });
-    if (!plan) throw new NotFoundException('Plano de controle nao encontrado');
+    if (!plan) throw new NotFoundException('Plano de controle não encontrado');
     return plan;
   }
 
@@ -1031,17 +1031,17 @@ export class FoodSafetyService {
   // ----------------------------- compliance / requisitos --------------------
   private parseVersionStatus(v?: string): FoodSafetyStandardVersionStatus | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyStandardVersionStatus).includes(v as FoodSafetyStandardVersionStatus)) throw new BadRequestException('Status de versao invalido.');
+    if (!Object.values(FoodSafetyStandardVersionStatus).includes(v as FoodSafetyStandardVersionStatus)) throw new BadRequestException('Status de versão inválido.');
     return v as FoodSafetyStandardVersionStatus;
   }
   private parseComplianceResult(v?: string): FoodSafetyComplianceResult | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyComplianceResult).includes(v as FoodSafetyComplianceResult)) throw new BadRequestException('Resultado de avaliacao invalido.');
+    if (!Object.values(FoodSafetyComplianceResult).includes(v as FoodSafetyComplianceResult)) throw new BadRequestException('Resultado de avaliação inválido.');
     return v as FoodSafetyComplianceResult;
   }
   private parseCriticality(v?: string): FoodSafetyRequirementCriticality | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyRequirementCriticality).includes(v as FoodSafetyRequirementCriticality)) throw new BadRequestException('Criticidade invalida.');
+    if (!Object.values(FoodSafetyRequirementCriticality).includes(v as FoodSafetyRequirementCriticality)) throw new BadRequestException('Criticidade inválida.');
     return v as FoodSafetyRequirementCriticality;
   }
 
@@ -1065,7 +1065,7 @@ export class FoodSafetyService {
 
   private async loadStandard(me: AuthPayload, id: string) {
     const std = await this.prisma.foodSafetyStandard.findFirst({ where: { id, companyId: me.companyId, deletedAt: null } });
-    if (!std) throw new NotFoundException('Norma nao encontrada');
+    if (!std) throw new NotFoundException('Norma não encontrada');
     return std;
   }
 
@@ -1104,7 +1104,7 @@ export class FoodSafetyService {
       where: { id, companyId: me.companyId, deletedAt: null },
       include: { standard: { select: { id: true, name: true, code: true } } },
     });
-    if (!version) throw new NotFoundException('Versao da norma nao encontrada');
+    if (!version) throw new NotFoundException('Versão da norma não encontrada');
     return version;
   }
 
@@ -1115,7 +1115,7 @@ export class FoodSafetyService {
       data: {
         companyId: me.companyId,
         standardId,
-        versionLabel: this.requiredText(body?.versionLabel, 'Versao'),
+        versionLabel: this.requiredText(body?.versionLabel, 'Versão'),
         effectiveDate: this.optionalDate(body?.effectiveDate) ?? null,
         status: this.parseVersionStatus(body?.status) ?? FoodSafetyStandardVersionStatus.DRAFT,
         notes: this.nullableText(body?.notes) ?? null,
@@ -1127,7 +1127,7 @@ export class FoodSafetyService {
   async updateVersion(me: AuthPayload, id: string, patch: any) {
     const before = await this.loadVersion(me, id);
     const data: any = {};
-    if ('versionLabel' in (patch ?? {})) data.versionLabel = this.requiredText(patch.versionLabel, 'Versao');
+    if ('versionLabel' in (patch ?? {})) data.versionLabel = this.requiredText(patch.versionLabel, 'Versão');
     if ('effectiveDate' in (patch ?? {})) data.effectiveDate = this.optionalDate(patch.effectiveDate);
     if ('notes' in (patch ?? {})) data.notes = this.nullableText(patch.notes);
     const status = 'status' in (patch ?? {}) ? this.parseVersionStatus(patch.status) : undefined;
@@ -1168,7 +1168,7 @@ export class FoodSafetyService {
       where: { id, companyId: me.companyId, deletedAt: null },
       include: this.requirementInclude(),
     });
-    if (!req) throw new NotFoundException('Requisito nao encontrado');
+    if (!req) throw new NotFoundException('Requisito não encontrado');
     return req;
   }
 
@@ -1192,7 +1192,7 @@ export class FoodSafetyService {
   }
 
   async createRequirement(me: AuthPayload, body: any) {
-    const standardVersionId = this.requiredText(body?.standardVersionId, 'Versao da norma');
+    const standardVersionId = this.requiredText(body?.standardVersionId, 'Versão da norma');
     await this.loadVersion(me, standardVersionId);
     const responsibleUserId = await this.validateUser(me.companyId, this.id(body?.responsibleUserId));
     return this.prisma.foodSafetyRequirement.create({
@@ -1200,7 +1200,7 @@ export class FoodSafetyService {
         companyId: me.companyId,
         standardVersionId,
         responsibleUserId,
-        title: this.requiredText(body?.title, 'Titulo'),
+        title: this.requiredText(body?.title, 'Título'),
         code: this.nullableText(body?.code) ?? null,
         chapter: this.nullableText(body?.chapter) ?? null,
         item: this.nullableText(body?.item) ?? null,
@@ -1219,7 +1219,7 @@ export class FoodSafetyService {
   async updateRequirement(me: AuthPayload, id: string, patch: any) {
     await this.loadRequirement(me, id);
     const data: any = {};
-    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Titulo');
+    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Título');
     if ('code' in (patch ?? {})) data.code = this.nullableText(patch.code);
     if ('chapter' in (patch ?? {})) data.chapter = this.nullableText(patch.chapter);
     if ('item' in (patch ?? {})) data.item = this.nullableText(patch.item);
@@ -1290,52 +1290,52 @@ export class FoodSafetyService {
   // ----------------------------- cadeia / fornecedores / recall ------------
   private parseSupplierStatus(v?: string): FoodSafetySupplierStatus | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetySupplierStatus).includes(v as FoodSafetySupplierStatus)) throw new BadRequestException('Status de fornecedor invalido.');
+    if (!Object.values(FoodSafetySupplierStatus).includes(v as FoodSafetySupplierStatus)) throw new BadRequestException('Status de fornecedor inválido.');
     return v as FoodSafetySupplierStatus;
   }
   private parseSupplierCriticality(v?: string): FoodSafetySupplierCriticality | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetySupplierCriticality).includes(v as FoodSafetySupplierCriticality)) throw new BadRequestException('Criticidade de fornecedor invalida.');
+    if (!Object.values(FoodSafetySupplierCriticality).includes(v as FoodSafetySupplierCriticality)) throw new BadRequestException('Criticidade de fornecedor inválida.');
     return v as FoodSafetySupplierCriticality;
   }
   private parseMaterialCategory(v?: string): FoodSafetyMaterialCategory | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyMaterialCategory).includes(v as FoodSafetyMaterialCategory)) throw new BadRequestException('Categoria de material invalida.');
+    if (!Object.values(FoodSafetyMaterialCategory).includes(v as FoodSafetyMaterialCategory)) throw new BadRequestException('Categoria de material inválida.');
     return v as FoodSafetyMaterialCategory;
   }
   private parseMaterialStatus(v?: string): FoodSafetyMaterialStatus | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyMaterialStatus).includes(v as FoodSafetyMaterialStatus)) throw new BadRequestException('Status de material invalido.');
+    if (!Object.values(FoodSafetyMaterialStatus).includes(v as FoodSafetyMaterialStatus)) throw new BadRequestException('Status de material inválido.');
     return v as FoodSafetyMaterialStatus;
   }
   private parseLotType(v?: string): FoodSafetyLotType | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyLotType).includes(v as FoodSafetyLotType)) throw new BadRequestException('Tipo de lote invalido.');
+    if (!Object.values(FoodSafetyLotType).includes(v as FoodSafetyLotType)) throw new BadRequestException('Tipo de lote inválido.');
     return v as FoodSafetyLotType;
   }
   private parseLotStatus(v?: string): FoodSafetyLotStatus | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyLotStatus).includes(v as FoodSafetyLotStatus)) throw new BadRequestException('Status de lote invalido.');
+    if (!Object.values(FoodSafetyLotStatus).includes(v as FoodSafetyLotStatus)) throw new BadRequestException('Status de lote inválido.');
     return v as FoodSafetyLotStatus;
   }
   private parseTraceEventType(v?: string): FoodSafetyTraceEventType | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyTraceEventType).includes(v as FoodSafetyTraceEventType)) throw new BadRequestException('Tipo de evento de rastreabilidade invalido.');
+    if (!Object.values(FoodSafetyTraceEventType).includes(v as FoodSafetyTraceEventType)) throw new BadRequestException('Tipo de evento de rastreabilidade inválido.');
     return v as FoodSafetyTraceEventType;
   }
   private parseRecallStatus(v?: string): FoodSafetyRecallStatus | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyRecallStatus).includes(v as FoodSafetyRecallStatus)) throw new BadRequestException('Status de recall invalido.');
+    if (!Object.values(FoodSafetyRecallStatus).includes(v as FoodSafetyRecallStatus)) throw new BadRequestException('Status de recall inválido.');
     return v as FoodSafetyRecallStatus;
   }
   private parseRecallSeverity(v?: string): FoodSafetyRecallSeverity | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyRecallSeverity).includes(v as FoodSafetyRecallSeverity)) throw new BadRequestException('Severidade de recall invalida.');
+    if (!Object.values(FoodSafetyRecallSeverity).includes(v as FoodSafetyRecallSeverity)) throw new BadRequestException('Severidade de recall inválida.');
     return v as FoodSafetyRecallSeverity;
   }
   private parseRecallItemStatus(v?: string): FoodSafetyRecallItemStatus | undefined {
     if (!v) return undefined;
-    if (!Object.values(FoodSafetyRecallItemStatus).includes(v as FoodSafetyRecallItemStatus)) throw new BadRequestException('Status de item de recall invalido.');
+    if (!Object.values(FoodSafetyRecallItemStatus).includes(v as FoodSafetyRecallItemStatus)) throw new BadRequestException('Status de item de recall inválido.');
     return v as FoodSafetyRecallItemStatus;
   }
 
@@ -1399,7 +1399,7 @@ export class FoodSafetyService {
       where: { id, companyId: me.companyId, deletedAt: null },
       include: this.supplierInclude(),
     });
-    if (!supplier) throw new NotFoundException('Fornecedor nao encontrado');
+    if (!supplier) throw new NotFoundException('Fornecedor não encontrado');
     return supplier;
   }
 
@@ -1508,7 +1508,7 @@ export class FoodSafetyService {
       where: { id, companyId: me.companyId, deletedAt: null },
       include: this.materialInclude(),
     });
-    if (!material) throw new NotFoundException('Materia-prima/material nao encontrado');
+    if (!material) throw new NotFoundException('Materia-prima/material não encontrado');
     return material;
   }
 
@@ -1589,7 +1589,7 @@ export class FoodSafetyService {
       where: { id, companyId: me.companyId, deletedAt: null },
       include: this.lotInclude(),
     });
-    if (!lot) throw new NotFoundException('Lote nao encontrado');
+    if (!lot) throw new NotFoundException('Lote não encontrado');
     return lot;
   }
 
@@ -1630,7 +1630,7 @@ export class FoodSafetyService {
         materialId,
         supplierId,
         processId,
-        code: this.requiredText(body?.code, 'Codigo do lote'),
+        code: this.requiredText(body?.code, 'Código do lote'),
         type: this.parseLotType(body?.type) ?? FoodSafetyLotType.RECEIVED,
         status: this.parseLotStatus(body?.status) ?? FoodSafetyLotStatus.QUARANTINED,
         quantity: this.optionalFloat(body?.quantity) ?? null,
@@ -1669,7 +1669,7 @@ export class FoodSafetyService {
       if (process) await this.assertProcessWriteArea(me, process.orgNodeId, 'edit');
       data.processId = processId;
     }
-    if ('code' in (patch ?? {})) data.code = this.requiredText(patch.code, 'Codigo do lote');
+    if ('code' in (patch ?? {})) data.code = this.requiredText(patch.code, 'Código do lote');
     if ('type' in (patch ?? {})) data.type = this.parseLotType(patch.type);
     if ('status' in (patch ?? {})) data.status = this.parseLotStatus(patch.status);
     if ('quantity' in (patch ?? {})) data.quantity = this.optionalFloat(patch.quantity);
@@ -1716,7 +1716,7 @@ export class FoodSafetyService {
     const stepId = this.id(body?.stepId);
     if (stepId) {
       const step = await this.loadStep(me, stepId);
-      if (processId && step.processId !== processId) throw new BadRequestException('Etapa nao pertence ao processo informado.');
+      if (processId && step.processId !== processId) throw new BadRequestException('Etapa não pertence ao processo informado.');
       processId = step.processId;
     }
     const process = processId ? await this.loadProcess(me, processId) : null;
@@ -1802,7 +1802,7 @@ export class FoodSafetyService {
       where: { id, companyId: me.companyId, deletedAt: null },
       include: this.recallInclude(),
     });
-    if (!recall) throw new NotFoundException('Recall nao encontrado');
+    if (!recall) throw new NotFoundException('Recall não encontrado');
     return recall;
   }
 
@@ -1838,7 +1838,7 @@ export class FoodSafetyService {
         rootLotId,
         responsibleUserId,
         code: this.nullableText(body?.code) ?? null,
-        title: this.requiredText(body?.title, 'Titulo do recall'),
+        title: this.requiredText(body?.title, 'Título do recall'),
         reason: this.nullableText(body?.reason) ?? null,
         severity: this.parseRecallSeverity(body?.severity) ?? FoodSafetyRecallSeverity.MEDIUM,
         status: this.parseRecallStatus(body?.status) ?? FoodSafetyRecallStatus.SIMULATION,
@@ -1866,7 +1866,7 @@ export class FoodSafetyService {
     }
     if ('responsibleUserId' in (patch ?? {})) data.responsibleUserId = await this.validateUser(me.companyId, this.id(patch.responsibleUserId));
     if ('code' in (patch ?? {})) data.code = this.nullableText(patch.code);
-    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Titulo do recall');
+    if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Título do recall');
     if ('reason' in (patch ?? {})) data.reason = this.nullableText(patch.reason);
     if ('severity' in (patch ?? {})) data.severity = this.parseRecallSeverity(patch.severity);
     if ('status' in (patch ?? {})) data.status = this.parseRecallStatus(patch.status);
@@ -1902,7 +1902,7 @@ export class FoodSafetyService {
 
   async updateRecallItem(me: AuthPayload, id: string, patch: any) {
     const item = await this.prisma.foodSafetyRecallItem.findFirst({ where: { id, companyId: me.companyId, deletedAt: null } });
-    if (!item) throw new NotFoundException('Item de recall nao encontrado');
+    if (!item) throw new NotFoundException('Item de recall não encontrado');
     const data: any = {};
     if ('status' in (patch ?? {})) data.status = this.parseRecallItemStatus(patch.status);
     if ('quantity' in (patch ?? {})) data.quantity = this.optionalFloat(patch.quantity);
@@ -2003,10 +2003,10 @@ export class FoodSafetyService {
       const riskLevel = computedScore < 50 || s.status === FoodSafetySupplierStatus.BLOCKED ? 'CRITICAL' : computedScore < 70 ? 'HIGH' : computedScore < 85 ? 'MEDIUM' : 'LOW';
       const drivers = [
         s.status !== FoodSafetySupplierStatus.APPROVED ? `Status ${s.status}` : null,
-        s.criticality === FoodSafetySupplierCriticality.CRITICAL ? 'Fornecedor critico' : null,
+        s.criticality === FoodSafetySupplierCriticality.CRITICAL ? 'Fornecedor crítico' : null,
         blockedLots > 0 ? `${blockedLots} lote(s) bloqueado(s)/recolhido(s)` : null,
         blockedMaterials > 0 ? `${blockedMaterials} material(is) bloqueado(s)` : null,
-        reviewOverdue ? 'Revisao vencida' : null,
+        reviewOverdue ? 'Revisão vencida' : null,
         s.documentsStatus ? `Documentos: ${s.documentsStatus}` : null,
       ].filter(Boolean);
       return {
@@ -2100,16 +2100,16 @@ export class FoodSafetyService {
         severity: 'CRITICAL',
         title: 'Monitoramentos fora do limite',
         description: `${dashboard.monitoring.out} registro(s) recente(s) ficaram fora do limite, com ${dashboard.monitoring.lotBlocked} lote(s) sinalizado(s) para bloqueio.`,
-        action: 'Priorizar NCs abertas automaticamente, confirmar contencao e validar eficacia das acoes.',
+        action: 'Priorizar as NCs abertas automaticamente, confirmar a contenção e validar a eficácia das ações.',
         area: 'Monitoramento PPR/PPRO/PCC',
       });
     }
     if ((dashboard.overview.hazardsCritical ?? 0) > 0 || (dashboard.overview.hazardsHigh ?? 0) > 0) {
       insights.push({
         severity: (dashboard.overview.hazardsCritical ?? 0) > 0 ? 'CRITICAL' : 'HIGH',
-        title: 'Perigos APPCC em nivel elevado',
-        description: `${dashboard.overview.hazardsCritical ?? 0} perigo(s) critico(s) e ${dashboard.overview.hazardsHigh ?? 0} alto(s) permanecem na matriz.`,
-        action: 'Revisar controles preventivos, limites e classificacao PPR/PPRO/PCC dos processos afetados.',
+        title: 'Perigos APPCC em nível elevado',
+        description: `${dashboard.overview.hazardsCritical ?? 0} perigo(s) crítico(s) e ${dashboard.overview.hazardsHigh ?? 0} alto(s) permanecem na matriz.`,
+        action: 'Revisar controles preventivos, limites e classificação PPR/PPRO/PCC dos processos afetados.',
         area: 'Perigos / APPCC',
       });
     }
@@ -2119,7 +2119,7 @@ export class FoodSafetyService {
         severity: riskySuppliers.some((s) => s.riskLevel === 'CRITICAL') ? 'CRITICAL' : 'HIGH',
         title: 'Fornecedores com score de risco',
         description: riskySuppliers.map((s) => `${s.name} (${s.score})`).join(', '),
-        action: 'Reavaliar homologacao, documentos, auditorias e bloqueios antes de novos recebimentos.',
+        action: 'Reavaliar homologação, documentos, auditorias e bloqueios antes de novos recebimentos.',
         area: 'Fornecedores',
       });
     }
@@ -2127,8 +2127,8 @@ export class FoodSafetyService {
       insights.push({
         severity: 'CRITICAL',
         title: 'Recall ou simulado ativo',
-        description: `${dashboard.chain.activeRecalls} recall(s)/simulacao(oes) aguardam acompanhamento.`,
-        action: 'Conferir lotes impactados, comunicacoes, disposicao e encerramento formal.',
+        description: `Operações de recall ou simulação que aguardam acompanhamento: ${dashboard.chain.activeRecalls}.`,
+        action: 'Conferir lotes impactados, comunicações, disposição e encerramento formal.',
         area: 'Rastreabilidade e Recall',
       });
     }
@@ -2136,18 +2136,18 @@ export class FoodSafetyService {
       insights.push({
         severity: dashboard.compliance.compliancePct < 60 ? 'HIGH' : 'MEDIUM',
         title: 'Conformidade normativa abaixo do alvo',
-        description: `Conformidade atual em ${dashboard.compliance.compliancePct}% sobre ${dashboard.compliance.applicable} requisito(s) aplicavel(is).`,
-        action: 'Avaliar requisitos pendentes/nao atendidos e abrir plano de adequacao para responsaveis.',
+        description: `Conformidade atual em ${dashboard.compliance.compliancePct}% sobre ${dashboard.compliance.applicable} requisito(s) aplicável(is).`,
+        action: 'Avaliar os requisitos pendentes ou não atendidos e abrir um plano de adequação com os responsáveis.',
         area: 'Compliance',
       });
     }
     if (insights.length === 0) {
       insights.push({
         severity: 'LOW',
-        title: 'Sem alertas criticos no momento',
-        description: 'Os sinais recentes nao indicam desvios criticos acumulados.',
-        action: 'Manter rotina de monitoramento, revisoes e simulados programados.',
-        area: 'Visao Geral',
+        title: 'Sem alertas críticos no momento',
+        description: 'Os sinais recentes não indicam desvios críticos acumulados.',
+        action: 'Manter rotina de monitoramento, revisões e simulados programados.',
+        area: 'Visão Geral',
       });
     }
     const aiInsights = await this.tryGeminiFoodSafetyInsights({ dashboard, scorecard, fallbackInsights: insights });
@@ -2165,9 +2165,9 @@ export class FoodSafetyService {
     fallbackInsights: Array<{ severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; title: string; description: string; action: string; area: string }>;
   }): Promise<Array<{ severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; title: string; description: string; action: string; area: string }> | null> {
     if (!this.gemini?.isEnabled) return null;
-    const prompt = `Voce e um especialista senior em seguranca de alimentos, APPCC, PPR/PPRO/PCC e compliance industrial.
-Gere insights executivos em portugues do Brasil para o modulo Seguranca dos Alimentos.
-Use somente os dados fornecidos. Nao aprove, bloqueie ou encerre nada automaticamente.
+    const prompt = `Você é um especialista sênior em segurança de alimentos, APPCC, PPR/PPRO/PCC e compliance industrial.
+Gere insights executivos em português do Brasil para o módulo Segurança dos Alimentos.
+Use somente os dados fornecidos. Não aprove, bloqueie ou encerre nada automaticamente.
 
 Responda apenas JSON no schema:
 {
@@ -2193,7 +2193,7 @@ ${JSON.stringify({
         title: String(item.title ?? '').trim(),
         description: String(item.description ?? '').trim(),
         action: String(item.action ?? '').trim(),
-        area: String(item.area ?? 'Seguranca dos Alimentos').trim(),
+        area: String(item.area ?? 'Segurança dos Alimentos').trim(),
       }))
       .filter((item) => item.title && item.description && item.action);
     return insights?.length ? insights.slice(0, 6) : null;
@@ -2216,7 +2216,7 @@ ${JSON.stringify({
       const csv = this.toCsv(['lote', 'tipo', 'status', 'material', 'fornecedor', 'quantidade', 'unidade', 'validade'], rows.map((r) => [r.code, r.type, r.status, r.material?.name, r.supplier?.name, r.quantity, r.unit, r.expiresAt?.toISOString?.() ?? r.expiresAt]));
       return { filename: 'food-safety-lotes.csv', mimeType: 'text/csv;charset=utf-8', encoding: 'utf8', content: csv, rowCount: rows.length };
     }
-    throw new BadRequestException('Dataset de exportacao invalido.');
+    throw new BadRequestException('Dataset de exportação inválido.');
   }
 
   async importData(me: AuthPayload, body: any) {
@@ -2232,7 +2232,7 @@ ${JSON.stringify({
         if (dataset === 'suppliers') await this.createSupplier(me, row);
         else if (dataset === 'materials') await this.createMaterial(me, row);
         else if (dataset === 'lots') await this.createLot(me, row);
-        else throw new BadRequestException('Dataset de importacao invalido.');
+        else throw new BadRequestException('Dataset de importação inválido.');
         created++;
       } catch (e: any) {
         errors.push({ row: i + 1, message: e?.message ?? 'Erro ao importar linha' });

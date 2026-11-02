@@ -84,7 +84,7 @@ export default function AuditPage() {
         eyebrow="Configurações"
         tone="admin"
         title="Auditoria"
-        description="Rastreabilidade automática de acessos, criacoes, edicoes, exclusoes, parâmetros e permissões."
+        description="Rastreabilidade automática de acessos, criações, edições, exclusões, parâmetros e permissões."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Configurações', href: '/settings' }, { label: 'Auditoria' }]}
         actions={
           <div className="flex gap-2">

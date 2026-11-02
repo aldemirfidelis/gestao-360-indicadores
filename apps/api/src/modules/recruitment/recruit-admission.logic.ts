@@ -18,8 +18,8 @@ export function evaluateAdmissionReadiness(input: AdmissionReadinessInput): Admi
   const blocks: string[] = [];
   if (input.applicationStatus !== 'ACTIVE') blocks.push('Candidatura precisa estar ativa.');
   if (input.offerStatus !== 'ACCEPTED') blocks.push('Proposta precisa estar aceita.');
-  if (input.preAdmissionStatus !== 'ASO_CLEARED') blocks.push('Pre-admissao precisa estar liberada pelo ASO.');
-  if (input.asoResult && !['APTO', 'APTO_COM_RESTRICAO'].includes(input.asoResult)) blocks.push('ASO nao liberou a admissao.');
+  if (input.preAdmissionStatus !== 'ASO_CLEARED') blocks.push('Pré-admissão precisa estar liberada pelo ASO.');
+  if (input.asoResult && !['APTO', 'APTO_COM_RESTRICAO'].includes(input.asoResult)) blocks.push('ASO não liberou a admissão.');
   return { ready: blocks.length === 0, blocks };
 }
 

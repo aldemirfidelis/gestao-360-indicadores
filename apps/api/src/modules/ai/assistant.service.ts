@@ -60,7 +60,7 @@ export class AssistantService {
     const companyId = user.companyId;
 
     this.logger.log(
-      `Processando ajuda inteligente para usuario: ${user.sub}, empresa: ${companyId}, modulo: ${module || 'Nenhum'}, caracteres: ${message.length}`,
+      `Processando ajuda inteligente para usuário: ${user.sub}, empresa: ${companyId}, módulo: ${module || 'Nenhum'}, caracteres: ${message.length}`,
     );
 
     const words = this.extractKeywords(message);

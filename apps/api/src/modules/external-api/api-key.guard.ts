@@ -50,7 +50,7 @@ export class ApiKeyGuard implements CanActivate {
 
     const requestIp = normalizeIp(String(req.ip ?? req.socket?.remoteAddress ?? ''));
     if (key.allowedIps.length > 0 && !key.allowedIps.map(normalizeIp).includes(requestIp)) {
-      throw new ForbiddenException('IP nao autorizado para esta chave de API.');
+      throw new ForbiddenException('IP não autorizado para esta chave de API.');
     }
     this.enforceKeyRateLimit(key.id, key.rateLimitPerMinute);
 

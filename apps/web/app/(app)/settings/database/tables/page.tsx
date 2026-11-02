@@ -86,26 +86,26 @@ export default function DatabaseTablesPage() {
         </Button>
       </div>
 
-      <SectionCard title="Catalogo de tabelas" description="Mapa navegavel de tabela fisica, modulo, origem, finalidade e impacto." contentClassName="p-0">
+      <SectionCard title="Catálogo de tabelas" description="Mapa navegável de tabela física, módulo, origem, finalidade e impacto." contentClassName="p-0">
         <div className="flex flex-wrap items-center gap-2 border-b p-3">
           <div className="relative min-w-[240px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Buscar por tabela, modulo, origem, finalidade ou impacto..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input className="pl-9" placeholder="Buscar por tabela, módulo, origem, finalidade ou impacto..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <NativeSelect value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} className="w-auto">
             <option value="all">Todas</option>
-            <option value="business">Negocio</option>
+            <option value="business">Negócio</option>
             <option value="system">Sistema</option>
           </NativeSelect>
           <NativeSelect value={moduleKey} onChange={(e) => setModuleKey(e.target.value)} className="w-auto max-w-[260px]">
-            <option value="all">Todos os modulos</option>
+            <option value="all">Todos os módulos</option>
             {moduleOptions.map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
           </NativeSelect>
         </div>
 
-        {tables.isLoading && <LoadingState label="Lendo catalogo..." />}
+        {tables.isLoading && <LoadingState label="Lendo catálogo..." />}
         {!tables.isLoading && rows.length === 0 && <EmptyState title="Nenhuma tabela encontrada" className="border-0 bg-transparent" />}
 
         {rows.length > 0 && (
@@ -114,16 +114,16 @@ export default function DatabaseTablesPage() {
               <thead>
                 <tr>
                   <Th label="Tabela" onClick={() => toggleSort('name')} active={sortKey === 'name'} dir={sortDir} />
-                  <th className="min-w-[260px] text-left">Identificacao</th>
+                  <th className="min-w-[260px] text-left">Identificação</th>
                   <th className="min-w-[320px] text-left">O que faz / impacto</th>
                   <th className="text-left">Tipo</th>
                   <Th label="Registros (est.)" onClick={() => toggleSort('estimatedRows')} active={sortKey === 'estimatedRows'} dir={sortDir} />
                   <Th label="Colunas" onClick={() => toggleSort('columnCount')} active={sortKey === 'columnCount'} dir={sortDir} />
                   <th className="text-left">PK</th>
                   <th className="text-left">FKs</th>
-                  <th className="text-left">Indices</th>
+                  <th className="text-left">Índices</th>
                   <Th label="Tamanho" onClick={() => toggleSort('sizeBytes')} active={sortKey === 'sizeBytes'} dir={sortDir} />
-                  <th className="text-right">Acoes</th>
+                  <th className="text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,7 +158,7 @@ export default function DatabaseTablesPage() {
                     </td>
                     <td>
                       <Badge variant="outline" className={cn(t.kind === 'system' && 'border-status-yellow/40 text-status-yellow')}>
-                        {t.kind === 'system' ? 'Sistema' : 'Negocio'}
+                        {t.kind === 'system' ? 'Sistema' : 'Negócio'}
                       </Badge>
                     </td>
                     <td>{formatNumber(t.estimatedRows)}</td>
@@ -184,7 +184,7 @@ export default function DatabaseTablesPage() {
 
       <p className="flex items-center gap-2 text-xs text-muted-foreground">
         <ShieldAlert className="h-3.5 w-3.5" />
-        Acoes destrutivas (limpar/excluir tabela) ficam na tela da tabela, com confirmacao reforcada, backup automatico e auditoria.
+        Ações destrutivas (limpar/excluir tabela) ficam na tela da tabela, com confirmação reforçada, backup automático e auditoria.
       </p>
     </div>
   );

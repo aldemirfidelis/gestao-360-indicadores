@@ -64,7 +64,7 @@ const validRow = {
   nome: 'Ana Silva',
   cpf: '529.982.247-25',
   cargo: 'Operador I',
-  area: 'Producao',
+  area: 'Produção',
   centro_de_custo: 'CC-100',
   salario_base: '3.500,75',
   data_admissao: '10/01/2022',

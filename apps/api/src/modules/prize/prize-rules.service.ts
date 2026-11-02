@@ -112,7 +112,7 @@ export class PrizeRulesService {
   }
 
   async createCatalog(me: AuthPayload, dto: UpsertCatalogDto) {
-    if (!dto.name?.trim()) throw new BadRequestException('Nome do indicador e obrigatorio');
+    if (!dto.name?.trim()) throw new BadRequestException('Nome do indicador é obrigatório');
     const code = (dto.code ?? '').trim() || (await this.nextCatalogCode(me.companyId));
     await this.assertCatalogCode(me.companyId, code);
     const catalog = await this.prisma.prizeIndicatorCatalog.create({
@@ -242,13 +242,13 @@ export class PrizeRulesService {
   }
 
   async createGroup(me: AuthPayload, dto: UpsertRuleGroupDto) {
-    if (!dto.annexVersionId) throw new BadRequestException('Versao do anexo e obrigatoria');
-    if (!dto.name?.trim()) throw new BadRequestException('Nome da combinacao e obrigatorio');
-    if (dto.salaryPercent === undefined || dto.salaryPercent === null) throw new BadRequestException('Salario possivel % e obrigatorio');
+    if (!dto.annexVersionId) throw new BadRequestException('Versão do anexo é obrigatória');
+    if (!dto.name?.trim()) throw new BadRequestException('Nome da combinação é obrigatório');
+    if (dto.salaryPercent === undefined || dto.salaryPercent === null) throw new BadRequestException('Salário possível % é obrigatório');
     await this.assertAnnexVersion(me.companyId, dto.annexVersionId);
     const { areaRefs, positionRefs, areaRefIds, cargoRefIds } = await this.resolveGroupRefs(me.companyId, dto, me.sub);
-    if (!areaRefs.length) throw new BadRequestException('Informe pelo menos uma area para a combinacao');
-    if (!positionRefs.length) throw new BadRequestException('Informe pelo menos um cargo para a combinacao');
+    if (!areaRefs.length) throw new BadRequestException('Informe pelo menos uma área para a combinação');
+    if (!positionRefs.length) throw new BadRequestException('Informe pelo menos um cargo para a combinação');
     const group = await this.prisma.prizeRuleGroup.create({
       data: {
         companyId: me.companyId,
@@ -275,8 +275,8 @@ export class PrizeRulesService {
     const refsProvided = dto.areaRefs !== undefined || dto.positionRefs !== undefined || dto.areaRefIds !== undefined || dto.cargoRefIds !== undefined;
     const resolved = refsProvided ? await this.resolveGroupRefs(me.companyId, dto, me.sub) : null;
     if (resolved) {
-      if (resolved.areaRefs.length === 0) throw new BadRequestException('Informe pelo menos uma area para a combinacao');
-      if (resolved.positionRefs.length === 0) throw new BadRequestException('Informe pelo menos um cargo para a combinacao');
+      if (resolved.areaRefs.length === 0) throw new BadRequestException('Informe pelo menos uma área para a combinação');
+      if (resolved.positionRefs.length === 0) throw new BadRequestException('Informe pelo menos um cargo para a combinação');
     }
     const updated = await this.prisma.prizeRuleGroup.update({
       where: { id },
@@ -306,8 +306,8 @@ export class PrizeRulesService {
 
   async addRuleIndicator(me: AuthPayload, groupId: string, dto: UpsertRuleIndicatorDto) {
     const group = await this.getGroup(me.companyId, groupId);
-    if (!dto.catalogId) throw new BadRequestException('Indicador de catalogo e obrigatorio');
-    if (dto.weight === undefined || dto.weight === null) throw new BadRequestException('Peso % no grupo e obrigatorio');
+    if (!dto.catalogId) throw new BadRequestException('Indicador de catálogo é obrigatório');
+    if (dto.weight === undefined || dto.weight === null) throw new BadRequestException('Peso % no grupo é obrigatório');
     await this.getCatalog(me.companyId, dto.catalogId);
     const indicator = await this.prisma.prizeRuleIndicator.create({
       data: {
@@ -360,7 +360,7 @@ export class PrizeRulesService {
 
   async setParameter(me: AuthPayload, ruleIndicatorId: string, dto: RuleParameterDto) {
     await this.getRuleIndicator(me.companyId, ruleIndicatorId);
-    if (!dto.year || !dto.month || dto.month < 1 || dto.month > 12) throw new BadRequestException('Ano e mes validos sao obrigatorios');
+    if (!dto.year || !dto.month || dto.month < 1 || dto.month > 12) throw new BadRequestException('Ano e mês válidos são obrigatórios');
     const parameter = await this.prisma.prizeRuleParameter.upsert({
       where: { ruleIndicatorId_year_month: { ruleIndicatorId, year: dto.year, month: dto.month } },
       update: {
@@ -387,7 +387,7 @@ export class PrizeRulesService {
     const parameter = await this.getParameter(companyId, parameterId);
     const zero = parameter.zero === null ? null : Number(parameter.zero);
     const target = parameter.target === null ? null : Number(parameter.target);
-    if (zero === null || target === null) throw new BadRequestException('Parametro precisa ter Zero e Meta');
+    if (zero === null || target === null) throw new BadRequestException('Parâmetro precisa ter Zero e Meta');
     const direction = parameter.ruleIndicator.catalog.direction === 'LOWER_BETTER' ? 'LOWER_BETTER' : 'HIGHER_BETTER';
     try {
       return {
@@ -496,9 +496,9 @@ export class PrizeRulesService {
   }
 
   async upsertAlias(me: AuthPayload, dto: RuleAliasDto) {
-    if (!dto.sourceValue?.trim()) throw new BadRequestException('Valor de origem e obrigatorio');
+    if (!dto.sourceValue?.trim()) throw new BadRequestException('Valor de origem é obrigatório');
     const normalizedKey = normalizeRuleKey(dto.sourceValue);
-    if (!normalizedKey) throw new BadRequestException('Valor de origem invalido');
+    if (!normalizedKey) throw new BadRequestException('Valor de origem inválido');
     const alias = await this.prisma.prizeRuleAlias.upsert({
       where: { companyId_kind_normalizedKey: { companyId: me.companyId, kind: dto.kind, normalizedKey } },
       update: {
@@ -537,19 +537,19 @@ export class PrizeRulesService {
 
   private async getCatalog(companyId: string, id: string) {
     const catalog = await this.prisma.prizeIndicatorCatalog.findFirst({ where: { id, companyId, deletedAt: null } });
-    if (!catalog) throw new NotFoundException('Indicador de catalogo nao encontrado');
+    if (!catalog) throw new NotFoundException('Indicador de catálogo não encontrado');
     return catalog;
   }
 
   private async getGroup(companyId: string, id: string) {
     const group = await this.prisma.prizeRuleGroup.findFirst({ where: { id, companyId, deletedAt: null } });
-    if (!group) throw new NotFoundException('Combinacao nao encontrada');
+    if (!group) throw new NotFoundException('Combinação não encontrada');
     return group;
   }
 
   private async getRuleIndicator(companyId: string, id: string) {
     const ruleIndicator = await this.prisma.prizeRuleIndicator.findFirst({ where: { id, companyId, deletedAt: null } });
-    if (!ruleIndicator) throw new NotFoundException('Indicador da combinacao nao encontrado');
+    if (!ruleIndicator) throw new NotFoundException('Indicador da combinação não encontrado');
     return ruleIndicator;
   }
 
@@ -558,19 +558,19 @@ export class PrizeRulesService {
       where: { id, companyId },
       include: { ruleIndicator: { include: { catalog: true } }, bands: { orderBy: { orderIndex: 'asc' } } },
     });
-    if (!parameter) throw new NotFoundException('Parametro nao encontrado');
+    if (!parameter) throw new NotFoundException('Parâmetro não encontrado');
     return parameter;
   }
 
   private async assertAnnexVersion(companyId: string, annexVersionId: string) {
     const version = await this.prisma.prizeAnnexVersion.findFirst({ where: { id: annexVersionId, annex: { companyId } } });
-    if (!version) throw new NotFoundException('Versao do anexo nao encontrada');
+    if (!version) throw new NotFoundException('Versão do anexo não encontrada');
     return version;
   }
 
   private async assertCompetence(companyId: string, competenceId: string) {
     const competence = await this.prisma.prizeCompetence.findFirst({ where: { id: competenceId, companyId } });
-    if (!competence) throw new NotFoundException('Competencia nao encontrada');
+    if (!competence) throw new NotFoundException('Competência não encontrada');
     return competence;
   }
 
@@ -581,6 +581,6 @@ export class PrizeRulesService {
 
   private async assertCatalogCode(companyId: string, code: string) {
     const existing = await this.prisma.prizeIndicatorCatalog.findFirst({ where: { companyId, code, deletedAt: null } });
-    if (existing) throw new ConflictException(`Ja existe indicador de catalogo com o codigo ${code}`);
+    if (existing) throw new ConflictException(`Já existe indicador de catálogo com o código ${code}`);
   }
 }

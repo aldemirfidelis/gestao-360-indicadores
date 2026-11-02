@@ -320,7 +320,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
             {formatNumber(stats.pending)} pendentes
           </span>
           <span className="rounded-full bg-status-blue/15 px-2.5 py-1 font-medium text-status-blue">
-            {formatNumber(totalEdited)} edicoes
+            {formatNumber(totalEdited)} edições
           </span>
         </div>
       </div>
@@ -483,7 +483,7 @@ export function IndicatorResultEditor(props: IndicatorMonthlyEditorProps) {
                             variant="ghost"
                             size="sm"
                             onClick={() => replicateForwardFrom(cell.periodRef)}
-                            title="Replicar esta meta para os meses vazios a frente"
+                            title="Replicar esta meta para os meses vazios à frente"
                           >
                             <ArrowDownToLine className="h-4 w-4" />
                           </Button>

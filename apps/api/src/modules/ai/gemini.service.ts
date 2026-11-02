@@ -35,7 +35,7 @@ export class GeminiService {
 
     if (!geminiApiKey) {
       if (!this.groqApiKey) {
-        this.logger.warn('GROQ_API_KEY/GEMINI_API_KEY ausentes - servico de IA respondera com fallback deterministico.');
+        this.logger.warn('GROQ_API_KEY/GEMINI_API_KEY ausentes - serviço de IA respondera com fallback determinístico.');
       }
       return;
     }
@@ -156,7 +156,7 @@ export class GeminiService {
    */
   async generateJson<T = unknown>(prompt: string, options?: { temperature?: number; maxOutputTokens?: number }): Promise<T | null> {
     if (!this.isEnabled) return null;
-    const fullPrompt = `${prompt}\n\nResponda APENAS com JSON valido (sem markdown, sem comentarios, sem texto extra).`;
+    const fullPrompt = `${prompt}\n\nResponda APENAS com JSON válido (sem markdown, sem comentários, sem texto extra).`;
     const text = await this.generateText(fullPrompt, options);
     if (!text) return null;
     return parseJsonResponse<T>(text, this.logger);
@@ -174,7 +174,7 @@ export class GeminiService {
     options?: { temperature?: number; maxOutputTokens?: number },
   ): Promise<T | null> {
     if (!this.geminiClient) return null;
-    const fullPrompt = `${prompt}\n\nResponda APENAS com JSON valido (sem markdown, sem comentarios, sem texto extra).`;
+    const fullPrompt = `${prompt}\n\nResponda APENAS com JSON válido (sem markdown, sem comentários, sem texto extra).`;
     const candidates = [...new Set([this.geminiActiveModelName, ...this.geminiCandidates])];
     for (const name of candidates) {
       const model = this.getGeminiModel(name);
@@ -216,7 +216,7 @@ function parseJsonResponse<T>(text: string, logger: Logger): T | null {
   try {
     return JSON.parse(cleaned) as T;
   } catch (err: any) {
-    logger.warn(`Resposta Gemini nao e JSON valido: ${err?.message ?? err}. Trecho: ${cleaned.slice(0, 200)}`);
+    logger.warn(`Resposta Gemini não é JSON válido: ${err?.message ?? err}. Trecho: ${cleaned.slice(0, 200)}`);
     return null;
   }
 }

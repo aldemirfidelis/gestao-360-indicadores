@@ -401,7 +401,7 @@ export function IndicatorFormDialog({
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Field label="Nome do indicador" required className="xl:col-span-2">
-            <Input value={form.name} onChange={(e) => patchForm(setForm, { name: e.target.value })} placeholder="Ex.: Absenteismo" />
+            <Input value={form.name} onChange={(e) => patchForm(setForm, { name: e.target.value })} placeholder="Ex.: Absenteísmo" />
           </Field>
           <Field label="Código">
             <Input value={form.code} onChange={(e) => patchForm(setForm, { code: e.target.value })} placeholder="Ex.: RH-001" />
@@ -555,7 +555,7 @@ export function IndicatorFormDialog({
                 : 'Ao concluir uma inspeção deste formulário nesta área/setor, o sistema lança a média de conformidade do mês neste indicador.'}
             </p>
           </Field>)}
-          <Field label="Formula de cálculo" className="md:col-span-2">
+          <Field label="Fórmula de cálculo" className="md:col-span-2">
             <Input value={form.formula} onChange={(e) => patchForm(setForm, { formula: e.target.value })} placeholder="Ex.: (faltas / horas previstas) * 100" />
           </Field>
           <Field label="Categoria">
@@ -1072,7 +1072,7 @@ function historyActionLabel(action: string) {
     DELETE: 'Exclusão lógica',
     CREATE_TARGET: 'Meta criada',
     UPDATE_TARGET: 'Meta alterada',
-    CREATE_RESULT: 'Realizado lancado',
+    CREATE_RESULT: 'Realizado lançado',
     UPDATE_RESULT: 'Realizado alterado',
   };
   return labels[action] ?? action;

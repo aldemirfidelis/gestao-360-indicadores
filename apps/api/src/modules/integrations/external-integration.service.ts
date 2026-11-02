@@ -146,7 +146,7 @@ export class ExternalIntegrationService {
 
   async createApiKey(me: AuthPayload, dto: CreateApiKeyDto) {
     const scopes = dedupeScopes(dto.scopes);
-    if (scopes.length === 0) throw new BadRequestException('Selecione ao menos um escopo valido.');
+    if (scopes.length === 0) throw new BadRequestException('Selecione ao menos um escopo válido.');
     const { token, hash, prefix } = generateApiKey();
     const created = await this.prisma.inboundApiKey.create({
       data: {

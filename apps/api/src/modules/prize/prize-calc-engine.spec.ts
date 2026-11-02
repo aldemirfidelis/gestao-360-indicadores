@@ -173,7 +173,7 @@ describe('computePrize — motor de cálculo', () => {
   it('transitoriedade sem direito ao prêmio bloqueia o pagamento', () => {
     const r = computePrize(input({
       gainPotential: 1000, salaryPercent: null,
-      allocations: [{ destArea: 'Logistica', days: 30, ruleApplied: 'APPLY_DEST', hasRight: false }],
+      allocations: [{ destArea: 'Logística', days: 30, ruleApplied: 'APPLY_DEST', hasRight: false }],
     }));
     expect(r.blocked).toBe(true);
     expect(r.finalValue).toBe(0);

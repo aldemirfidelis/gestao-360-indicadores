@@ -64,7 +64,7 @@ const DEFAULT_TEMPLATES: Record<RecruitEmailEvent, { subject: string; body: stri
   },
   INTERVIEW_SCHEDULED: {
     subject: 'Entrevista agendada — {{vaga}}',
-    body: 'Olá, {{candidato}}!\n\nSua entrevista para "{{vaga}}" foi agendada para {{data_hora}}.\n{{link}}{{local}}{{instrucoes}}\nCaso precise reagendar, responda este e-mail — sua mensagem vai direto para a equipe de {{empresa}}.',
+    body: 'Olá, {{candidato}}!\n\nSua entrevista para "{{vaga}}" foi agendada para {{data_hora}}.\n{{link}}{{local}}{{instruções}}\nCaso precise reagendar, responda este e-mail — sua mensagem vai direto para a equipe de {{empresa}}.',
   },
   OFFER_SENT: {
     subject: 'Proposta de trabalho — {{vaga}}',

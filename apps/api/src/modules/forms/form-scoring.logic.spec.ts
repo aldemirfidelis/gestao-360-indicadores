@@ -142,7 +142,7 @@ describe('conformityScore', () => {
   });
 
   it('sim/não também contam, para checklist simples', () => {
-    expect(conformityScore([{ fieldType: 'YES_NO', value: 'Sim' }, { fieldType: 'BOOLEAN', value: 'Nao' }]).percent).toBe(50);
+    expect(conformityScore([{ fieldType: 'YES_NO', value: 'Sim' }, { fieldType: 'BOOLEAN', value: 'Não' }]).percent).toBe(50);
   });
 });
 

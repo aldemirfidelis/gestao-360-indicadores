@@ -26,17 +26,17 @@ interface DatasetDefinition {
 }
 
 const DATASETS: DatasetDefinition[] = [
-  { id: 'users', label: 'Usuarios', description: 'Contas humanas, papeis, status e ultimo acesso.', columns: columns(['id', 'ID'], ['name', 'Nome'], ['email', 'E-mail'], ['jobTitle', 'Cargo'], ['role', 'Papel'], ['status', 'Status'], ['active', 'Ativo'], ['lastLoginAt', 'Ultimo acesso'], ['createdAt', 'Criado em']) },
-  { id: 'org-structure', label: 'Estrutura organizacional', description: 'Filiais, areas, setores e hierarquia da empresa.', columns: columns(['id', 'ID'], ['parentId', 'Pai'], ['branchId', 'Filial'], ['name', 'Nome'], ['code', 'Codigo'], ['type', 'Tipo'], ['active', 'Ativo'], ['createdAt', 'Criado em'], ['updatedAt', 'Atualizado em']) },
-  { id: 'employees', label: 'Colaboradores', description: 'Cadastro corporativo minimo, sem dados pessoais ou salariais sensiveis.', columns: columns(['id', 'ID'], ['registrationId', 'Matricula'], ['name', 'Nome'], ['orgNodeId', 'Area'], ['jobId', 'Cargo'], ['band', 'Faixa'], ['shift', 'Turno'], ['status', 'Status'], ['approvalStatus', 'Aprovacao'], ['createdAt', 'Criado em']) },
-  { id: 'indicators', label: 'Indicadores', description: 'Catalogo de indicadores e seus responsaveis.', columns: columns(['id', 'ID'], ['code', 'Codigo'], ['name', 'Nome'], ['ownerNodeId', 'Area'], ['responsibleUserId', 'Responsavel'], ['type', 'Tipo'], ['category', 'Categoria'], ['unit', 'Unidade'], ['periodicity', 'Periodicidade'], ['direction', 'Direcao'], ['status', 'Status'], ['feedKind', 'Alimentacao'], ['updatedAt', 'Atualizado em']) },
-  { id: 'action-plans', label: 'Planos de acao', description: 'Acoes, prazos, responsaveis e andamento.', columns: columns(['id', 'ID'], ['title', 'Titulo'], ['ownerNodeId', 'Area'], ['responsibleUserId', 'Responsavel'], ['origin', 'Origem'], ['priority', 'Prioridade'], ['status', 'Status'], ['startDate', 'Inicio'], ['dueDate', 'Prazo'], ['progress', 'Progresso'], ['completedAt', 'Conclusao'], ['updatedAt', 'Atualizado em']) },
-  { id: 'risks', label: 'Riscos', description: 'Registro corporativo de riscos e avaliacao residual.', columns: columns(['id', 'ID'], ['title', 'Titulo'], ['orgNodeId', 'Area'], ['responsibleUserId', 'Responsavel'], ['category', 'Categoria'], ['status', 'Status'], ['probability', 'Probabilidade'], ['impact', 'Impacto'], ['residualProbability', 'Prob. residual'], ['residualImpact', 'Impacto residual'], ['dueDate', 'Prazo'], ['updatedAt', 'Atualizado em']) },
-  { id: 'non-conformities', label: 'Nao conformidades', description: 'Nao conformidades, severidade, origem e situacao.', columns: columns(['id', 'ID'], ['number', 'Numero'], ['title', 'Titulo'], ['orgNodeId', 'Area'], ['responsibleUserId', 'Responsavel'], ['source', 'Origem'], ['severity', 'Severidade'], ['status', 'Status'], ['dueDate', 'Prazo'], ['identifiedAt', 'Identificada em'], ['closedAt', 'Encerrada em']) },
-  { id: 'documents', label: 'Documentos', description: 'Metadados de documentos; conteudo e arquivos nao sao expostos.', columns: columns(['id', 'ID'], ['number', 'Numero'], ['code', 'Codigo'], ['title', 'Titulo'], ['orgNodeId', 'Area'], ['type', 'Tipo'], ['status', 'Status'], ['version', 'Versao'], ['validFrom', 'Vigencia inicial'], ['validUntil', 'Vigencia final'], ['publishedAt', 'Publicado em'], ['updatedAt', 'Atualizado em']) },
-  { id: 'audit', label: 'Auditoria', description: 'Trilha resumida de eventos, sem payloads ou identificadores de rede.', columns: columns(['id', 'ID'], ['userId', 'Usuario'], ['action', 'Acao'], ['module', 'Modulo'], ['entity', 'Entidade'], ['entityId', 'Registro'], ['recordLabel', 'Descricao'], ['result', 'Resultado'], ['createdAt', 'Data/hora']) },
-  { id: 'imports', label: 'Importacoes', description: 'Historico e resultado de cargas em lote.', columns: columns(['id', 'ID'], ['target', 'Destino'], ['fileName', 'Arquivo'], ['totalRows', 'Linhas'], ['okRows', 'Sucesso'], ['errorRows', 'Erros'], ['startedAt', 'Inicio'], ['finishedAt', 'Fim']) },
-  { id: 'integration-logs', label: 'Logs de integracao', description: 'Execucoes de conectores e tempos de resposta, sem credenciais.', columns: columns(['id', 'ID'], ['integrationId', 'Integracao'], ['direction', 'Direcao'], ['operation', 'Operacao'], ['status', 'Status'], ['httpStatus', 'HTTP'], ['message', 'Mensagem'], ['latencyMs', 'Latencia (ms)'], ['createdAt', 'Data/hora']) },
+  { id: 'users', label: 'Usuários', description: 'Contas humanas, papéis, status e último acesso.', columns: columns(['id', 'ID'], ['name', 'Nome'], ['email', 'E-mail'], ['jobTitle', 'Cargo'], ['role', 'Papel'], ['status', 'Status'], ['active', 'Ativo'], ['lastLoginAt', 'Último acesso'], ['createdAt', 'Criado em']) },
+  { id: 'org-structure', label: 'Estrutura organizacional', description: 'Filiais, áreas, setores e hierarquia da empresa.', columns: columns(['id', 'ID'], ['parentId', 'Pai'], ['branchId', 'Filial'], ['name', 'Nome'], ['code', 'Código'], ['type', 'Tipo'], ['active', 'Ativo'], ['createdAt', 'Criado em'], ['updatedAt', 'Atualizado em']) },
+  { id: 'employees', label: 'Colaboradores', description: 'Cadastro corporativo mínimo, sem dados pessoais ou salariais sensíveis.', columns: columns(['id', 'ID'], ['registrationId', 'Matrícula'], ['name', 'Nome'], ['orgNodeId', 'Área'], ['jobId', 'Cargo'], ['band', 'Faixa'], ['shift', 'Turno'], ['status', 'Status'], ['approvalStatus', 'Aprovação'], ['createdAt', 'Criado em']) },
+  { id: 'indicators', label: 'Indicadores', description: 'Catálogo de indicadores e seus responsáveis.', columns: columns(['id', 'ID'], ['code', 'Código'], ['name', 'Nome'], ['ownerNodeId', 'Área'], ['responsibleUserId', 'Responsável'], ['type', 'Tipo'], ['category', 'Categoria'], ['unit', 'Unidade'], ['periodicity', 'Periodicidade'], ['direction', 'Direção'], ['status', 'Status'], ['feedKind', 'Alimentação'], ['updatedAt', 'Atualizado em']) },
+  { id: 'action-plans', label: 'Planos de ação', description: 'Ações, prazos, responsáveis e andamento.', columns: columns(['id', 'ID'], ['title', 'Título'], ['ownerNodeId', 'Área'], ['responsibleUserId', 'Responsável'], ['origin', 'Origem'], ['priority', 'Prioridade'], ['status', 'Status'], ['startDate', 'Início'], ['dueDate', 'Prazo'], ['progress', 'Progresso'], ['completedAt', 'Conclusão'], ['updatedAt', 'Atualizado em']) },
+  { id: 'risks', label: 'Riscos', description: 'Registro corporativo de riscos e avaliação residual.', columns: columns(['id', 'ID'], ['title', 'Título'], ['orgNodeId', 'Área'], ['responsibleUserId', 'Responsável'], ['category', 'Categoria'], ['status', 'Status'], ['probability', 'Probabilidade'], ['impact', 'Impacto'], ['residualProbability', 'Prob. residual'], ['residualImpact', 'Impacto residual'], ['dueDate', 'Prazo'], ['updatedAt', 'Atualizado em']) },
+  { id: 'non-conformities', label: 'Não conformidades', description: 'Não conformidades, severidade, origem e situação.', columns: columns(['id', 'ID'], ['number', 'Número'], ['title', 'Título'], ['orgNodeId', 'Área'], ['responsibleUserId', 'Responsável'], ['source', 'Origem'], ['severity', 'Severidade'], ['status', 'Status'], ['dueDate', 'Prazo'], ['identifiedAt', 'Identificada em'], ['closedAt', 'Encerrada em']) },
+  { id: 'documents', label: 'Documentos', description: 'Metadados de documentos; conteúdo e arquivos não são expostos.', columns: columns(['id', 'ID'], ['number', 'Número'], ['code', 'Código'], ['title', 'Título'], ['orgNodeId', 'Área'], ['type', 'Tipo'], ['status', 'Status'], ['version', 'Versão'], ['validFrom', 'Vigência inicial'], ['validUntil', 'Vigência final'], ['publishedAt', 'Publicado em'], ['updatedAt', 'Atualizado em']) },
+  { id: 'audit', label: 'Auditoria', description: 'Trilha resumida de eventos, sem payloads ou identificadores de rede.', columns: columns(['id', 'ID'], ['userId', 'Usuário'], ['action', 'Ação'], ['module', 'Módulo'], ['entity', 'Entidade'], ['entityId', 'Registro'], ['recordLabel', 'Descrição'], ['result', 'Resultado'], ['createdAt', 'Data/hora']) },
+  { id: 'imports', label: 'Importações', description: 'Histórico e resultado de cargas em lote.', columns: columns(['id', 'ID'], ['target', 'Destino'], ['fileName', 'Arquivo'], ['totalRows', 'Linhas'], ['okRows', 'Sucesso'], ['errorRows', 'Erros'], ['startedAt', 'Início'], ['finishedAt', 'Fim']) },
+  { id: 'integration-logs', label: 'Logs de integração', description: 'Execuções de conectores e tempos de resposta, sem credenciais.', columns: columns(['id', 'ID'], ['integrationId', 'Integração'], ['direction', 'Direção'], ['operation', 'Operação'], ['status', 'Status'], ['httpStatus', 'HTTP'], ['message', 'Mensagem'], ['latencyMs', 'Latência (ms)'], ['createdAt', 'Data/hora']) },
 ];
 
 @Injectable()
@@ -62,7 +62,7 @@ export class CompanyAdminService {
       this.prisma.inboundApiKey.count({ where: { companyId, status: 'active' } }),
       this.prisma.auditLog.count({ where: { companyId } }),
     ]);
-    if (!company) throw new BadRequestException('Empresa ativa nao encontrada.');
+    if (!company) throw new BadRequestException('Empresa ativa não encontrada.');
     return { company, counts: { users, profiles, branches, areas, indicators, connectors, apiKeys, auditEvents } };
   }
 
@@ -83,7 +83,7 @@ export class CompanyAdminService {
     const { rows } = await this.queryDataset(me.companyId, definition.id, search?.trim(), 0, 5000);
     await this.auditWriter.record(me, {
       action: 'EXPORT', module: 'Dados da Empresa', entity: 'CompanyDataset', entityId: definition.id,
-      message: `Exportacao da visao ${definition.label}`, payload: { dataset: definition.id, rows: rows.length },
+      message: `Exportação da visão ${definition.label}`, payload: { dataset: definition.id, rows: rows.length },
     });
     const header = definition.columns.map((column) => csvCell(column.label)).join(';');
     const lines = rows.map((row) => definition.columns.map((column) => csvCell(formatCsvValue(row[column.key]))).join(';'));
@@ -92,7 +92,7 @@ export class CompanyAdminService {
 
   private definition(datasetId: string) {
     const definition = DATASETS.find((item) => item.id === datasetId);
-    if (!definition) throw new BadRequestException('Conjunto de dados nao permitido.');
+    if (!definition) throw new BadRequestException('Conjunto de dados não permitido.');
     return definition;
   }
 

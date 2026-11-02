@@ -150,7 +150,7 @@ export function JobDetailDialog({
                 <Input value={form.careerTrack} onChange={(e) => setForm({ ...form, careerTrack: e.target.value })} />
               </div>
               <div>
-                <Label>Nível hierarquico</Label>
+                <Label>Nível hierárquico</Label>
                 <Input value={form.hierarchyLevel} onChange={(e) => setForm({ ...form, hierarchyLevel: e.target.value })} />
               </div>
               <div>

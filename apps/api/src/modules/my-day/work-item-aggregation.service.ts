@@ -1,3 +1,4 @@
+import { formatQuantity } from '@g360/shared';
 import { isProductRouteActive, isProductModuleActive } from '@g360/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -695,7 +696,7 @@ export class WorkItemAggregationService {
         sourceEntityId: p.id,
         itemType: p.kind === 'ONBOARDING' ? 'EMPLOYEE_ONBOARDING' : 'EMPLOYEE_OFFBOARDING',
         title: `${p.kind === 'ONBOARDING' ? 'Admissão' : 'Desligamento'}: ${p.employee.name}`,
-        summary: pending > 0 ? `${pending} item(ns) obrigatório(s) pendente(s) no checklist` : 'Checklist completo — pronto para concluir',
+        summary: pending > 0 ? `${formatQuantity(pending, 'item obrigatório pendente', 'itens obrigatórios pendentes')} no checklist` : 'Checklist completo — pronto para concluir',
         status: p.status,
         criticality: p.dueDate && p.dueDate.getTime() < Date.now() ? 'HIGH' : 'MEDIUM',
         dueAt: p.dueDate,
@@ -801,7 +802,7 @@ export class WorkItemAggregationService {
       .map((row) => ({
         sourceModule: 'inventory', sourceEntityType: 'MATERIAL_WITHDRAWAL', sourceEntityId: row.id,
         itemType: 'WAREHOUSE_QUEUE', title: `Atender ${row.number}`,
-        summary: `${row.items.length} item(ns) · ${row.warehouse.name}`,
+        summary: `${formatQuantity(row.items.length, 'item', 'itens')} · ${row.warehouse.name}`,
         status: row.status, criticality: 'MEDIUM', dueAt: row.neededAt, assignedUserId: me.sub,
         requesterUserId: row.requesterId, orgNodeId: row.orgNodeId, requiresDecision: row.status === 'REQUESTED',
         recommendedAction: row.status === 'REQUESTED' ? 'Aprovar e separar materiais' : 'Registrar a baixa dos materiais entregues',

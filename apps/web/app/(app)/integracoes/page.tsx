@@ -40,10 +40,10 @@ export default function IntegrationsPage() {
         json: { enabled: !item.userEnabled, config: {} },
       }),
     onSuccess: () => {
-      toast.success('Preferencia atualizada.');
+      toast.success('Preferência atualizada.');
       qc.invalidateQueries({ queryKey: ['integrations'] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a preferencia'),
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a preferência'),
   });
 
   const rows = query.data ?? [];

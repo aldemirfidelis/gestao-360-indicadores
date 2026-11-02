@@ -278,7 +278,7 @@ export class AuthService {
         },
       },
     });
-    if (!user) throw new UnauthorizedException('Usuário nao encontrado');
+    if (!user) throw new UnauthorizedException('Usuário não encontrado');
     const permissionKeys = new Set<string>();
     user.permissions.forEach((item) => permissionKeys.add(item.permission.key));
     user.accessProfile?.permissions.forEach((item) => permissionKeys.add(item.permission.key));

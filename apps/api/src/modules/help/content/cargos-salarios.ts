@@ -11,7 +11,7 @@ export const cargosSalarios: HelpCatalogCategory = {
       slug: 'cargos-salarios-visao-geral',
       title: 'Cargos e Salários: visão geral',
       summary: 'A suíte de remuneração: estrutura, faixas, movimentações e governança.',
-      tags: ['cargos e salarios', 'remuneracao', 'rh', 'salario', 'compensation'],
+      tags: ['cargos e salários', 'remuneracao', 'rh', 'salario', 'compensation'],
       body: `O módulo **Cargos e Salários** é uma suíte completa de gestão de remuneração:
 
 - **Visão Geral** — painel com os indicadores de remuneração;
@@ -35,7 +35,7 @@ export const cargosSalarios: HelpCatalogCategory = {
       slug: 'catalogo-e-descricoes-de-cargo',
       title: 'Catálogo de cargos e descrições',
       summary: 'Cadastre cargos versionados e gere descrições em Word com aprovação.',
-      tags: ['cargo', 'descricao de cargo', 'catalogo', 'funcao', 'docx'],
+      tags: ['cargo', 'descrição de cargo', 'catalogo', 'funcao', 'docx'],
       body: `## Catálogo de Cargos
 - Organize os cargos por **famílias** (ex.: Operações, Administrativo, Comercial);
 - Cada cargo tem **versões** — mudanças criam versão nova, preservando o histórico;

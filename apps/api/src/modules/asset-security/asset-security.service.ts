@@ -110,13 +110,13 @@ export class AssetSecurityService {
         'Portaria de Colaboradores',
         'Portaria de Prestadores',
         'Portaria de Visitantes',
-        'Portaria de Veiculos Leves',
+        'Portaria de Veículos Leves',
         'Portaria de Cargas',
-        'Portaria Agricola',
+        'Portaria Agrícola',
         'Portaria Administrativa',
-        'Portaria Temporaria',
+        'Portaria Temporária',
       ],
-      vehicleTypes: ['Carro', 'Moto', 'Caminhao', 'Carreta', 'Bitrem', 'Onibus', 'Van', 'Maquina', 'Trator', 'Veiculo agricola', 'Outro'],
+      vehicleTypes: ['Carro', 'Moto', 'Caminhão', 'Carreta', 'Bitrem', 'Onibus', 'Van', 'Máquina', 'Trator', 'Veículo agrícola', 'Outro'],
     };
   }
 
@@ -342,7 +342,7 @@ export class AssetSecurityService {
 
   async updateGate(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityGate', me.companyId, id, 'Portaria nao encontrada');
+    const before = await this.loadTenant('securityGate', me.companyId, id, 'Portaria não encontrada');
     const unitId = 'unitId' in body ? await this.validateOrgNode(me.companyId, this.id(body.unitId)) : before.unitId;
     if (unitId) await this.access.assertCanWrite(me.sub, unitId, MODULE, 'edit');
     const saved = await this.db.securityGate.update({ where: { id }, data: this.gatePatch(body, unitId) });
@@ -368,7 +368,7 @@ export class AssetSecurityService {
 
   async updatePost(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityPost', me.companyId, id, 'Posto nao encontrado');
+    const before = await this.loadTenant('securityPost', me.companyId, id, 'Posto não encontrado');
     const unitId = 'unitId' in body ? await this.validateOrgNode(me.companyId, this.id(body.unitId)) : before.unitId;
     if (unitId) await this.access.assertCanWrite(me.sub, unitId, MODULE, 'edit');
     const gateId = 'gateId' in body ? await this.validateGate(me.companyId, this.id(body.gateId)) : before.gateId;
@@ -452,7 +452,7 @@ export class AssetSecurityService {
       const documentNumber = this.onlyDigits(this.text(this.sheetValue(row, ['CPF', 'Documento'])));
       const local = this.nullableText(this.sheetValue(row, ['Local']));
       const jobTitle = this.nullableText(this.sheetValue(row, ['Cargo']));
-      const area = this.nullableText(this.sheetValue(row, ['Area de Atuacao', 'Área de Atuação', 'Area de Atuação', 'Área de Atuacao']));
+      const area = this.nullableText(this.sheetValue(row, ['Área de Atuação', 'Área de Atuação', 'Área de Atuação', 'Área de Atuação']));
 
       if (!name) {
         skipped += 1;
@@ -482,7 +482,7 @@ export class AssetSecurityService {
         documentMasked: this.maskDocument(documentNumber),
         originCompanyName: local,
         jobTitle,
-        notes: area ? `Area de Atuacao: ${area}` : null,
+        notes: area ? `Área de Atuação: ${area}` : null,
         documentStatus: 'NOT_REQUIRED',
         status: 'ACTIVE',
         updatedById: me.sub,
@@ -497,13 +497,13 @@ export class AssetSecurityService {
       }
     }
 
-    await this.audit(me, 'IMPORT_PEOPLE', 'SecurityPerson', null, 'Importacao de pessoas', null, { created, updated, skipped, samples });
+    await this.audit(me, 'IMPORT_PEOPLE', 'SecurityPerson', null, 'Importação de pessoas', null, { created, updated, skipped, samples });
     return { total: rows.length, created, updated, skipped, samples };
   }
 
   async updatePerson(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityPerson', me.companyId, id, 'Pessoa nao encontrada');
+    const before = await this.loadTenant('securityPerson', me.companyId, id, 'Pessoa não encontrada');
     const saved = await this.db.securityPerson.update({ where: { id }, data: this.personPatch(body) });
     await this.audit(me, 'UPDATE', 'SecurityPerson', saved.id, saved.name, this.maskPersonForAudit(before), this.maskPersonForAudit(saved));
     return saved;
@@ -533,7 +533,7 @@ export class AssetSecurityService {
 
   async updateContractorCompany(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityContractorCompany', me.companyId, id, 'Empresa prestadora nao encontrada');
+    const before = await this.loadTenant('securityContractorCompany', me.companyId, id, 'Empresa prestadora não encontrada');
     const saved = await this.db.securityContractorCompany.update({ where: { id }, data: this.contractorCompanyPatch(body) });
     await this.audit(me, 'UPDATE', 'SecurityContractorCompany', saved.id, saved.tradeName || saved.legalName, before, saved);
     return saved;
@@ -563,7 +563,7 @@ export class AssetSecurityService {
 
   async updateVehicle(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityVehicle', me.companyId, id, 'Veiculo nao encontrado');
+    const before = await this.loadTenant('securityVehicle', me.companyId, id, 'Veículo não encontrado');
     const saved = await this.db.securityVehicle.update({ where: { id }, data: this.vehiclePatch(body) });
     await this.audit(me, 'UPDATE', 'SecurityVehicle', saved.id, saved.plate, before, saved);
     return saved;
@@ -585,7 +585,7 @@ export class AssetSecurityService {
 
   async updateDocumentRequirement(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityDocumentRequirement', me.companyId, id, 'Documento obrigatorio nao encontrado');
+    const before = await this.loadTenant('securityDocumentRequirement', me.companyId, id, 'Documento obrigatório não encontrado');
     const saved = await this.db.securityDocumentRequirement.update({ where: { id }, data: this.documentRequirementPatch(body) });
     await this.audit(me, 'UPDATE', 'SecurityDocumentRequirement', saved.id, saved.name, before, saved);
     return saved;
@@ -652,7 +652,7 @@ export class AssetSecurityService {
 
   async updateAuthorization(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityAuthorization', me.companyId, id, 'Autorizacao nao encontrada');
+    const before = await this.loadTenant('securityAuthorization', me.companyId, id, 'Autorização não encontrada');
     const patch = await this.authorizationPatch(me, body);
     const saved = await this.db.securityAuthorization.update({ where: { id }, data: patch });
     await this.createWorkItemForAuthorization(me, saved);
@@ -662,7 +662,7 @@ export class AssetSecurityService {
 
   async decideAuthorization(me: AuthPayload, id: string, status: 'APPROVED' | 'REJECTED', body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityAuthorization', me.companyId, id, 'Autorizacao nao encontrada');
+    const before = await this.loadTenant('securityAuthorization', me.companyId, id, 'Autorização não encontrada');
     const qrToken = before.qrCodeToken || this.token('asq');
     const data: JsonMap = status === 'APPROVED'
       ? { status, approverId: me.sub, approvedAt: new Date(), rejectedAt: null, qrCodeToken: qrToken, qrExpiresAt: this.date(body.qrExpiresAt) || before.qrExpiresAt || before.scheduledEndAt, notes: this.nullableText(body.notes) ?? before.notes, updatedById: me.sub }
@@ -676,7 +676,7 @@ export class AssetSecurityService {
 
   async createExternalInvite(me: AuthPayload, authorizationId: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const auth = await this.loadTenant('securityAuthorization', me.companyId, authorizationId, 'Autorizacao nao encontrada');
+    const auth = await this.loadTenant('securityAuthorization', me.companyId, authorizationId, 'Autorização não encontrada');
     const token = this.token('ext');
     const invite = await this.db.securityExternalInvite.create({
       data: {
@@ -694,7 +694,7 @@ export class AssetSecurityService {
 
   async getExternalInvite(token: string) {
     const invite = await this.db.securityExternalInvite.findFirst({ where: { token, deletedAt: null, status: 'ACTIVE' } });
-    if (!invite || new Date(invite.expiresAt).getTime() < Date.now()) throw new NotFoundException('Convite expirado ou invalido.');
+    if (!invite || new Date(invite.expiresAt).getTime() < Date.now()) throw new NotFoundException('Convite expirado ou inválido.');
     const authorization = invite.authorizationId
       ? await this.db.securityAuthorization.findFirst({ where: { id: invite.authorizationId, companyId: invite.companyId, deletedAt: null } })
       : null;
@@ -719,7 +719,7 @@ export class AssetSecurityService {
 
   async submitExternalInvite(token: string, body: JsonMap) {
     const invite = await this.db.securityExternalInvite.findFirst({ where: { token, deletedAt: null, status: 'ACTIVE' } });
-    if (!invite || new Date(invite.expiresAt).getTime() < Date.now()) throw new NotFoundException('Convite expirado ou invalido.');
+    if (!invite || new Date(invite.expiresAt).getTime() < Date.now()) throw new NotFoundException('Convite expirado ou inválido.');
     const saved = await this.db.securityExternalInvite.update({
       where: { id: invite.id },
       data: {
@@ -842,7 +842,7 @@ export class AssetSecurityService {
           postId: saved.postId,
           type: 'INCIDENT',
           category: 'EXCECAO_PORTARIA',
-          description: `Excecao aprovada para entrada: ${saved.exceptionJustification}. Motivo: ${saved.exceptionReason || 'N/A'}`,
+          description: `Exceção aprovada para entrada: ${saved.exceptionJustification}. Motivo: ${saved.exceptionReason || 'N/A'}`,
           occurredAt: saved.entryAt || new Date(),
           status: 'OPEN',
           createdById: me.sub,
@@ -897,7 +897,7 @@ export class AssetSecurityService {
 
   async updateMaterialMovement(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityMaterialMovement', me.companyId, id, 'Movimentacao de material nao encontrada');
+    const before = await this.loadTenant('securityMaterialMovement', me.companyId, id, 'Movimentação de material não encontrada');
     const saved = await this.db.securityMaterialMovement.update({ where: { id }, data: await this.materialPatch(me, body) });
     await this.audit(me, 'UPDATE', 'SecurityMaterialMovement', saved.id, saved.code || saved.description, before, saved);
     return saved;
@@ -920,7 +920,7 @@ export class AssetSecurityService {
 
   async updateCustodyItem(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityCustodyItem', me.companyId, id, 'Item nao encontrado');
+    const before = await this.loadTenant('securityCustodyItem', me.companyId, id, 'Item não encontrado');
     const saved = await this.db.securityCustodyItem.update({ where: { id }, data: await this.custodyPatch(me, body) });
     await this.audit(me, 'UPDATE', 'SecurityCustodyItem', saved.id, saved.code, before, saved);
     return saved;
@@ -928,8 +928,8 @@ export class AssetSecurityService {
 
   async loanCustodyItem(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityCustodyItem', me.companyId, id, 'Item nao encontrado');
-    if (!['AVAILABLE', 'OVERDUE'].includes(before.status)) throw new BadRequestException('Item nao esta disponivel para emprestimo.');
+    const before = await this.loadTenant('securityCustodyItem', me.companyId, id, 'Item não encontrado');
+    if (!['AVAILABLE', 'OVERDUE'].includes(before.status)) throw new BadRequestException('Item não está disponível para empréstimo.');
     const expectedReturnAt = this.date(body.expectedReturnAt) || new Date(Date.now() + 8 * 60 * 60 * 1000);
     const saved = await this.db.securityCustodyItem.update({
       where: { id },
@@ -946,14 +946,14 @@ export class AssetSecurityService {
         updatedById: me.sub,
       },
     });
-    await this.createOperationalWorkItem(me, 'SecurityCustodyItem', saved.id, `${saved.itemType}_PENDING`, `${saved.description} pendente de devolucao`, 'MEDIUM', expectedReturnAt);
+    await this.createOperationalWorkItem(me, 'SecurityCustodyItem', saved.id, `${saved.itemType}_PENDING`, `${saved.description} pendente de devolução`, 'MEDIUM', expectedReturnAt);
     await this.audit(me, 'LOAN', 'SecurityCustodyItem', saved.id, saved.code, before, saved);
     return saved;
   }
 
   async returnCustodyItem(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityCustodyItem', me.companyId, id, 'Item nao encontrado');
+    const before = await this.loadTenant('securityCustodyItem', me.companyId, id, 'Item não encontrado');
     const saved = await this.db.securityCustodyItem.update({
       where: { id },
       data: {
@@ -989,7 +989,7 @@ export class AssetSecurityService {
 
   async updateCorrespondence(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityCorrespondence', me.companyId, id, 'Correspondencia nao encontrada');
+    const before = await this.loadTenant('securityCorrespondence', me.companyId, id, 'Correspondência não encontrada');
     const saved = await this.db.securityCorrespondence.update({ where: { id }, data: await this.correspondencePatch(me, body) });
     await this.audit(me, 'UPDATE', 'SecurityCorrespondence', saved.id, saved.trackingCode || saved.recipient, before, saved);
     return saved;
@@ -997,7 +997,7 @@ export class AssetSecurityService {
 
   async pickupCorrespondence(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityCorrespondence', me.companyId, id, 'Correspondencia nao encontrada');
+    const before = await this.loadTenant('securityCorrespondence', me.companyId, id, 'Correspondência não encontrada');
     const saved = await this.db.securityCorrespondence.update({
       where: { id },
       data: {
@@ -1029,7 +1029,7 @@ export class AssetSecurityService {
 
   async updateBlocklist(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityBlocklist', me.companyId, id, 'Bloqueio nao encontrado');
+    const before = await this.loadTenant('securityBlocklist', me.companyId, id, 'Bloqueio não encontrado');
     const saved = await this.db.securityBlocklist.update({ where: { id }, data: this.blocklistPatch(body) });
     await this.audit(me, 'UPDATE_BLOCK', 'SecurityBlocklist', saved.id, saved.reason, before, saved);
     return saved;
@@ -1094,7 +1094,7 @@ export class AssetSecurityService {
 
   async updateIncident(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityIncident', me.companyId, id, 'Ocorrencia nao encontrada');
+    const before = await this.loadTenant('securityIncident', me.companyId, id, 'Ocorrência não encontrada');
     const saved = await this.db.securityIncident.update({ where: { id }, data: await this.incidentPatch(me, body) });
     await this.audit(me, 'UPDATE', 'SecurityIncident', saved.id, saved.title, before, saved);
     return saved;
@@ -1102,7 +1102,7 @@ export class AssetSecurityService {
 
   async closeIncident(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityIncident', me.companyId, id, 'Ocorrencia nao encontrada');
+    const before = await this.loadTenant('securityIncident', me.companyId, id, 'Ocorrência não encontrada');
     const saved = await this.db.securityIncident.update({
       where: { id },
       data: { status: 'CLOSED', closedAt: new Date(), closedById: me.sub, immediateAction: this.nullableText(body.immediateAction) ?? before.immediateAction, notes: this.nullableText(body.notes) ?? before.notes },
@@ -1136,7 +1136,7 @@ export class AssetSecurityService {
 
   async updateRoundRoute(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityRoundRoute', me.companyId, id, 'Rota nao encontrada');
+    const before = await this.loadTenant('securityRoundRoute', me.companyId, id, 'Rota não encontrada');
     const saved = await this.db.securityRoundRoute.update({ where: { id }, data: await this.roundRoutePatch(me, body) });
     await this.audit(me, 'UPDATE', 'SecurityRoundRoute', saved.id, saved.name, before, saved);
     return saved;
@@ -1144,7 +1144,7 @@ export class AssetSecurityService {
 
   async createRoundCheckpoint(me: AuthPayload, routeId: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    await this.loadTenant('securityRoundRoute', me.companyId, routeId, 'Rota nao encontrada');
+    await this.loadTenant('securityRoundRoute', me.companyId, routeId, 'Rota não encontrada');
     const saved = await this.db.securityRoundCheckpoint.create({ data: this.roundCheckpointData(me, routeId, body) });
     await this.audit(me, 'CREATE', 'SecurityRoundCheckpoint', saved.id, saved.name, null, saved);
     return saved;
@@ -1153,7 +1153,7 @@ export class AssetSecurityService {
   /** Edita um ponto de ronda (usado principalmente para posicionar no mapa). */
   async updateRoundCheckpoint(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityRoundCheckpoint', me.companyId, id, 'Ponto de ronda nao encontrado');
+    const before = await this.loadTenant('securityRoundCheckpoint', me.companyId, id, 'Ponto de ronda não encontrado');
     const saved = await this.db.securityRoundCheckpoint.update({
       where: { id },
       data: this.clean({
@@ -1203,7 +1203,7 @@ export class AssetSecurityService {
 
   async updateRoundExecution(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityRoundExecution', me.companyId, id, 'Ronda nao encontrada');
+    const before = await this.loadTenant('securityRoundExecution', me.companyId, id, 'Ronda não encontrada');
     const saved = await this.db.securityRoundExecution.update({
       where: { id },
       data: {
@@ -1222,10 +1222,10 @@ export class AssetSecurityService {
 
   async visitRoundCheckpoint(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityRoundExecution', me.companyId, id, 'Ronda nao encontrada');
+    const before = await this.loadTenant('securityRoundExecution', me.companyId, id, 'Ronda não encontrada');
     const checkpointId = this.requiredText(body.checkpointId, 'Ponto de ronda');
     const checkpoint = await this.db.securityRoundCheckpoint.findFirst({ where: { id: checkpointId, companyId: me.companyId, deletedAt: null } });
-    if (!checkpoint) throw new NotFoundException('Ponto de ronda nao encontrado');
+    if (!checkpoint) throw new NotFoundException('Ponto de ronda não encontrado');
     const visited = Array.from(new Set([...(before.visitedCheckpointIds ?? []), checkpointId]));
     const saved = await this.db.securityRoundExecution.update({
       where: { id },
@@ -1243,7 +1243,7 @@ export class AssetSecurityService {
   async scanCheckpoint(me: AuthPayload, checkpointId: string, body: JsonMap) {
     await this.assertPackageWrite(me);
     const checkpoint = await this.db.securityRoundCheckpoint.findFirst({ where: { id: checkpointId, companyId: me.companyId, deletedAt: null } });
-    if (!checkpoint) throw new NotFoundException('Ponto de ronda nao encontrado.');
+    if (!checkpoint) throw new NotFoundException('Ponto de ronda não encontrado.');
     let execution = await this.db.securityRoundExecution.findFirst({
       where: { companyId: me.companyId, routeId: checkpoint.routeId, deletedAt: null, status: { in: ['PLANNED', 'IN_PROGRESS'] }, assignedUserId: me.sub },
       orderBy: { createdAt: 'desc' },
@@ -1258,7 +1258,7 @@ export class AssetSecurityService {
 
   async finishRoundExecution(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityRoundExecution', me.companyId, id, 'Ronda nao encontrada');
+    const before = await this.loadTenant('securityRoundExecution', me.companyId, id, 'Ronda não encontrada');
     const checkpoints = before.routeId
       ? await this.db.securityRoundCheckpoint.findMany({ where: { companyId: me.companyId, routeId: before.routeId, deletedAt: null, status: 'ACTIVE' }, select: { id: true } })
       : [];
@@ -1276,7 +1276,7 @@ export class AssetSecurityService {
         notes: this.nullableText(body.notes) ?? before.notes,
       },
     });
-    if (missed.length) await this.createOperationalWorkItem(me, 'SecurityRoundExecution', saved.id, 'ROUND_MISSED_CHECKPOINTS', `Ronda com ${missed.length} ponto(s) nao visitado(s)`, 'HIGH');
+    if (missed.length) await this.createOperationalWorkItem(me, 'SecurityRoundExecution', saved.id, 'ROUND_MISSED_CHECKPOINTS', `Ronda com ${missed.length} ponto(s) não visitado(s)`, 'HIGH');
     await this.audit(me, 'ROUND_FINISH', 'SecurityRoundExecution', saved.id, saved.routeId, before, saved);
     return saved;
   }
@@ -1298,7 +1298,7 @@ export class AssetSecurityService {
 
   async updateShiftHandover(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityShiftHandover', me.companyId, id, 'Troca de turno nao encontrada');
+    const before = await this.loadTenant('securityShiftHandover', me.companyId, id, 'Troca de turno não encontrada');
     const saved = await this.db.securityShiftHandover.update({ where: { id }, data: await this.shiftHandoverPatch(me, body) });
     await this.audit(me, 'UPDATE', 'SecurityShiftHandover', saved.id, saved.shiftName, before, saved);
     return saved;
@@ -1306,7 +1306,7 @@ export class AssetSecurityService {
 
   async completeShiftHandover(me: AuthPayload, id: string, body: JsonMap) {
     await this.assertPackageWrite(me);
-    const before = await this.loadTenant('securityShiftHandover', me.companyId, id, 'Troca de turno nao encontrada');
+    const before = await this.loadTenant('securityShiftHandover', me.companyId, id, 'Troca de turno não encontrada');
     const hasPending = Boolean(Array.isArray(body.pendingItems) ? body.pendingItems.length : body.pendingItems);
     const saved = await this.db.securityShiftHandover.update({
       where: { id },
@@ -1320,7 +1320,7 @@ export class AssetSecurityService {
         evidence: this.json(body.evidence) ?? before.evidence,
       },
     });
-    if (hasPending) await this.createOperationalWorkItem(me, 'SecurityShiftHandover', saved.id, 'HANDOVER_PENDING', 'Troca de turno concluida com pendencias', 'MEDIUM');
+    if (hasPending) await this.createOperationalWorkItem(me, 'SecurityShiftHandover', saved.id, 'HANDOVER_PENDING', 'Troca de turno concluída com pendências', 'MEDIUM');
     await this.audit(me, 'COMPLETE', 'SecurityShiftHandover', saved.id, saved.shiftName, before, saved);
     return saved;
   }
@@ -1348,7 +1348,7 @@ export class AssetSecurityService {
 
   async validateQr(me: AuthPayload, token: string) {
     const qr = await this.db.securityQrCode.findFirst({ where: { companyId: me.companyId, token, deletedAt: null } });
-    if (!qr) throw new NotFoundException('QR Code nao encontrado.');
+    if (!qr) throw new NotFoundException('QR Code não encontrado.');
     if (qr.status !== 'ACTIVE') return { valid: false, reason: qr.status, qr };
     if (qr.expiresAt && new Date(qr.expiresAt).getTime() < Date.now()) return { valid: false, reason: 'EXPIRED', qr };
     return { valid: true, qr };
@@ -1411,22 +1411,22 @@ export class AssetSecurityService {
     ]);
     const insights: Array<{ severity: string; title: string; description: string; recommendation: string; humanDecisionRequired: boolean }> = [];
     if (summary.criticalIncidents > 0) {
-      insights.push({ severity: 'CRITICAL', title: 'Ocorrencias criticas abertas', description: `${summary.criticalIncidents} ocorrencia(s) criticas/emergenciais aguardam tratativa.`, recommendation: 'Priorizar responsavel, evidencias e plano de acao. A IA nao encerra nem reclassifica ocorrencias automaticamente.', humanDecisionRequired: true });
+      insights.push({ severity: 'CRITICAL', title: 'Ocorrências críticas abertas', description: `${summary.criticalIncidents} ocorrência(s) críticas/emergenciais aguardam tratativa.`, recommendation: 'Priorizar responsável, evidências e plano de ação. A IA não encerra nem reclassifica ocorrências automaticamente.', humanDecisionRequired: true });
     }
     if (summary.overduePresence > 0) {
-      insights.push({ severity: 'HIGH', title: 'Permanencia excedida', description: `${summary.overduePresence} pessoa(s) ou veiculo(s) ultrapassaram a previsao de saida.`, recommendation: 'Acionar responsavel interno, confirmar localizacao e registrar saida ou excecao formal.', humanDecisionRequired: true });
+      insights.push({ severity: 'HIGH', title: 'Permanência excedida', description: `${summary.overduePresence} pessoa(s) ou veículo(s) ultrapassaram a previsão de saída.`, recommendation: 'Acionar responsável interno, confirmar localização e registrar saída ou exceção formal.', humanDecisionRequired: true });
     }
     if (lateRounds.length > 0) {
-      insights.push({ severity: 'HIGH', title: 'Rondas atrasadas ou incompletas', description: `${lateRounds.length} ronda(s) recentes estao atrasadas ou com ponto nao visitado.`, recommendation: 'Verificar posto/escala, registrar justificativa e abrir plano se houver recorrencia.', humanDecisionRequired: true });
+      insights.push({ severity: 'HIGH', title: 'Rondas atrasadas ou incompletas', description: `${lateRounds.length} ronda(s) recentes estão atrasadas ou com ponto não visitado.`, recommendation: 'Verificar posto/escala, registrar justificativa e abrir plano se houver recorrência.', humanDecisionRequired: true });
     }
     if (invalidDocs.length > 0) {
-      insights.push({ severity: 'MEDIUM', title: 'Documentos pendentes', description: `${invalidDocs.length} cadastro(s) amostrados possuem documentos vencidos, ausentes ou reprovados.`, recommendation: 'Bloquear acesso conforme regra parametrizada ou solicitar regularizacao antes da proxima entrada.', humanDecisionRequired: true });
+      insights.push({ severity: 'MEDIUM', title: 'Documentos pendentes', description: `${invalidDocs.length} cadastro(s) amostrados possuem documentos vencidos, ausentes ou reprovados.`, recommendation: 'Bloquear acesso conforme regra parametrizada ou solicitar regularização antes da próxima entrada.', humanDecisionRequired: true });
     }
     if (pendingExits.length > 0) {
-      insights.push({ severity: 'MEDIUM', title: 'Saidas pendentes', description: `${pendingExits.length} registro(s) precisam de conciliacao de saida.`, recommendation: 'Conciliar com livro eletronico, chaves/crachas e responsavel interno.', humanDecisionRequired: true });
+      insights.push({ severity: 'MEDIUM', title: 'Saídas pendentes', description: `${pendingExits.length} registro(s) precisam de conciliação de saída.`, recommendation: 'Conciliar com livro eletrônico, chaves/crachás e responsável interno.', humanDecisionRequired: true });
     }
     if (insights.length === 0) {
-      insights.push({ severity: 'LOW', title: 'Operacao sem sinais criticos', description: 'Os indicadores operacionais nao apontam acumulacao critica neste momento.', recommendation: 'Manter rondas, checklists e conciliacao de saida por turno.', humanDecisionRequired: false });
+      insights.push({ severity: 'LOW', title: 'Operação sem sinais críticos', description: 'Os indicadores operacionais não apontam acumulação crítica neste momento.', recommendation: 'Manter rondas, checklists e conciliação de saída por turno.', humanDecisionRequired: false });
     }
     const samples = { incidents, pendingExits, lateRounds, invalidDocs };
     const aiInsights = await this.tryGeminiAssetSecurityInsights({ summary, insights, samples });
@@ -1446,9 +1446,9 @@ export class AssetSecurityService {
     samples: Record<string, unknown>;
   }): Promise<Array<{ severity: string; title: string; description: string; recommendation: string; humanDecisionRequired: boolean }> | null> {
     if (!this.gemini?.isEnabled) return null;
-    const prompt = `Voce e um especialista senior em seguranca patrimonial, portaria, controle de acesso, rondas e tratamento de ocorrencias.
-Gere recomendações executivas em portugues do Brasil para a operacao.
-Use somente os dados fornecidos e mantenha todas as decisoes como recomendacao humana.
+    const prompt = `Você é um especialista sênior em segurança patrimonial, portaria, controle de acesso, rondas e tratamento de ocorrências.
+Gere recomendações executivas em português do Brasil para a operação.
+Use somente os dados fornecidos e mantenha todas as decisões como recomendação humana.
 
 Responda apenas JSON no schema:
 {
@@ -1681,7 +1681,7 @@ ${JSON.stringify(context, null, 2)}`;
   private contractorCompanyData(me: AuthPayload, body: JsonMap) {
     return {
       companyId: me.companyId,
-      legalName: this.requiredText(body.legalName, 'Razao social'),
+      legalName: this.requiredText(body.legalName, 'Razão social'),
       tradeName: this.nullableText(body.tradeName),
       cnpj: this.onlyDigits(this.text(body.cnpj)) || null,
       contractCode: this.nullableText(body.contractCode),
@@ -1702,7 +1702,7 @@ ${JSON.stringify(context, null, 2)}`;
 
   private contractorCompanyPatch(body: JsonMap) {
     return this.clean({
-      legalName: 'legalName' in body ? this.requiredText(body.legalName, 'Razao social') : undefined,
+      legalName: 'legalName' in body ? this.requiredText(body.legalName, 'Razão social') : undefined,
       tradeName: 'tradeName' in body ? this.nullableText(body.tradeName) : undefined,
       cnpj: 'cnpj' in body ? (this.onlyDigits(this.text(body.cnpj)) || null) : undefined,
       contractCode: 'contractCode' in body ? this.nullableText(body.contractCode) : undefined,
@@ -1843,7 +1843,7 @@ ${JSON.stringify(context, null, 2)}`;
       responsibleUserId: this.id(body.responsibleUserId),
       type: this.enumValue(body.type, MOVEMENT_TYPES, 'MATERIAL_ENTRY'),
       code: this.nullableText(body.code),
-      description: this.requiredText(body.description, 'Descricao'),
+      description: this.requiredText(body.description, 'Descrição'),
       quantity: this.float(body.quantity),
       unit: this.nullableText(body.unit),
       origin: this.nullableText(body.origin),
@@ -1873,7 +1873,7 @@ ${JSON.stringify(context, null, 2)}`;
       responsibleUserId: 'responsibleUserId' in body ? this.id(body.responsibleUserId) : undefined,
       type: 'type' in body ? this.enumValue(body.type, MOVEMENT_TYPES, 'MATERIAL_ENTRY') : undefined,
       code: 'code' in body ? this.nullableText(body.code) : undefined,
-      description: 'description' in body ? this.requiredText(body.description, 'Descricao') : undefined,
+      description: 'description' in body ? this.requiredText(body.description, 'Descrição') : undefined,
       quantity: 'quantity' in body ? this.float(body.quantity) : undefined,
       unit: 'unit' in body ? this.nullableText(body.unit) : undefined,
       origin: 'origin' in body ? this.nullableText(body.origin) : undefined,
@@ -1899,8 +1899,8 @@ ${JSON.stringify(context, null, 2)}`;
       unitId: await this.validateOrgNode(me.companyId, this.id(body.unitId)),
       gateId: await this.validateGate(me.companyId, this.id(body.gateId)),
       itemType: this.enumValue(body.itemType, CUSTODY_TYPES, 'KEY'),
-      code: this.requiredText(body.code, 'Codigo'),
-      description: this.requiredText(body.description, 'Descricao'),
+      code: this.requiredText(body.code, 'Código'),
+      description: this.requiredText(body.description, 'Descrição'),
       location: this.nullableText(body.location),
       responsibleUserId: this.id(body.responsibleUserId),
       purpose: this.nullableText(body.purpose),
@@ -1916,8 +1916,8 @@ ${JSON.stringify(context, null, 2)}`;
       unitId: 'unitId' in body ? await this.validateOrgNode(me.companyId, this.id(body.unitId)) : undefined,
       gateId: 'gateId' in body ? await this.validateGate(me.companyId, this.id(body.gateId)) : undefined,
       itemType: 'itemType' in body ? this.enumValue(body.itemType, CUSTODY_TYPES, 'KEY') : undefined,
-      code: 'code' in body ? this.requiredText(body.code, 'Codigo') : undefined,
-      description: 'description' in body ? this.requiredText(body.description, 'Descricao') : undefined,
+      code: 'code' in body ? this.requiredText(body.code, 'Código') : undefined,
+      description: 'description' in body ? this.requiredText(body.description, 'Descrição') : undefined,
       location: 'location' in body ? this.nullableText(body.location) : undefined,
       responsibleUserId: 'responsibleUserId' in body ? this.id(body.responsibleUserId) : undefined,
       notes: 'notes' in body ? this.nullableText(body.notes) : undefined,
@@ -1932,7 +1932,7 @@ ${JSON.stringify(context, null, 2)}`;
       unitId: await this.validateOrgNode(me.companyId, this.id(body.unitId)),
       gateId: await this.validateGate(me.companyId, this.id(body.gateId)),
       sender: this.nullableText(body.sender),
-      recipient: this.requiredText(body.recipient, 'Destinatario'),
+      recipient: this.requiredText(body.recipient, 'Destinatário'),
       recipientUserId: this.id(body.recipientUserId),
       carrierName: this.nullableText(body.carrierName),
       trackingCode: this.nullableText(body.trackingCode),
@@ -1952,7 +1952,7 @@ ${JSON.stringify(context, null, 2)}`;
       unitId: 'unitId' in body ? await this.validateOrgNode(me.companyId, this.id(body.unitId)) : undefined,
       gateId: 'gateId' in body ? await this.validateGate(me.companyId, this.id(body.gateId)) : undefined,
       sender: 'sender' in body ? this.nullableText(body.sender) : undefined,
-      recipient: 'recipient' in body ? this.requiredText(body.recipient, 'Destinatario') : undefined,
+      recipient: 'recipient' in body ? this.requiredText(body.recipient, 'Destinatário') : undefined,
       recipientUserId: 'recipientUserId' in body ? this.id(body.recipientUserId) : undefined,
       carrierName: 'carrierName' in body ? this.nullableText(body.carrierName) : undefined,
       trackingCode: 'trackingCode' in body ? this.nullableText(body.trackingCode) : undefined,
@@ -2013,7 +2013,7 @@ ${JSON.stringify(context, null, 2)}`;
       checkpointId: this.id(body.checkpointId),
       actionPlanId: this.id(body.actionPlanId),
       code: this.text(body.code) || (await this.nextCode('securityIncident', me.companyId, 'OCO')),
-      title: this.requiredText(body.title, 'Titulo'),
+      title: this.requiredText(body.title, 'Título'),
       type: this.nullableText(body.type),
       severity: this.enumValue(body.severity, INCIDENT_SEVERITIES, 'MEDIUM'),
       status: this.enumValue(body.status, INCIDENT_STATUSES, 'OPEN'),
@@ -2035,7 +2035,7 @@ ${JSON.stringify(context, null, 2)}`;
       unitId: 'unitId' in body ? await this.validateOrgNode(me.companyId, this.id(body.unitId)) : undefined,
       gateId: 'gateId' in body ? await this.validateGate(me.companyId, this.id(body.gateId)) : undefined,
       postId: 'postId' in body ? await this.validatePost(me.companyId, this.id(body.postId)) : undefined,
-      title: 'title' in body ? this.requiredText(body.title, 'Titulo') : undefined,
+      title: 'title' in body ? this.requiredText(body.title, 'Título') : undefined,
       type: 'type' in body ? this.nullableText(body.type) : undefined,
       severity: 'severity' in body ? this.enumValue(body.severity, INCIDENT_SEVERITIES, 'MEDIUM') : undefined,
       status: 'status' in body ? this.enumValue(body.status, INCIDENT_STATUSES, 'OPEN') : undefined,
@@ -2093,7 +2093,7 @@ ${JSON.stringify(context, null, 2)}`;
   private mapImage(value: unknown): string | null {
     const raw = this.nullableText(value);
     if (!raw) return null;
-    if (!raw.startsWith('data:image/')) throw new BadRequestException('Mapa invalido: envie uma imagem.');
+    if (!raw.startsWith('data:image/')) throw new BadRequestException('Mapa inválido: envie uma imagem.');
     if (raw.length > 2_000_000) throw new BadRequestException('Mapa muito grande: reduza a imagem (limite ~2MB).');
     return raw;
   }
@@ -2102,7 +2102,7 @@ ${JSON.stringify(context, null, 2)}`;
   private mapCoord(value: unknown): number | null {
     if (value === null || value === undefined || value === '') return null;
     const n = Number(value);
-    if (!Number.isFinite(n)) throw new BadRequestException('Posicao no mapa invalida.');
+    if (!Number.isFinite(n)) throw new BadRequestException('Posição no mapa inválida.');
     return Math.min(100, Math.max(0, n));
   }
 
@@ -2168,7 +2168,7 @@ ${JSON.stringify(context, null, 2)}`;
       gateId: await this.validateGate(me.companyId, this.id(body.gateId)),
       postId: await this.validatePost(me.companyId, this.id(body.postId)),
       occurredAt: this.date(body.occurredAt) || new Date(),
-      title: this.requiredText(body.title, 'Titulo'),
+      title: this.requiredText(body.title, 'Título'),
       entryType: this.requiredText(body.entryType, 'Tipo'),
       description: this.nullableText(body.description),
       attachments: this.json(body.attachments),
@@ -2200,11 +2200,11 @@ ${JSON.stringify(context, null, 2)}`;
       if (pkg?.antiPassback) {
         if (person) {
           const openPerson = await this.db.securityAccessMovement.findFirst({ where: { companyId: me.companyId, personId: person.id, status: 'OPEN' } });
-          if (openPerson) throw new ForbiddenException('Anti-passback: Pessoa ja consta como presente no local. Registre a saida anterior ou use uma excecao.');
+          if (openPerson) throw new ForbiddenException('Anti-passback: Pessoa já consta como presente no local. Registre a saída anterior ou use uma exceção.');
         }
         if (vehicle) {
           const openVehicle = await this.db.securityAccessMovement.findFirst({ where: { companyId: me.companyId, vehicleId: vehicle.id, status: 'OPEN' } });
-          if (openVehicle) throw new ForbiddenException('Anti-passback: Veiculo ja consta como presente no local. Registre a saida anterior ou use uma excecao.');
+          if (openVehicle) throw new ForbiddenException('Anti-passback: Veículo já consta como presente no local. Registre a saída anterior ou use uma exceção.');
         }
       }
     }
@@ -2214,21 +2214,21 @@ ${JSON.stringify(context, null, 2)}`;
       if (gate) {
         if (gate.vehicleCapacity && vehicle) {
           const currentVehicles = await this.db.securityAccessMovement.count({ where: { companyId: me.companyId, gateId: gate.id, vehicleId: { not: null }, status: 'OPEN' } });
-          if (currentVehicles >= gate.vehicleCapacity) throw new ForbiddenException(`Capacidade maxima de veiculos (${gate.vehicleCapacity}) atingida para este portao/patio.`);
+          if (currentVehicles >= gate.vehicleCapacity) throw new ForbiddenException(`Capacidade máxima de veículos (${gate.vehicleCapacity}) atingida para este portão/pátio.`);
         }
         if (gate.personCapacity && person) {
           const currentPeople = await this.db.securityAccessMovement.count({ where: { companyId: me.companyId, gateId: gate.id, personId: { not: null }, status: 'OPEN' } });
-          if (currentPeople >= gate.personCapacity) throw new ForbiddenException(`Capacidade maxima de pessoas (${gate.personCapacity}) atingida para este portao/area.`);
+          if (currentPeople >= gate.personCapacity) throw new ForbiddenException(`Capacidade máxima de pessoas (${gate.personCapacity}) atingida para este portao/area.`);
         }
       }
     }
     if (authorization && !['APPROVED', 'PARTIALLY_USED'].includes(authorization.status) && !hasException) {
-      throw new BadRequestException('Autorizacao nao aprovada para entrada.');
+      throw new BadRequestException('Autorização não aprovada para entrada.');
     }
     for (const row of [person, vehicle, contractor]) {
       if (!row) continue;
       if (['EXPIRED', 'MISSING', 'REJECTED', 'BLOCKED'].includes(row.documentStatus) && !hasException) {
-        throw new BadRequestException(`Documentacao impede acesso (${row.documentStatus}).`);
+        throw new BadRequestException(`Documentação impede acesso (${row.documentStatus}).`);
       }
       if (row.status === 'BLOCKED' && !hasException) throw new ForbiddenException('Cadastro bloqueado para acesso.');
       if (row.status === 'INACTIVE' && !hasException) throw new ForbiddenException('Cadastro inativo para acesso.');
@@ -2267,7 +2267,7 @@ ${JSON.stringify(context, null, 2)}`;
     const found = await this.findPersonForEntry(me.companyId, term, body.personKind ?? body.kind ?? body.type);
     if (found) return found;
     if (digits && !/[a-zA-ZÀ-ÿ]/.test(term)) {
-      throw new NotFoundException('Pessoa nao encontrada. Importe o cadastro ou digite o nome completo.');
+      throw new NotFoundException('Pessoa não encontrada. Importe o cadastro ou digite o nome completo.');
     }
     const saved = await this.db.securityPerson.create({
       data: {
@@ -2401,7 +2401,7 @@ ${JSON.stringify(context, null, 2)}`;
       },
       orderBy: { entryAt: 'desc' },
     });
-    if (!movement) throw new NotFoundException('Entrada aberta nao encontrada.');
+    if (!movement) throw new NotFoundException('Entrada aberta não encontrada.');
     return movement;
   }
 
@@ -2424,7 +2424,7 @@ ${JSON.stringify(context, null, 2)}`;
       const saved = await this.createRoundExecution(me, { ...payload, offlineSyncId: sync.id });
       return saved.id;
     }
-    throw new BadRequestException(`Tipo offline nao suportado: ${entityType}`);
+    throw new BadRequestException(`Tipo offline não suportado: ${entityType}`);
   }
 
   private movementWhere(me: AuthPayload, q: Query) {
@@ -2500,28 +2500,28 @@ ${JSON.stringify(context, null, 2)}`;
   private async validateOrgNode(companyId: string, id: string | null) {
     if (!id) return null;
     const row = await this.db.orgNode.findFirst({ where: { id, companyId, deletedAt: null }, select: { id: true } });
-    if (!row) throw new NotFoundException('Unidade/area nao encontrada');
+    if (!row) throw new NotFoundException('Unidade/area não encontrada');
     return row.id;
   }
 
   private async validateGate(companyId: string, id: string | null) {
     if (!id) return null;
     const row = await this.db.securityGate.findFirst({ where: { id, companyId, deletedAt: null }, select: { id: true } });
-    if (!row) throw new NotFoundException('Portaria nao encontrada');
+    if (!row) throw new NotFoundException('Portaria não encontrada');
     return row.id;
   }
 
   private async validatePost(companyId: string, id: string | null) {
     if (!id) return null;
     const row = await this.db.securityPost.findFirst({ where: { id, companyId, deletedAt: null }, select: { id: true } });
-    if (!row) throw new NotFoundException('Posto nao encontrado');
+    if (!row) throw new NotFoundException('Posto não encontrado');
     return row.id;
   }
 
   private async validatePerson(companyId: string, id: string | null) {
     if (!id) return null;
     const row = await this.db.securityPerson.findFirst({ where: { id, companyId, deletedAt: null } });
-    if (!row) throw new NotFoundException('Pessoa nao encontrada');
+    if (!row) throw new NotFoundException('Pessoa não encontrada');
     return row;
   }
 
@@ -2532,7 +2532,7 @@ ${JSON.stringify(context, null, 2)}`;
   private async validateVehicle(companyId: string, id: string | null) {
     if (!id) return null;
     const row = await this.db.securityVehicle.findFirst({ where: { id, companyId, deletedAt: null } });
-    if (!row) throw new NotFoundException('Veiculo nao encontrado');
+    if (!row) throw new NotFoundException('Veículo não encontrado');
     return row;
   }
 
@@ -2543,7 +2543,7 @@ ${JSON.stringify(context, null, 2)}`;
   private async validateContractorCompany(companyId: string, id: string | null) {
     if (!id) return null;
     const row = await this.db.securityContractorCompany.findFirst({ where: { id, companyId, deletedAt: null } });
-    if (!row) throw new NotFoundException('Empresa prestadora nao encontrada');
+    if (!row) throw new NotFoundException('Empresa prestadora não encontrada');
     return row;
   }
 
@@ -2554,21 +2554,21 @@ ${JSON.stringify(context, null, 2)}`;
   private async validateAuthorization(companyId: string, id: string | null) {
     if (!id) return null;
     const row = await this.db.securityAuthorization.findFirst({ where: { id, companyId, deletedAt: null } });
-    if (!row) throw new NotFoundException('Autorizacao nao encontrada');
+    if (!row) throw new NotFoundException('Autorização não encontrada');
     return row;
   }
 
   private async validateRoundRoute(companyId: string, id: string | null) {
     if (!id) return null;
     const row = await this.db.securityRoundRoute.findFirst({ where: { id, companyId, deletedAt: null }, select: { id: true } });
-    if (!row) throw new NotFoundException('Rota de ronda nao encontrada');
+    if (!row) throw new NotFoundException('Rota de ronda não encontrada');
     return row.id;
   }
 
   private async assertPackageWrite(me: AuthPayload) {
     const config = await this.getPackage(me);
-    if (['DISABLED', 'BLOCKED', 'EXPIRED'].includes(String(config.status))) throw new ForbiddenException('Modulo de Seguranca Patrimonial indisponivel para esta empresa.');
-    if (config.status === 'READ_ONLY') throw new ForbiddenException('Modulo de Seguranca Patrimonial esta em modo somente leitura.');
+    if (['DISABLED', 'BLOCKED', 'EXPIRED'].includes(String(config.status))) throw new ForbiddenException('Módulo de Segurança Patrimonial indisponível para esta empresa.');
+    if (config.status === 'READ_ONLY') throw new ForbiddenException('Módulo de Segurança Patrimonial está em modo somente leitura.');
   }
 
   private async areaScopedWhere(me: AuthPayload, where: JsonMap) {
@@ -2668,13 +2668,13 @@ ${JSON.stringify(context, null, 2)}`;
 
   private async createWorkItemForAuthorization(me: AuthPayload, authorization: any) {
     if (!['REQUESTED', 'WAITING_DOCUMENTS', 'WAITING_APPROVAL'].includes(authorization.status)) return;
-    await this.createOperationalWorkItem(me, 'SecurityAuthorization', authorization.id, authorization.status, `Autorizacao ${authorization.code ?? ''} aguardando tratativa`, 'MEDIUM', authorization.scheduledStartAt);
+    await this.createOperationalWorkItem(me, 'SecurityAuthorization', authorization.id, authorization.status, `Autorização ${authorization.code ?? ''} aguardando tratativa`, 'MEDIUM', authorization.scheduledStartAt);
   }
 
   private async createPresenceWorkItems(me: AuthPayload, movement: any) {
     if (!movement.expectedExitAt) return;
     const dueAt = new Date(movement.expectedExitAt);
-    await this.createOperationalWorkItem(me, 'SecurityAccessMovement', movement.id, 'PENDING_EXIT', `Saida prevista para ${movement.code}`, 'LOW', dueAt);
+    await this.createOperationalWorkItem(me, 'SecurityAccessMovement', movement.id, 'PENDING_EXIT', `Saída prevista para ${movement.code}`, 'LOW', dueAt);
   }
 
   private async createOperationalWorkItem(me: AuthPayload, entity: string, entityId: string, itemType: string, title: string, priority: string, dueAt?: Date | string | null) {
@@ -2692,7 +2692,7 @@ ${JSON.stringify(context, null, 2)}`;
         status: 'OPEN',
         priority,
         priorityScore: priority === 'CRITICAL' ? 100 : priority === 'HIGH' ? 80 : priority === 'MEDIUM' ? 50 : 20,
-        priorityReason: 'Gerado pelo modulo de Seguranca Patrimonial',
+        priorityReason: 'Gerado pelo módulo de Segurança Patrimonial',
         dueAt: dueAt ? new Date(dueAt) : null,
         sourceCreatedAt: new Date(),
         contextData: { module: MODULE, entity, entityId },
@@ -2776,7 +2776,7 @@ ${JSON.stringify(context, null, 2)}`;
 
   private requiredText(value: unknown, field: string) {
     const text = this.text(value);
-    if (!text) throw new BadRequestException(`${field} e obrigatorio.`);
+    if (!text) throw new BadRequestException(`${field} é obrigatório.`);
     return text;
   }
 
@@ -2795,14 +2795,14 @@ ${JSON.stringify(context, null, 2)}`;
   private int(value: unknown): number | null {
     if (value === undefined || value === null || value === '') return null;
     const parsed = Number(value);
-    if (!Number.isFinite(parsed)) throw new BadRequestException('Valor numerico invalido.');
+    if (!Number.isFinite(parsed)) throw new BadRequestException('Valor numérico inválido.');
     return Math.round(parsed);
   }
 
   private float(value: unknown): number | null {
     if (value === undefined || value === null || value === '') return null;
     const parsed = Number(value);
-    if (!Number.isFinite(parsed)) throw new BadRequestException('Valor numerico invalido.');
+    if (!Number.isFinite(parsed)) throw new BadRequestException('Valor numérico inválido.');
     return parsed;
   }
 

@@ -101,10 +101,10 @@ export function fallbackTriage(input: FallbackTriageInput) {
   const screeningPenalty = input.screening?.knockoutFailed.length ? 0.25 : input.screening?.requiredMissing.length ? 0.1 : 0;
   const confidence = Math.max(0.15, Math.min(0.85, coverage - screeningPenalty));
   return {
-    summary: `Analise deterministica para ${input.vacancyTitle}: ${found.length}/${terms.length || 0} requisito(s) objetivo(s) encontrados no material do candidato. Revisao humana obrigatoria.`,
+    summary: `Análise determinística para ${input.vacancyTitle}: ${found.length}/${terms.length || 0} requisito(s) objetivo(s) encontrados no material do candidato. Revisão humana obrigatória.`,
     criteria: terms.map((term) => ({ term, found: found.includes(term) })),
     evidence: found.map((term) => ({ term, source: 'candidate_text' })),
-    missingRequirements: missing.map((term) => ({ term, reason: 'Nao encontrado no texto analisado.' })),
+    missingRequirements: missing.map((term) => ({ term, reason: 'Não encontrado no texto analisado.' })),
     risks: [
       ...(input.screening?.requiredMissing ?? []).map((questionId) => ({ kind: 'REQUIRED_MISSING', questionId })),
       ...(input.screening?.knockoutFailed ?? []).map((questionId) => ({ kind: 'KNOCKOUT_FAILED', questionId })),
