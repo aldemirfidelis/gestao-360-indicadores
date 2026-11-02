@@ -951,3 +951,11 @@ Pedido do usuário depois de testar em produção:
   causa" (só vale para empresas novas; as existentes mantêm a linha no banco,
   desativável em Parâmetros). Enums do banco/shared e o rótulo de exibição
   continuam, para ações antigas salvas com Pareto (abrem no Ishikawa).
+- Publicado em 2026-11-02 com OK do usuário: commit `006e213`, imagens
+  `0.1.0+006e2137` (montadas antes: API 74 s, web 134 s); `make deploy` em
+  27 s (16:13:46Z a 16:14:13Z), sem migration pendente (153). Backup antes:
+  `db-backups/g360-20261102-160953.dump`. Rollback:
+  `g360-api:rollback-3dcaf24-20261102` e `g360-web:rollback-3dcaf24-20261102`.
+  Validado: containers saudáveis, `migrate status` em dia, health/home/login/
+  demonstração/`/actions` 200, PDCA novo nos chunks da web. Sem teste em
+  navegador (o usuário testa).
