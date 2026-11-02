@@ -1,6 +1,6 @@
 # Memoria Operacional do Projeto
 
-Atualizada em: 2026-11-01
+Atualizada em: 2026-11-02
 
 Este arquivo deve ser lido antes de qualquer tarefa no repositorio
 `gestao-360-indicadores`. Ele registra o estado operacional vigente. Quando
@@ -119,6 +119,23 @@ DNS (2026-11-02):
   consulta a DigitalOcean cai no droplet, que repassa para a Vultr. A
   configuracao de repasse nao grava log de acesso; para medir trafego residual
   usar `ss -Htn state established "( sport = :443 )"` no droplet.
+
+Primeiro deploy na Vultr (2026-11-02, autorizado pelo usuario):
+
+- Commits `23cac63` (correcoes da auditoria), `81f219f` (menu principal sem o
+  grupo Gestao a Vista, secoes abertas por padrao e Gestao de Premio
+  suspenso) e `b16441a` (docs). Push em `main`; imagens `0.1.0+b16441ae`.
+- Imagens montadas antes com os containers no ar; `make deploy` levou 26 s
+  (~20 s fora do ar). Rollback: `g360-api:rollback-25258cb-20261102` e
+  `g360-web:rollback-25258cb-20261102`. Backup antes em `db-backups/`.
+- Validado: health/home/login/demonstracao/portal 200, `/gestao-premio` 404,
+  push do Apdata para o premio 404 ("Modulo aguardando reativacao"),
+  `/eficacia` leva a `/actions?effectivenessStatus=PENDING`; na demonstracao,
+  o menu mostra Meu Dia, Tarefas e os 10 itens antigos da Gestao a Vista como
+  links diretos, sem erro de JS.
+- Nesta maquina Windows o Git nao tem `user.name`/`user.email` globais: os
+  commits usaram a autoria do usuario passada so no comando. O typecheck da
+  API precisou de `--max-old-space-size=8192` aqui.
 
 Pendente (com o usuario):
 
@@ -333,7 +350,8 @@ aconteceu em 2026-10. Backup so no disco do proprio droplet nao basta.
   variaveis `S3_*`/`AWS_*` no `.env`, copia para DigitalOcean Spaces/S3
   (precisa de `awscli` no droplet).
 - Cron sugerido (`crontab -e` como root):
-  `0 3 * * * cd /opt/gestao-360-indicadores && ./scripts/backup-db.sh >> /var/log/g360-backup.log 2>&1`
+  `0 3 * * * cd /opt/gestao-360-indicadores && bash scripts/backup-db.sh >> /var/log/g360-backup.log 2>&1`
+  (o script não tem bit de execução: sempre chamar com `bash`)
 - Restauracao: ver o cabecalho de `scripts/backup-db.sh`.
 - Antes de afirmar que existe backup utilizavel, conferir o cron, o log e o
   arquivo no destino off-site.
@@ -821,3 +839,42 @@ Portal Admin (as senhas ficam só no droplet).
   não saem); DNS sem MX, SPF, DKIM e DMARC; páginas ativas sem item de menu
   (`/reports`, `/insights`, `/dashboard`, `/periods`, `/treatments`,
   `/plataforma`); perfil Totem é levado a `/totem`, que está suspensa.
+
+## Mapa Estratégico: canvas mais fácil de manipular (2026-11-02, publicado)
+
+Pedido do usuário: os cards do canvas do BSC eram difíceis de arrastar. Mantido
+o `reactflow` 11 já instalado; a mudança é de modelo e de interação, não de
+biblioteca.
+
+- Geometria em `apps/web/lib/strategy-map-layout.ts` (funções puras, com
+  testes): perspectivas são faixas fixas empilhadas que crescem com o conteúdo;
+  o card guarda posição relativa à faixa (no banco continua absoluta e a
+  perspectiva grava origem e tamanho da faixa). Mapas antigos são convertidos
+  na leitura, sem gravar nada até a primeira edição.
+- Tela: "Editar mapa" só para quem tem `strategy:objectives:update` ou
+  `strategy:manage` e não é demonstração; arrastar para outra faixa troca a
+  perspectiva; salvamento automático em fila com atualização imediata do cache
+  (o card não volta mais para a posição antiga); "Organizar" por faixa; mini
+  mapa e controles de zoom; ligação pelos pontos ou por "Ligar a…"; trocar a
+  perspectiva pelo painel lateral zera a posição e o card cai na primeira vaga
+  livre da faixa nova.
+- API: `PATCH /strategy/maps/:id/layout` aceita `lanes` além de `nodes` e
+  valida que as perspectivas de destino são do mapa. Sem migration.
+- Validado nesta máquina Windows: `tsc` de web e API, lint, web 13 arquivos /
+  100 testes, testes do serviço de estratégia. Não testado no navegador antes
+  da publicação.
+- Publicado em 2026-11-02 com OK do usuário: commit `01f67a4`, imagens
+  `0.1.0+01f67a44`. Imagens montadas antes com o site no ar (API 66 s, web
+  138 s); `make deploy` levou 25 s (14:37:01Z a 14:37:26Z), sem migration
+  pendente (153). Backup antes: `db-backups/g360-20261102-143643.dump`.
+  Rollback: `g360-api:rollback-b16441a-20261102` e
+  `g360-web:rollback-b16441a-20261102`.
+- Validado depois: containers saudáveis, `migrate status` em dia, health,
+  home, login, demonstração e `/strategy` com 200, PATCH de layout sem token
+  401, chunk novo da tela e mensagem nova da API dentro dos containers.
+- `scripts/backup-db.sh` não tem bit de execução no Git (100644): rodar com
+  `bash scripts/backup-db.sh`, como o cron da Vultr já faz. `./scripts/...`
+  dá "Permission denied".
+- O notebook travou durante esse trabalho com ~1 GB de memória livre. Antes de
+  typecheck, build ou `pnpm dev`, conferir a memória livre e não deixar
+  processos Node antigos rodando.
