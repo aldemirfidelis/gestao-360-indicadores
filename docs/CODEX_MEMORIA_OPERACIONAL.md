@@ -931,3 +931,23 @@ Estratégico. Verificados os 12 módulos ativos; tinham o mesmo tipo de problema
   de `\r`. Remover linha com `^(\s*)...\r?\n` num arquivo CRLF deixou um `\r`
   solto; o Git passou a ver o arquivo como não-texto e o diff mostrava o
   arquivo inteiro. Conferir `git ls-files --eol` depois de editar por script.
+
+## PDCA redesenhado e Pareto removido (2026-11-02)
+
+Pedido do usuário depois de testar em produção:
+
+- **PDCA** (`components/platform/pdca-visual-analysis.tsx`): ciclo no sentido
+  horário da roda de Deming (Plan no alto à direita, Do embaixo à direita,
+  Check embaixo à esquerda, Act no alto à esquerda; antes estava invertido),
+  anel em SVG com setas, sem o painel fixo "Etapa selecionada" (a edição abre
+  num `Sheet` lateral só ao clicar, com navegação entre etapas e checklist
+  embutido), salvamento automático em fila com status (componente
+  compartilhado `auto-save-status.tsx`, também usado no Ishikawa). Ids de
+  etapa gerados no navegador: "Transformar em tarefa do plano" não falha mais
+  até recarregar.
+- **Pareto**: fora da sequência de análise (agora Ishikawa → 5 Porquês → 5W2H
+  → PDCA), componente `pareto-visual-analysis.tsx` apagado, semeadura no
+  Ishikawa removida e item tirado do catálogo padrão "Métodos de análise de
+  causa" (só vale para empresas novas; as existentes mantêm a linha no banco,
+  desativável em Parâmetros). Enums do banco/shared e o rótulo de exibição
+  continuam, para ações antigas salvas com Pareto (abrem no Ishikawa).

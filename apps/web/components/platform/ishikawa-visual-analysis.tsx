@@ -23,7 +23,8 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { AlertTriangle, ArrowRight, CircleCheck, Download, GripVertical, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowRight, Download, GripVertical, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { AutoSaveStatus, type AutoSaveState } from '@/components/platform/auto-save-status';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -37,7 +38,6 @@ import { cn } from '@/lib/utils';
 
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 type CauseStatus = 'DRAFT' | 'IN_REVIEW' | 'LIKELY_CAUSE' | 'ROOT_CAUSE' | 'DISCARDED' | 'CONVERTED_TO_ACTION';
-type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 interface IshikawaCause {
   id: string;
@@ -137,8 +137,6 @@ export function IshikawaVisualAnalysis({
   rootCause,
   saving,
   canEdit = true,
-  seedCauses,
-  onSeedConsumed,
   onSendToFiveWhys,
   onSave,
 }: {
@@ -149,9 +147,6 @@ export function IshikawaVisualAnalysis({
   users?: UserOption[];
   saving: boolean;
   canEdit?: boolean;
-  /** causas vindas do Pareto (vitais) — semeadas na espinha da categoria correspondente */
-  seedCauses?: Array<{ title: string; category?: string }> | null;
-  onSeedConsumed?: () => void;
   onRootCauseChange: (value: string) => void;
   onSendToFiveWhys?: (text: string, causeId: string) => void;
   /** Devolve a promessa do salvamento: a fila espera um terminar para mandar o próximo. */
@@ -169,7 +164,7 @@ export function IshikawaVisualAnalysis({
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loadingAi, setLoadingAi] = useState(false);
-  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [saveState, setSaveState] = useState<AutoSaveState>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [geometry, setGeometry] = useState<Geometry | null>(null);
 
@@ -272,35 +267,6 @@ export function IshikawaVisualAnalysis({
   function saveIfDirty() {
     if (dirtyRef.current) queueSave();
   }
-
-  // Semeadura vinda do Pareto: adiciona as causas vitais na espinha da categoria
-  // correspondente (sem repetir títulos já existentes).
-  const seedConsumedRef = useRef(false);
-  useEffect(() => {
-    if (!seedCauses?.length) {
-      // seed consumido/limpo — libera uma próxima rodada vinda do Pareto
-      seedConsumedRef.current = false;
-      return;
-    }
-    if (seedConsumedRef.current || !canEdit) return;
-    seedConsumedRef.current = true;
-    const existingTitles = new Set(causesRef.current.map((cause) => cause.title.trim().toLowerCase()));
-    const additions: IshikawaCause[] = [];
-    for (const seed of seedCauses) {
-      const title = String(seed.title ?? '').trim();
-      if (!title || existingTitles.has(title.toLowerCase())) continue;
-      existingTitles.add(title.toLowerCase());
-      additions.push(makeCause({ category: getCategory(seed.category ?? 'METHOD').key, title }));
-    }
-    if (additions.length) {
-      commit([...causesRef.current, ...additions]);
-      toast.success(`${additions.length} causa(s) vital(is) do Pareto adicionada(s) ao Ishikawa`);
-    } else {
-      toast.info('As causas vitais do Pareto já estão no Ishikawa.');
-    }
-    onSeedConsumed?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seedCauses, canEdit]);
 
   function openAdd(category = 'METHOD') {
     setDraft({ category, title: '' });
@@ -520,7 +486,7 @@ export function IshikawaVisualAnalysis({
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {canEdit && <IshikawaSaveStatus state={saving && saveState !== 'error' ? 'saving' : saveState} lastSavedAt={lastSavedAt} onRetry={queueSave} />}
+          {canEdit && <AutoSaveStatus state={saving && saveState !== 'error' ? 'saving' : saveState} lastSavedAt={lastSavedAt} onRetry={queueSave} />}
           <Button size="sm" variant="outline" onClick={exportImage}>
             <Download className="mr-2 h-4 w-4" />
             Exportar
@@ -950,30 +916,6 @@ const FishHead = forwardRef<HTMLDivElement, { problem: string }>(({ problem }, r
   </div>
 ));
 FishHead.displayName = 'FishHead';
-
-function IshikawaSaveStatus({ state, lastSavedAt, onRetry }: { state: SaveState; lastSavedAt: string | null; onRetry: () => void }) {
-  if (state === 'saving') {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Salvando…
-      </span>
-    );
-  }
-  if (state === 'error') {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-destructive">
-        <AlertTriangle className="h-3.5 w-3.5" /> Falha ao salvar
-        <button type="button" className="underline underline-offset-2" onClick={onRetry}>Tentar de novo</button>
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-      <CircleCheck className="h-3.5 w-3.5 text-emerald-600" />
-      {state === 'saved' && lastSavedAt ? `Salvo às ${lastSavedAt}` : 'Salvamento automático'}
-    </span>
-  );
-}
 
 function Legend({ canEdit }: { canEdit: boolean }) {
   return (

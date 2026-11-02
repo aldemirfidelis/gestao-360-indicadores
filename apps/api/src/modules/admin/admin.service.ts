@@ -72,11 +72,10 @@ const PARAMETER_CATEGORIES: Array<{ code: string; name: string; module: string; 
     code: 'METODOS_ANALISE_CAUSA',
     name: 'Metodos de análise de causa',
     module: 'Tratativas',
-    description: 'Metodos como 5 Porques, Ishikawa, Pareto, PDCA e FCA.',
+    description: 'Metodos como 5 Porques, Ishikawa, PDCA e FCA.',
     items: [
       { code: 'FIVE_WHYS', name: '5 Porques' },
       { code: 'ISHIKAWA', name: 'Ishikawa' },
-      { code: 'PARETO', name: 'Pareto' },
       { code: 'PDCA', name: 'PDCA' },
       { code: 'FCA', name: 'FCA' },
       { code: 'MASP', name: 'MASP' },

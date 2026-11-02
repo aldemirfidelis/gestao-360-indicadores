@@ -14,12 +14,10 @@ import { IshikawaVisualAnalysis } from '@/components/platform/ishikawa-visual-an
 import { PDCAVisualAnalysis } from '@/components/platform/pdca-visual-analysis';
 import { FiveWTwoHVisualAnalysis } from '@/components/platform/five-w-two-h-visual-analysis';
 import { FiveWhysVisualAnalysis } from '@/components/platform/five-whys-visual-analysis';
-import { ParetoVisualAnalysis, type ParetoItem } from '@/components/platform/pareto-visual-analysis';
 
 const TOOL_LABEL = ANALYSIS_METHOD_LABEL;
-// Pareto abre a sequência (prioriza as causas), mas é OPCIONAL: a faixa-guia
-// permite ir direto ao Ishikawa sem quebrar a análise.
-const VISIBLE_ANALYSIS_METHODS = ['PARETO', 'ISHIKAWA', 'FIVE_WHYS', 'FIVE_W_TWO_H', 'PDCA'] as const;
+// Sequência do método: Ishikawa → 5 Porquês → 5W2H → PDCA (o Pareto saiu em 2026-11).
+const VISIBLE_ANALYSIS_METHODS = ['ISHIKAWA', 'FIVE_WHYS', 'FIVE_W_TWO_H', 'PDCA'] as const;
 
 /**
  * Ferramentas reais de análise de causa (5 Porquês, Ishikawa 6M, MASP, PDCA...).
@@ -78,15 +76,14 @@ export function AnalysisWorkspace({
   title?: string;
   description?: string;
 }) {
-  // Sem análise ainda → abre no passo 1 da sequência (Pareto, opcional);
-  // com análise salva → volta para a ferramenta usada; método legado
-  // não-visível (ex.: MASP) → cai no Ishikawa.
-  // O Ishikawa espera cada salvamento terminar (fila); as demais ferramentas só disparam.
+  // Ishikawa e PDCA esperam cada salvamento terminar (fila); as demais ferramentas só disparam.
   const persist = (payload: AnalysisPayload, options?: AnalysisSaveOptions) => Promise.resolve(onSave(payload, options));
   const fire = (payload: AnalysisPayload) => {
     persist(payload).catch(() => undefined);
   };
-  const preferredMethod = action.analysisTool ?? action.analysisSessions[0]?.method ?? 'PARETO';
+  // Sem análise ainda → abre no passo 1 da sequência (Ishikawa); com análise salva →
+  // volta para a ferramenta usada; método fora da sequência (MASP, Pareto antigo) → Ishikawa.
+  const preferredMethod = action.analysisTool ?? action.analysisSessions[0]?.method ?? 'ISHIKAWA';
   const initialMethod = isVisibleAnalysisMethod(preferredMethod) ? preferredMethod : 'ISHIKAWA';
   const session =
     action.analysisSessions.find((item) => item.method === initialMethod) ??
@@ -110,13 +107,10 @@ export function AnalysisWorkspace({
   const anchoredRootCauses: Array<{ cause: string; rootCause: string }> = (ishikawa ?? [])
     .filter((c: any) => (c?.rootCause ?? '').trim())
     .map((c: any) => ({ cause: c.title || c.description || 'Causa', rootCause: String(c.rootCause).trim() }));
-  // Encadeamento: causas vitais do Pareto semeiam o Ishikawa (opcional).
-  const [seedIshikawaCauses, setSeedIshikawaCauses] = useState<Array<{ title: string; category?: string }> | null>(null);
   const ishikawaSession = action.analysisSessions.find((item) => item.method === 'ISHIKAWA');
   const pdcaSession = action.analysisSessions.find((item) => item.method === 'PDCA');
   const fiveW2HSession = action.analysisSessions.find((item) => item.method === 'FIVE_W_TWO_H');
   const fiveWhysSession = action.analysisSessions.find((item) => item.method === 'FIVE_WHYS');
-  const paretoSession = action.analysisSessions.find((item) => item.method === 'PARETO');
 
   // Quando o 5 Porquês está investigando uma causa do Ishikawa, o quadro é o DAQUELA
   // causa (persistido nela), não a sessão única — assim cada causa tem sua análise.
@@ -150,22 +144,6 @@ export function AnalysisWorkspace({
       </div>
 
       <AnalysisSequenceHint method={method} onSelect={setMethod} />
-
-      {method === 'PARETO' && (
-        <ParetoVisualAnalysis
-          actionId={action.id}
-          session={paretoSession}
-          saving={saving}
-          canEdit={canEdit}
-          onSendToIshikawa={(causes) => {
-            setSeedIshikawaCauses(causes);
-            setMethod('ISHIKAWA');
-          }}
-          onSave={(items: ParetoItem[]) =>
-            fire({ method: 'PARETO', problem, rootCause: consolidatedRootText() || rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items } })
-          }
-        />
-      )}
 
       {method === 'FIVE_WHYS' && (
         <FiveWhysVisualAnalysis
@@ -219,8 +197,6 @@ export function AnalysisWorkspace({
           users={users}
           saving={saving}
           canEdit={canEdit}
-          seedCauses={seedIshikawaCauses}
-          onSeedConsumed={() => setSeedIshikawaCauses(null)}
           onRootCauseChange={setRootCause}
           onSendToFiveWhys={(causeText, causeId) => {
             const text = String(causeText ?? '').trim();
@@ -261,7 +237,10 @@ export function AnalysisWorkspace({
           onRootCauseChange={setRootCause}
           onSave={(stages, nextRootCause = rootCause) => {
             setPdcaSteps(stages);
-            fire({ method, problem, rootCause: consolidatedRootText() || nextRootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps: stages });
+            return persist(
+              { method, problem, rootCause: consolidatedRootText() || nextRootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps: stages },
+              { silent: true },
+            );
           }}
         />
       )}
