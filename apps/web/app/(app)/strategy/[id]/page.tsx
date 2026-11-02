@@ -7,11 +7,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import ReactFlow, {
   Background,
+  ConnectionLineType,
   ConnectionMode,
+  Controls,
+  EdgeLabelRenderer,
   Handle,
+  MarkerType,
+  MiniMap,
   NodeResizer,
+  NodeToolbar,
   Position,
   getRectOfNodes,
+  getSmoothStepPath,
   getTransformForBounds,
   useEdgesState,
   useNodesState,
@@ -19,8 +26,10 @@ import ReactFlow, {
   ReactFlowProvider,
   type Connection,
   type Edge,
+  type EdgeChange,
   type EdgeProps,
   type Node,
+  type NodeChange,
   type NodeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -29,23 +38,25 @@ import {
   AlertTriangle,
   ArrowRight,
   Calendar,
+  Check,
   ChevronDown,
+  CircleCheck,
   Circle,
   ClipboardList,
-  Compass,
   Download,
   ExternalLink,
-  Filter,
-  GripVertical,
   History,
+  LayoutGrid,
   Layers,
   Link2,
+  Loader2,
   Mail,
   Maximize2,
   Minimize2,
   Monitor,
   Network,
   Move,
+  PanelRightOpen,
   Pencil,
   Plus,
   Presentation,
@@ -78,6 +89,21 @@ import {
 import { api, ApiError } from '@/lib/api';
 import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
 import { ACTION_PRIORITY_LABEL, ACTION_STATUS_LABEL } from '@/lib/labels';
+import {
+  CARD_MIN_HEIGHT,
+  CARD_MIN_WIDTH,
+  LANE_HEADER_WIDTH,
+  LAYOUT_GRID,
+  arrangeLayout,
+  cardPosition,
+  deriveLayout,
+  dropLane,
+  layoutChanges,
+  moveCards,
+  resizeCard,
+  type LayoutChanges,
+  type MapLayout,
+} from '@/lib/strategy-map-layout';
 import { useVision360 } from '@/components/ui/vision360-context';
 
 interface Perspective {
@@ -198,11 +224,6 @@ interface StrategyOptions {
   users: UserOption[];
 }
 
-const LANE_HEIGHT = 230;
-const LANE_WIDTH = 1320;
-const LANE_X = 0;
-const OBJECTIVE_START_X = 300;
-
 const STATUS_LABEL: Record<string, string> = {
   PLANNED: 'Planejado',
   ON_TRACK: 'No prazo',
@@ -314,56 +335,58 @@ const PERSPECTIVE_PRESETS = [
   { name: 'Custos', kind: 'COSTS', color: '#ef4444', icon: '$' },
 ];
 
-function PerspectiveLane({
-  data,
-  selected,
-}: NodeProps<{
+interface LaneData {
   perspective: Perspective;
   objectiveCount: number;
   editMode: boolean;
-  onResize?: (width: number, height: number) => void;
-}>) {
+  isDropTarget: boolean;
+  onAddObjective: (perspectiveId: string) => void;
+}
+
+// Faixa da perspectiva: fundo fixo que não captura o mouse, então arrastar o
+// fundo move o mapa. Só o rótulo responde: o clique seleciona a perspectiva.
+function PerspectiveLane({ data }: NodeProps<LaneData>) {
   const perspective = data.perspective;
   const color = perspective.color ?? '#64748b';
 
-  const laneStyle: React.CSSProperties = {
-    borderColor: color,
-    background: `linear-gradient(to right, ${color}1a, ${color}05), hsl(var(--background))`,
-  };
-
   return (
     <div
-      className="relative h-full w-full overflow-hidden rounded-lg border-2 shadow-sm"
-      style={laneStyle}
+      className="flex h-full w-full overflow-hidden rounded-xl border transition-shadow"
+      style={{
+        borderColor: `${color}66`,
+        background: `linear-gradient(to right, ${color}${data.isDropTarget ? '30' : '14'}, ${color}05), hsl(var(--background))`,
+        boxShadow: data.isDropTarget ? `0 0 0 3px ${color}` : undefined,
+      }}
     >
-      {data.editMode && (
-        <NodeResizer
-          minWidth={520}
-          minHeight={150}
-          isVisible={selected}
-          handleStyle={{ background: color }}
-          lineStyle={{ borderColor: color }}
-          onResizeEnd={(_, params) => data.onResize?.(Math.round(params.width), Math.round(params.height))}
-        />
-      )}
-      <div className="flex h-full">
-        <div
-          className="flex w-[68px] shrink-0 items-center justify-center"
-          style={{ background: color }}
-        >
-          <div
-            className="select-none whitespace-nowrap text-xl font-bold uppercase tracking-wide text-white drop-shadow-sm"
-            style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+      <div
+        className="nopan flex shrink-0 cursor-pointer select-none flex-col justify-center gap-1.5 px-4 text-white"
+        style={{ width: LANE_HEADER_WIDTH, background: color, pointerEvents: 'all' }}
+        title={perspective.description || `Perspectiva ${perspective.name}`}
+      >
+        <div className="text-sm font-bold uppercase leading-tight tracking-wide drop-shadow-sm">{perspective.name}</div>
+        <div className="text-[11px] font-medium text-white/85">
+          {data.objectiveCount} {data.objectiveCount === 1 ? 'objetivo' : 'objetivos'}
+        </div>
+        {data.editMode && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              data.onAddObjective(perspective.id);
+            }}
+            className="mt-1 inline-flex w-fit items-center gap-1 rounded-md bg-white/20 px-2 py-1 text-[11px] font-semibold transition hover:bg-white/35"
           >
-            {perspective.name}
-          </div>
-        </div>
-        <div className="min-h-full flex-1 p-3">
-          {perspective.description && (
-            <p className="line-clamp-3 text-xs text-muted-foreground">{perspective.description}</p>
-          )}
-        </div>
+            <Plus className="h-3 w-3" /> Objetivo
+          </button>
+        )}
       </div>
+      {data.isDropTarget && (
+        <div className="flex flex-1 items-start justify-end p-3">
+          <span className="rounded-md px-2 py-1 text-xs font-semibold text-white shadow" style={{ background: color }}>
+            Soltar em {perspective.name}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -403,139 +426,92 @@ function objectiveHoverSummary(objective: Objective) {
   };
 }
 
-function ObjectiveNode({
-  data,
-  selected,
-}: NodeProps<{ objective: Objective; selected: boolean; editMode: boolean; propagated: boolean }>) {
+interface ObjectiveNodeData {
+  objective: Objective;
+  editMode: boolean;
+  onResizeEnd: (objectiveId: string, box: { x: number; y: number; width: number; height: number }) => void;
+  onStartLink: (objectiveId: string) => void;
+  onOpenDetails: (objectiveId: string) => void;
+}
+
+// Pontos de ligação centrados nas bordas, para não disputar o arraste do card.
+const HANDLE_SIDES = [
+  { id: 'top', position: Position.Top, style: { top: -8 } },
+  { id: 'right', position: Position.Right, style: { right: -8 } },
+  { id: 'bottom', position: Position.Bottom, style: { bottom: -8 } },
+  { id: 'left', position: Position.Left, style: { left: -8 } },
+] as const;
+
+function ObjectiveNode({ id, data, selected }: NodeProps<ObjectiveNodeData>) {
   const objective = data.objective;
   const light = objective.aggregateLight;
   const isDarkColor = light === 'GREEN' || light === 'RED';
   const summary = objectiveHoverSummary(objective);
   return (
     <div
-      tabIndex={0}
       className={cn(
-        'group relative flex h-full w-full flex-col rounded-lg border-2 p-3 shadow-md transition focus:outline-none',
+        'group relative flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 px-4 py-3 text-center shadow-md transition-shadow',
         LIGHT_CLASS[light] ?? LIGHT_CLASS.GRAY,
-        (selected || data.selected) && 'ring-2 ring-primary',
+        data.editMode && 'cursor-grab active:cursor-grabbing',
+        selected && 'shadow-xl ring-4 ring-primary/50',
       )}
     >
       {data.editMode && (
-        <NodeResizer
-          minWidth={220}
-          minHeight={130}
-          isVisible={selected || data.selected}
-          handleStyle={{ background: 'hsl(var(--primary))' }}
-          lineStyle={{ borderColor: 'hsl(var(--primary))' }}
-        />
+        <>
+          <NodeResizer
+            minWidth={CARD_MIN_WIDTH}
+            minHeight={CARD_MIN_HEIGHT}
+            isVisible={selected}
+            handleStyle={{ width: 10, height: 10, borderRadius: 3, background: 'hsl(var(--primary))', border: '2px solid white' }}
+            lineStyle={{ borderColor: 'hsl(var(--primary))' }}
+            onResizeEnd={(_, params) => data.onResizeEnd(id, params)}
+          />
+          <NodeToolbar position={Position.Top} offset={12}>
+            <div className="flex items-center gap-1 rounded-lg border bg-background p-1 shadow-lg">
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => data.onStartLink(id)}>
+                <Link2 className="mr-1 h-3.5 w-3.5" /> Ligar a…
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => data.onOpenDetails(id)}>
+                <PanelRightOpen className="mr-1 h-3.5 w-3.5" /> Detalhes
+              </Button>
+            </div>
+          </NodeToolbar>
+        </>
       )}
-      <Handle
-        id="left"
-        type="source"
-        position={Position.Left}
-        className={cn(
-          "!h-5 !w-5 !bg-transparent !border-0 flex items-center justify-center -translate-x-1 !absolute",
-          data.editMode ? "group-hover:opacity-100 opacity-0 transition-opacity duration-200 pointer-events-auto" : "!pointer-events-none !opacity-0"
-        )}
-        style={{ left: 0 }}
-      >
-        <span className="h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background shadow-md hover:scale-125 transition-transform duration-150 animate-pulse" />
-      </Handle>
-      <Handle
-        id="top"
-        type="source"
-        position={Position.Top}
-        className={cn(
-          "!h-5 !w-5 !bg-transparent !border-0 flex items-center justify-center -translate-y-1 !absolute",
-          data.editMode ? "group-hover:opacity-100 opacity-0 transition-opacity duration-200 pointer-events-auto" : "!pointer-events-none !opacity-0"
-        )}
-        style={{ top: 0 }}
-      >
-        <span className="h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background shadow-md hover:scale-125 transition-transform duration-150 animate-pulse" />
-      </Handle>
-      <div className="flex h-full flex-1 flex-col items-center justify-center gap-2 px-2 text-center">
-        <div className={cn("line-clamp-3 text-lg font-bold leading-tight", isDarkColor ? "text-white" : "text-foreground")}>
-          {objective.name}
-        </div>
-        <div className={cn("text-[11px]", isDarkColor ? "text-white/80" : "text-muted-foreground")}>
-          {summary.responsible}
-        </div>
-        {data.editMode && (
-          <GripVertical className={cn("absolute right-2 top-2 h-4 w-4 shrink-0", isDarkColor ? "text-white/70" : "text-muted-foreground")} />
-        )}
+      {HANDLE_SIDES.map((side) => (
+        <Handle
+          key={side.id}
+          id={side.id}
+          type="source"
+          position={side.position}
+          isConnectable={data.editMode}
+          title={data.editMode ? 'Arraste até outro objetivo para criar uma ligação' : undefined}
+          style={side.style}
+          className={cn(
+            '!h-4 !w-4 !rounded-full !border-2 !border-white !bg-primary !shadow-md transition-opacity',
+            data.editMode ? 'opacity-0 hover:ring-4 hover:ring-primary/30 group-hover:opacity-100' : '!pointer-events-none opacity-0',
+            data.editMode && selected && 'opacity-100',
+          )}
+        />
+      ))}
+      <div className={cn('line-clamp-3 text-[15px] font-bold leading-snug', isDarkColor ? 'text-white' : 'text-foreground')}>
+        {objective.name}
       </div>
-
-      {/* Tooltip flutuante de hover removido a pedido (sem usabilidade). Os
-          detalhes do objetivo ficam no painel lateral (drill-down) ao clicar. */}
-      <Handle
-        id="right"
-        type="source"
-        position={Position.Right}
-        className={cn(
-          "!h-5 !w-5 !bg-transparent !border-0 flex items-center justify-center translate-x-1 !absolute",
-          data.editMode ? "group-hover:opacity-100 opacity-0 transition-opacity duration-200 pointer-events-auto" : "!pointer-events-none !opacity-0"
-        )}
-        style={{ right: 0 }}
-      >
-        <span className="h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background shadow-md hover:scale-125 transition-transform duration-150 animate-pulse" />
-      </Handle>
-      <Handle
-        id="bottom"
-        type="source"
-        position={Position.Bottom}
-        className={cn(
-          "!h-5 !w-5 !bg-transparent !border-0 flex items-center justify-center translate-y-1 !absolute",
-          data.editMode ? "group-hover:opacity-100 opacity-0 transition-opacity duration-200 pointer-events-auto" : "!pointer-events-none !opacity-0"
-        )}
-        style={{ bottom: 0 }}
-      >
-        <span className="h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background shadow-md hover:scale-125 transition-transform duration-150 animate-pulse" />
-      </Handle>
+      <div className={cn('line-clamp-1 text-[11px]', isDarkColor ? 'text-white/80' : 'text-muted-foreground')}>
+        {summary.responsible}
+      </div>
     </div>
   );
 }
 
-function getOrthogonalPath({
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  controlX,
-  controlY,
-}: {
-  sourceX: number;
-  sourceY: number;
-  targetX: number;
-  targetY: number;
-  sourcePosition?: Position;
-  targetPosition?: Position;
-  controlX: number;
-  controlY: number;
-}) {
-  const targetIsHorizontal = targetPosition === Position.Left || targetPosition === Position.Right;
-  const routeHorizontalFirst = !targetIsHorizontal;
-
-  const points = routeHorizontalFirst
-    ? [
-        { x: sourceX, y: sourceY },
-        { x: controlX, y: sourceY },
-        { x: controlX, y: controlY },
-        { x: targetX, y: controlY },
-        { x: targetX, y: targetY },
-      ]
-    : [
-        { x: sourceX, y: sourceY },
-        { x: sourceX, y: controlY },
-        { x: controlX, y: controlY },
-        { x: controlX, y: targetY },
-        { x: targetX, y: targetY },
-      ];
-
-  return points
-    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-    .join(' ');
+interface StrategyEdgeData {
+  kind: string;
+  label?: string | null;
+  description?: string | null;
+  editMode?: boolean;
+  onRouteChange: (edgeId: string, offsetX: number, offsetY: number) => void;
+  onEdit: (edgeId: string) => void;
+  onRemove: (edgeId: string) => void;
 }
 
 function StrategyEdge({
@@ -548,13 +524,8 @@ function StrategyEdge({
   targetPosition,
   data,
   selected,
-}: EdgeProps<{
-  kind: string;
-  label?: string | null;
-  description?: string | null;
-  editMode?: boolean;
-  onEdgeDragStop?: (edgeId: string, offsetX: number, offsetY: number) => void;
-}>) {
+  markerEnd,
+}: EdgeProps<StrategyEdgeData>) {
   const [isDragging, setIsDragging] = useState(false);
   const [localOffset, setLocalOffset] = useState({ x: 0, y: 0 });
   const startDragPos = useRef({ x: 0, y: 0 });
@@ -581,22 +552,22 @@ function StrategyEdge({
     }
   }, [parsedOffset, isDragging]);
 
-  const midX = (sourceX + targetX) / 2;
-  const midY = (sourceY + targetY) / 2;
-  const controlX = midX + localOffset.x;
-  const controlY = midY + localOffset.y;
-
-  const path = getOrthogonalPath({
+  // O desvio gravado desloca o trecho do meio da linha (o mesmo campo usado
+  // pelas rotas antigas), então ligações já ajustadas mantêm o caminho.
+  const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
+    sourcePosition,
     targetX,
     targetY,
-    sourcePosition,
     targetPosition,
-    controlX,
-    controlY,
+    borderRadius: 14,
+    centerX: (sourceX + targetX) / 2 + localOffset.x,
+    centerY: (sourceY + targetY) / 2 + localOffset.y,
   });
   const meta = kindMeta(data?.kind);
+  const title = data?.label && data.label !== meta.label ? `${meta.label}: ${data.label}` : meta.label;
+  const editing = Boolean(selected && data?.editMode);
 
   const getPointerPosition = (event: React.PointerEvent<SVGCircleElement>) => {
     const svg = event.currentTarget.ownerSVGElement;
@@ -641,7 +612,7 @@ function StrategyEdge({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     setIsDragging(false);
-    data?.onEdgeDragStop?.(
+    data?.onRouteChange(
       id,
       Math.round(currentOffset.current.x),
       Math.round(currentOffset.current.y),
@@ -650,46 +621,27 @@ function StrategyEdge({
 
   return (
     <>
-      <style>{`
-        @keyframes edge-flow-dash {
-          from {
-            stroke-dashoffset: 24;
-          }
-          to {
-            stroke-dashoffset: 0;
-          }
-        }
-        .edge-animated-selected {
-          stroke-dasharray: 8 4 !important;
-          animation: edge-flow-dash 0.6s linear infinite !important;
-        }
-      `}</style>
-      <path
-        d={path}
-        fill="none"
-        stroke="transparent"
-        strokeWidth={18}
-        className="react-flow__edge-interaction"
-      />
+      <path d={path} fill="none" stroke="transparent" strokeWidth={22} className="react-flow__edge-interaction">
+        <title>{title}</title>
+      </path>
       <path
         id={id}
         d={path}
-        markerEnd="url(#g360-arrow)"
+        markerEnd={markerEnd}
         fill="none"
         style={{
           stroke: meta.color,
-          strokeWidth: selected ? 4.5 : 3,
-          opacity: 1,
-          strokeDasharray: selected ? undefined : (data?.kind === 'depende' ? '8 5' : undefined),
+          strokeWidth: selected ? 4 : 2.5,
+          strokeDasharray: data?.kind === 'depende' ? '8 5' : undefined,
           filter: 'drop-shadow(0 1px 1px rgba(15, 23, 42, 0.18))',
         }}
-        className={cn("react-flow__edge-path", selected ? 'edge-animated-selected' : '')}
+        className="react-flow__edge-path"
       />
-      {data?.editMode && (
+      {editing && (
         <g>
           <circle
-            cx={controlX}
-            cy={controlY}
+            cx={labelX}
+            cy={labelY}
             r={8}
             fill="#ffffff"
             stroke={meta.color}
@@ -700,16 +652,28 @@ function StrategyEdge({
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
-            className="nodrag nopan shadow-sm hover:scale-125 transition-transform"
-          />
-          <circle
-            cx={controlX}
-            cy={controlY}
-            r={3.5}
-            fill={meta.color}
-            style={{ pointerEvents: 'none' }}
-          />
+            className="nodrag nopan"
+          >
+            <title>Arraste para desviar a linha</title>
+          </circle>
+          <circle cx={labelX} cy={labelY} r={3.5} fill={meta.color} style={{ pointerEvents: 'none' }} />
         </g>
+      )}
+      {editing && !isDragging && (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan absolute flex items-center gap-1 rounded-lg border bg-background p-1 shadow-lg"
+            style={{ transform: `translate(-50%, calc(-100% - 14px)) translate(${labelX}px, ${labelY}px)`, pointerEvents: 'all' }}
+          >
+            <span className="px-1.5 text-[11px] font-semibold" style={{ color: meta.color }}>{meta.label}</span>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => data?.onEdit(id)}>
+              <Pencil className="mr-1 h-3 w-3" /> Editar
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive hover:text-destructive" onClick={() => data?.onRemove(id)}>
+              <Trash2 className="mr-1 h-3 w-3" /> Remover
+            </Button>
+          </div>
+        </EdgeLabelRenderer>
       )}
     </>
   );
@@ -731,8 +695,10 @@ function StrategyMapPageInner() {
   const { open: openVision360 } = useVision360();
   const qc = useQueryClient();
   const reactFlow = useReactFlow();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const authScope = `${user?.id ?? 'anon'}:${user?.companyId ?? 'none'}`;
+  // A demonstração e perfis só de consulta não veem o modo edição (o backend recusaria).
+  const canEdit = !user?.isDemo && hasPermission(['strategy:objectives:update', 'strategy:manage']);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -751,6 +717,7 @@ function StrategyMapPageInner() {
   const [orgNodeToAttach, setOrgNodeToAttach] = useState('');
   const [drawerObjective, setDrawerObjective] = useState<Objective | null>(null);
   const [pendingConnection, setPendingConnection] = useState<Connection | null>(null);
+  const [pendingTarget, setPendingTarget] = useState('');
   const [pendingKind, setPendingKind] = useState<string>('impacta');
   const [pendingLabel, setPendingLabel] = useState<string>('');
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null);
@@ -766,9 +733,15 @@ function StrategyMapPageInner() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [period, setPeriod] = useState('');
   const [periodOptions, setPeriodOptions] = useState<string[]>([]);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const pendingSaves = useRef(0);
+  const dropTargetRef = useRef<string | null>(null);
+  const editModeRef = useRef(editMode);
 
+  const mapQueryKey = useMemo(() => ['strategy', 'map', authScope, id, period] as const, [authScope, id, period]);
   const mapQuery = useQuery<StrategicMap>({
-    queryKey: ['strategy', 'map', authScope, id, period],
+    queryKey: mapQueryKey,
     queryFn: () =>
       api<StrategicMap>(`/strategy/maps/${id}${period ? `?periodRef=${encodeURIComponent(period)}` : ''}`),
     staleTime: 30_000,
@@ -887,31 +860,158 @@ function StrategyMapPageInner() {
     setEditingEdgeId(edgeId);
   }, []);
 
-  // Persistencia "silenciosa" de posicao/tamanho: NAO mostra toast nem invalida o
-  // mapa (o estado local do ReactFlow ja reflete a mudanca). Evita o refetch pesado
-  // no Neon a cada arrasto/resize, que era a causa do travamento ao organizar.
-  const resizeTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const persistPerspective = useCallback((perspectiveId: string, patch: Record<string, number>) => {
-    const timers = resizeTimers.current;
-    if (timers[perspectiveId]) clearTimeout(timers[perspectiveId]);
-    timers[perspectiveId] = setTimeout(() => {
-      api(`/strategy/perspectives/${perspectiveId}`, { method: 'PATCH', json: patch }).catch(() => {});
-    }, 400);
-  }, []);
-  const persistObjective = useCallback((objectiveId: string, patch: Record<string, number>) => {
-    api(`/strategy/objectives/${objectiveId}`, { method: 'PATCH', json: patch }).catch(() => {});
-  }, []);
+  const layout = useMemo(() => (map ? deriveLayout(map.perspectives, map.objectives) : null), [map]);
+  const layoutRef = useRef(layout);
+  useEffect(() => {
+    layoutRef.current = layout;
+  }, [layout]);
+  useEffect(() => {
+    editModeRef.current = editMode;
+  }, [editMode]);
 
-  const handlePerspectiveResize = useCallback(
-    (perspectiveId: string, width: number, height: number) => {
-      persistPerspective(perspectiveId, { width, height });
+  // Salvamento automático do layout. O cache do mapa muda na hora porque o canvas
+  // é reconstruído a partir dele: sem isso o card voltaria para a posição antiga
+  // ao clicar em qualquer lugar. As gravações vão em fila para não chegarem fora
+  // de ordem ao servidor.
+  const commitLayout = useCallback(
+    (next: MapLayout) => {
+      const current = mapRef.current;
+      if (!current) return;
+      const changes = layoutChanges(next, current.perspectives, current.objectives);
+      if (!changes.objectives.length && !changes.lanes.length) return;
+      void qc.cancelQueries({ queryKey: mapQueryKey });
+      qc.setQueryData<StrategicMap>(mapQueryKey, (old) => (old ? applyLayoutChanges(old, changes) : old));
+      pendingSaves.current += 1;
+      setSaveState('saving');
+      saveQueue.current = saveQueue.current
+        .then(() => api(`/strategy/maps/${id}/layout`, { method: 'PATCH', json: { nodes: changes.objectives, lanes: changes.lanes } }))
+        .then(() => {
+          pendingSaves.current -= 1;
+          if (pendingSaves.current === 0) setSaveState('saved');
+          // Outros períodos do mesmo mapa ainda guardam o layout anterior no cache.
+          void qc.invalidateQueries({ queryKey: ['strategy', 'map', authScope, id], refetchType: 'none' });
+        })
+        .catch((error: unknown) => {
+          pendingSaves.current -= 1;
+          setSaveState('error');
+          toast.error(error instanceof Error && error.message ? error.message : 'Não foi possível salvar o layout');
+          void qc.invalidateQueries({ queryKey: ['strategy', 'map', authScope, id] });
+        });
     },
-    [persistPerspective],
+    [authScope, id, mapQueryKey, qc],
   );
 
+  // Aplica o layout calculado nos nós já existentes, sem esperar o cache: o card
+  // encaixa na grade e na faixa no mesmo instante em que é solto.
+  const showLayout = useCallback(
+    (next: MapLayout) => {
+      dropTargetRef.current = null;
+      setNodes((current) =>
+        current.map((node) => {
+          if (node.type === 'perspectiveLane') {
+            const lane = next.lanes.find((item) => item.perspectiveId === node.id);
+            if (!lane) return node;
+            return {
+              ...node,
+              position: { x: 0, y: lane.top },
+              style: { ...node.style, width: next.width, height: lane.height },
+              width: next.width,
+              height: lane.height,
+              data: { ...node.data, isDropTarget: false },
+            };
+          }
+          const card = next.cards.get(node.id);
+          if (!card) return node;
+          return { ...node, position: cardPosition(next, card), style: { ...node.style, width: card.width, height: card.height } };
+        }),
+      );
+    },
+    [setNodes],
+  );
 
+  const showDropTarget = useCallback(
+    (laneId: string | null) => {
+      if (dropTargetRef.current === laneId) return;
+      dropTargetRef.current = laneId;
+      setNodes((current) =>
+        current.map((node) =>
+          node.type === 'perspectiveLane' ? { ...node, data: { ...node.data, isDropTarget: node.id === laneId } } : node,
+        ),
+      );
+    },
+    [setNodes],
+  );
 
+  const handleNodeDrag = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      const current = layoutRef.current;
+      const card = node.type === 'objective' ? current?.cards.get(node.id) : undefined;
+      if (!current || !card) return;
+      const lane = dropLane(current.lanes, card.perspectiveId, node.position.y + card.height / 2);
+      showDropTarget(lane && lane.perspectiveId !== card.perspectiveId ? lane.perspectiveId : null);
+    },
+    [showDropTarget],
+  );
 
+  const handleNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: Node, dragged: Node[]) => {
+      const current = layoutRef.current;
+      if (!current || !editModeRef.current) return;
+      const moves = (dragged?.length ? dragged : [node])
+        .filter((item) => item.type === 'objective')
+        .map((item) => ({ id: item.id, x: item.position.x, y: item.position.y }));
+      if (!moves.length) return;
+      const next = moveCards(current, moves);
+      for (const move of moves) {
+        const from = current.cards.get(move.id)?.perspectiveId;
+        const to = next.cards.get(move.id)?.perspectiveId;
+        if (!from || !to || from === to) continue;
+        const objective = mapRef.current?.objectives.find((item) => item.id === move.id);
+        const perspective = mapRef.current?.perspectives.find((item) => item.id === to);
+        toast.success(`"${objective?.name ?? 'Objetivo'}" agora está em ${perspective?.name ?? 'outra perspectiva'}`);
+      }
+      showLayout(next);
+      commitLayout(next);
+    },
+    [commitLayout, showLayout],
+  );
+
+  const handleResizeEnd = useCallback(
+    (objectiveId: string, box: { x: number; y: number; width: number; height: number }) => {
+      const current = layoutRef.current;
+      if (!current) return;
+      const next = resizeCard(current, objectiveId, box);
+      showLayout(next);
+      commitLayout(next);
+    },
+    [commitLayout, showLayout],
+  );
+
+  // Nada some do canvas sem passar pela API: remoções locais (tecla Delete) são ignoradas.
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => onNodesChange(changes.filter((change) => change.type !== 'remove')),
+    [onNodesChange],
+  );
+  const handleEdgesChange = useCallback(
+    (changes: EdgeChange[]) => onEdgesChange(changes.filter((change) => change.type !== 'remove')),
+    [onEdgesChange],
+  );
+
+  // Os nós recebem ações estáveis que leem a versão atual pelo ref; assim o
+  // canvas não é reconstruído a cada renderização da tela.
+  const actionsRef = useRef<(CanvasActions & { deleteRelation: (relationId: string) => void }) | null>(null);
+  const canvasActions = useMemo<CanvasActions>(
+    () => ({
+      addObjective: (perspectiveId) => actionsRef.current?.addObjective(perspectiveId),
+      startLink: (objectiveId) => actionsRef.current?.startLink(objectiveId),
+      openDetails: (objectiveId) => actionsRef.current?.openDetails(objectiveId),
+      resizeEnd: (objectiveId, box) => actionsRef.current?.resizeEnd(objectiveId, box),
+      editEdge: (edgeId) => actionsRef.current?.editEdge(edgeId),
+      removeEdge: (edgeId) => actionsRef.current?.removeEdge(edgeId),
+      routeEdge: (edgeId, offsetX, offsetY) => actionsRef.current?.routeEdge(edgeId, offsetX, offsetY),
+    }),
+    [],
+  );
 
   const computedEdges = useMemo(() => {
     const nodesMap = new Map(nodes.map((n) => [n.id, n]));
@@ -962,21 +1062,14 @@ function StrategyMapPageInner() {
     }
   }
 
-  function autoLayout() {
-    if (!map) return;
-    const updates = filteredObjectives.map((objective, index) => {
-      const laneIndex = map.perspectives.findIndex((p) => p.id === objective.perspectiveId);
-      const inLaneIndex = filteredObjectives.filter((o) => o.perspectiveId === objective.perspectiveId).findIndex((o) => o.id === objective.id);
-      const x = OBJECTIVE_START_X + (inLaneIndex % 4) * 320;
-      const y = Math.max(laneIndex, 0) * LANE_HEIGHT + 50 + Math.floor(inLaneIndex / 4) * 180;
-      return { id: objective.id, perspectiveId: objective.perspectiveId, position: index, positionX: x, positionY: y, width: objective.width ?? 260, height: objective.height ?? 150 };
-    });
-    api(`/strategy/maps/${id}/layout`, { method: 'PATCH', json: { nodes: updates } })
-      .then(() => {
-        toast.success('Layout reorganizado por perspectiva');
-        invalidate();
-      })
-      .catch((e: any) => toast.error(e?.message ?? 'Falha ao reorganizar layout'));
+  function arrangeMap() {
+    const current = layoutRef.current;
+    if (!current) return;
+    if (!window.confirm('Organizar os objetivos em linhas dentro de cada perspectiva? As posições atuais serão substituídas.')) return;
+    const next = arrangeLayout(current);
+    showLayout(next);
+    commitLayout(next);
+    window.setTimeout(() => reactFlow.fitView({ duration: 400, padding: 0.08 }), 60);
   }
 
   useEffect(() => {
@@ -1054,31 +1147,6 @@ function StrategyMapPageInner() {
     onError: (e: any) => toast.error(e?.message ?? 'Falha ao inativar objetivo'),
   });
 
-  const saveLayout = useMutation({
-    mutationFn: () =>
-      api(`/strategy/maps/${id}/layout`, {
-        method: 'PATCH',
-        json: {
-          nodes: nodes
-            .filter((node) => node.type === 'objective')
-            .map((node, index) => ({
-              id: node.id,
-              perspectiveId: perspectiveForY(map, node.position.y)?.id,
-              position: index,
-              positionX: Math.round(node.position.x),
-              positionY: Math.round(node.position.y),
-              width: Math.round(node.width ?? (node.style?.width as number | undefined) ?? 260),
-              height: Math.round(node.height ?? (node.style?.height as number | undefined) ?? 150),
-            })),
-        },
-      }),
-    onSuccess: () => {
-      toast.success('Layout salvo');
-      invalidate();
-    },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar layout'),
-  });
-
   const addRelation = useMutation({
     mutationFn: ({ connection, kind, label }: { connection: Connection; kind: string; label: string }) =>
       api('/strategy/relations', {
@@ -1097,6 +1165,7 @@ function StrategyMapPageInner() {
     onSuccess: () => {
       toast.success('Ligação criada');
       setPendingConnection(null);
+      setPendingTarget('');
       setPendingLabel('');
       setPendingKind('impacta');
       invalidate();
@@ -1157,18 +1226,22 @@ function StrategyMapPageInner() {
     });
   }, []);
 
+  // O canvas é reconstruído só quando o mapa, o filtro ou o modo mudam. Selecionar
+  // um card não reconstrói nada (antes reconstruía e desfazia o último arrasto).
   useEffect(() => {
-    if (!map) return;
-    const flowNodes = buildNodes(map, filteredObjectives, editMode, selectedId, handlePerspectiveResize);
-    const objectiveIds = new Set(filteredObjectives.map((objective) => objective.id));
-    const flowEdges = filteredObjectives.flatMap((objective) =>
-      objective.outRelations
-        .filter((relation) => objectiveIds.has(relation.to.id))
-        .map((relation) => toFlowEdge(relation, objective.id, handleEdgeDragStop, editMode)),
-    );
-    setNodes(flowNodes);
-    setEdges(flowEdges);
-  }, [editMode, filteredObjectives, map, selectedId, setEdges, setNodes, handlePerspectiveResize, handleEdgeDragStop]);
+    if (!map || !layout) return;
+    const flowNodes = buildNodes(map, layout, filteredObjectives, editMode, canvasActions);
+    const visibleIds = new Set(filteredObjectives.filter((objective) => layout.cards.has(objective.id)).map((objective) => objective.id));
+    const flowEdges = filteredObjectives
+      .filter((objective) => visibleIds.has(objective.id))
+      .flatMap((objective) =>
+        objective.outRelations
+          .filter((relation) => visibleIds.has(relation.to.id))
+          .map((relation) => toFlowEdge(relation, objective.id, editMode, canvasActions)),
+      );
+    setNodes((current) => keepSelection(current, flowNodes));
+    setEdges((current) => keepSelection(current, flowEdges));
+  }, [canvasActions, editMode, filteredObjectives, layout, map, setEdges, setNodes]);
 
   const removeRelation = useMutation({
     mutationFn: (relationId: string) => api(`/strategy/relations/${relationId}`, { method: 'DELETE' }),
@@ -1176,7 +1249,40 @@ function StrategyMapPageInner() {
       toast.success('Ligação removida');
       invalidate();
     },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao remover ligação'),
   });
+
+  useEffect(() => {
+    actionsRef.current = {
+      addObjective: (perspectiveId) => {
+        setObjectiveForm(defaultObjectiveForm(perspectiveId));
+        setObjectiveOpen(true);
+      },
+      startLink: (objectiveId) => {
+        setPendingConnection({ source: objectiveId, target: null, sourceHandle: null, targetHandle: null });
+        setPendingTarget('');
+        setPendingKind('impacta');
+        setPendingLabel('');
+      },
+      openDetails: (objectiveId) => {
+        const found = mapRef.current?.objectives.find((objective) => objective.id === objectiveId);
+        if (found) setDrawerObjective(found);
+      },
+      resizeEnd: handleResizeEnd,
+      editEdge: openEdgeEditor,
+      removeEdge: (edgeId) => {
+        if (window.confirm('Remover esta ligação?')) removeRelation.mutate(edgeId);
+      },
+      routeEdge: handleEdgeDragStop,
+      deleteRelation: (relationId) => removeRelation.mutate(relationId),
+    };
+  });
+
+  const handleEdgesDelete = useCallback((deleted: Edge[]) => {
+    if (!editModeRef.current || !deleted.length) return;
+    if (!window.confirm(deleted.length === 1 ? 'Remover esta ligação?' : `Remover ${deleted.length} ligações?`)) return;
+    deleted.forEach((edge) => actionsRef.current?.deleteRelation(edge.id));
+  }, []);
 
   const attachIndicator = useMutation({
     mutationFn: ({ objectiveId, indicatorId }: { objectiveId: string; indicatorId: string }) =>
@@ -1359,40 +1465,36 @@ function StrategyMapPageInner() {
         <div className="space-y-2">
           {!presentationMode && (
             <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-card px-2 py-1.5">
-              <Button
-                size="icon"
-                variant={editMode ? 'default' : 'outline'}
-                className="h-9 w-9"
-                onClick={() => setEditMode((value) => !value)}
-                title={editMode ? 'Modo edição' : 'Modo visualização'}
-                aria-label={editMode ? 'Modo edição' : 'Modo visualização'}
-              >
-                {editMode ? <Pencil className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
-              </Button>
-              <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => setPerspectiveOpen(true)} disabled={!editMode} title="Perspectiva" aria-label="Perspectiva">
-                <Layers className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                size="icon"
-                className="h-9 w-9"
-                onClick={() => {
-                  setObjectiveForm(defaultObjectiveForm(map.perspectives[0]?.id));
-                  setObjectiveOpen(true);
-                }}
-                disabled={!editMode || map.perspectives.length === 0}
-                title="Objetivo"
-                aria-label="Objetivo"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => saveLayout.mutate()} disabled={!editMode || saveLayout.isPending} title="Salvar layout" aria-label="Salvar layout">
-                <Save className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="icon" variant="outline" className="h-9 w-9" onClick={autoLayout} disabled={!editMode} title="Organizar" aria-label="Organizar">
-                <Compass className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => setPresentationMode(true)} title="Apresentar" aria-label="Apresentar">
-                <Presentation className="h-3.5 w-3.5" />
+              {canEdit && (
+                <Button size="sm" variant={editMode ? 'default' : 'outline'} className="h-9" onClick={() => setEditMode((value) => !value)}>
+                  {editMode ? <Check className="mr-1.5 h-4 w-4" /> : <Pencil className="mr-1.5 h-4 w-4" />}
+                  {editMode ? 'Concluir edição' : 'Editar mapa'}
+                </Button>
+              )}
+              {canEdit && editMode && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9"
+                    onClick={() => {
+                      setObjectiveForm(defaultObjectiveForm(map.perspectives[0]?.id));
+                      setObjectiveOpen(true);
+                    }}
+                    disabled={map.perspectives.length === 0}
+                  >
+                    <Plus className="mr-1.5 h-4 w-4" /> Objetivo
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-9" onClick={() => setPerspectiveOpen(true)}>
+                    <Layers className="mr-1.5 h-4 w-4" /> Perspectiva
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-9" onClick={arrangeMap} title="Distribui os objetivos em linhas dentro de cada perspectiva">
+                    <LayoutGrid className="mr-1.5 h-4 w-4" /> Organizar
+                  </Button>
+                </>
+              )}
+              <Button size="sm" variant="outline" className="h-9" onClick={() => setPresentationMode(true)}>
+                <Presentation className="mr-1.5 h-4 w-4" /> Apresentar
               </Button>
               <div className="ml-auto flex flex-wrap items-center gap-1.5">
                 {/* Período: combobox (não ícones — cada mês era um Calendar idêntico). */}
@@ -1425,7 +1527,12 @@ function StrategyMapPageInner() {
           )}
           <SectionCard
           title="Canvas estratégico"
-          description={editMode ? 'Arraste objetivos, conecte com drag-to-connect, redimensione pelos cantos e clique nas linhas para editar.' : 'Navegue, aproxime e clique no objetivo para abrir o detalhe. Passe o mouse para ver o resumo.'}
+          description={
+            editMode
+              ? 'Arraste os cards (solte sobre outra faixa para mudar a perspectiva), puxe os pontos azuis até outro objetivo para ligar e redimensione pelos cantos. Shift + arrastar seleciona vários. Tudo é salvo automaticamente.'
+              : 'Arraste o fundo para navegar, use a roda do mouse para aproximar e clique em um objetivo para ver o detalhe.'
+          }
+          actions={editMode ? <LayoutSaveStatus state={saveState} /> : undefined}
           contentClassName="p-0"
         >
           <div
@@ -1441,55 +1548,67 @@ function StrategyMapPageInner() {
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               connectionMode={ConnectionMode.Loose}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
+              connectionRadius={70}
+              connectionLineType={ConnectionLineType.SmoothStep}
+              connectionLineStyle={{ stroke: 'hsl(var(--primary))', strokeWidth: 2.5 }}
+              nodesDraggable={editMode}
+              nodesConnectable={editMode}
+              snapToGrid={editMode}
+              snapGrid={[LAYOUT_GRID, LAYOUT_GRID]}
+              nodeDragThreshold={4}
+              deleteKeyCode={editMode ? ['Delete', 'Backspace'] : null}
+              onNodesChange={handleNodesChange}
+              onEdgesChange={handleEdgesChange}
+              onEdgesDelete={handleEdgesDelete}
               onConnect={(connection) => {
                 if (!editMode || !connection.source || !connection.target) return;
                 if (connection.source === connection.target) return;
                 setPendingConnection(connection);
+                setPendingTarget('');
                 setPendingKind('impacta');
                 setPendingLabel('');
               }}
-              onNodeDragStop={(_, node) => {
-                if (!editMode) return;
-                if (node.type === 'objective') {
-                  persistObjective(node.id, {
-                    positionX: Math.round(node.position.x),
-                    positionY: Math.round(node.position.y),
-                  });
-                }
-                if (node.type === 'perspectiveLane') {
-                  persistPerspective(node.id, {
-                    positionX: Math.round(node.position.x),
-                    positionY: Math.round(node.position.y),
-                  });
-                }
-              }}
+              onNodeDrag={handleNodeDrag}
+              onNodeDragStop={handleNodeDragStop}
               onNodeClick={(_, node) => {
                 setSelectedId(node.id);
-                if (node.type === 'objective') {
+                // Na edição o clique só seleciona (o painel ao lado edita); na
+                // visualização ele abre o detalhe completo do objetivo.
+                if (node.type === 'objective' && !editMode) {
                   const found = map?.objectives.find((o) => o.id === node.id);
                   if (found) setDrawerObjective(found);
                 }
               }}
-              onEdgeClick={(_, edge) => {
-                if (!editMode) return;
-                openEdgeEditor(edge.id);
+              onNodeDoubleClick={(_, node) => {
+                if (node.type !== 'objective') return;
+                const found = map?.objectives.find((o) => o.id === node.id);
+                if (found) setDrawerObjective(found);
+              }}
+              onEdgeDoubleClick={(_, edge) => {
+                if (editMode) openEdgeEditor(edge.id);
               }}
               onPaneClick={() => setSelectedId(null)}
               fitView
-              minZoom={0.2}
+              fitViewOptions={{ padding: 0.08 }}
+              minZoom={0.15}
               maxZoom={2}
               proOptions={{ hideAttribution: true }}
             >
-              <svg width="0" height="0">
-                <defs>
-                  <marker id="g360-arrow" viewBox="0 0 10 10" markerWidth="6" markerHeight="6" refX="8" refY="5" orient="auto">
-                    <path d="M0,2 L8,5 L0,8 L2,5 z" fill="currentColor" />
-                  </marker>
-                </defs>
-              </svg>
               <Background gap={20} size={1} color="#cbd5e1" className="opacity-45" />
+              <Controls showInteractive={false} position="bottom-left" />
+              <MiniMap
+                pannable
+                zoomable
+                position="bottom-right"
+                className="hidden md:block"
+                maskColor="rgba(15, 23, 42, 0.08)"
+                nodeBorderRadius={6}
+                nodeColor={(node) =>
+                  node.type === 'objective'
+                    ? LIGHT_STROKE[(node.data as ObjectiveNodeData).objective.aggregateLight] ?? LIGHT_STROKE.GRAY
+                    : `${(node.data as LaneData).perspective.color ?? '#94a3b8'}33`
+                }
+              />
             </ReactFlow>
 
             <div className="absolute right-3 top-3 z-10 flex flex-wrap gap-1.5">
@@ -1503,7 +1622,7 @@ function StrategyMapPageInner() {
               )}
             </div>
 
-            <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 rounded-md border bg-background/95 px-4 py-1.5 text-[11px] shadow-sm backdrop-blur">
+            <div className="pointer-events-none absolute bottom-3 left-16 right-3 z-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 rounded-md border bg-background/95 px-4 py-1.5 text-[11px] shadow-sm backdrop-blur md:right-[236px]">
               <div className="flex items-center gap-2 font-semibold uppercase text-muted-foreground">
                 <Layers className="h-3 w-3" /> Tipos de relação:
               </div>
@@ -1724,22 +1843,39 @@ function StrategyMapPageInner() {
                 </div>
 
                 <div className="rounded-lg border p-3">
-                  <div className="mb-2 text-sm font-semibold">Ligacoes estratégicas</div>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold">Ligações estratégicas</span>
+                    {editMode && (
+                      <Button variant="outline" size="sm" onClick={() => canvasActions.startLink(selectedObjective.id)}>
+                        <Link2 className="mr-1 h-3.5 w-3.5" /> Nova ligação
+                      </Button>
+                    )}
+                  </div>
                   <div className="space-y-1 text-xs">
                     {selectedObjective.outRelations.map((relation) => (
                       <div key={relation.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1">
-                        <span className="truncate">Impacta {relation.to.name}</span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span style={{ background: kindMeta(relation.kind).color }} className="h-2 w-3 shrink-0 rounded" />
+                          <span className="truncate">{kindMeta(relation.kind).label} {relation.to.name}</span>
+                        </span>
                         {editMode && (
-                          <Button variant="ghost" size="sm" onClick={() => removeRelation.mutate(relation.id)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.confirm('Remover esta ligação?') && removeRelation.mutate(relation.id)}
+                          >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         )}
                       </div>
                     ))}
                     {selectedObjective.inRelations.map((relation) => (
-                      <div key={relation.id} className="rounded-md bg-muted/40 px-2 py-1">Impactado por {relation.from.name}</div>
+                      <div key={relation.id} className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1">
+                        <ArrowRight className="h-3 w-3 shrink-0 -scale-x-100" />
+                        <span className="truncate">{relation.from.name} ({kindMeta(relation.kind).label.toLowerCase()})</span>
+                      </div>
                     ))}
-                    {selectedObjective.outRelations.length + selectedObjective.inRelations.length === 0 && <p className="text-muted-foreground">Sem ligacoes cadastradas.</p>}
+                    {selectedObjective.outRelations.length + selectedObjective.inRelations.length === 0 && <p className="text-muted-foreground">Sem ligações cadastradas.</p>}
                   </div>
                 </div>
 
@@ -1752,7 +1888,17 @@ function StrategyMapPageInner() {
                   <Button
                     className="flex-1"
                     disabled={!editMode || updateObjective.isPending}
-                    onClick={() => updateObjective.mutate({ objectiveId: selectedObjective.id, patch: selectedObjectiveDraft })}
+                    onClick={() =>
+                      updateObjective.mutate({
+                        objectiveId: selectedObjective.id,
+                        // Trocar a perspectiva por aqui leva o card para a primeira vaga
+                        // livre da faixa nova; a posição antiga não vale na outra faixa.
+                        patch:
+                          selectedObjectiveDraft.perspectiveId !== selectedObjective.perspectiveId
+                            ? { ...selectedObjectiveDraft, positionX: 0, positionY: 0 }
+                            : selectedObjectiveDraft,
+                      })
+                    }
                   >
                     <Save className="mr-2 h-4 w-4" />
                     Salvar objetivo
@@ -1927,6 +2073,34 @@ function StrategyMapPageInner() {
             <p className="text-sm text-muted-foreground">
               Escolha o tipo de relação entre os objetivos selecionados.
             </p>
+            {pendingConnection && (
+              <div className="rounded-md border bg-muted/30 p-3 text-xs">
+                <div className="text-muted-foreground">De</div>
+                <div className="font-semibold">{map.objectives.find((o) => o.id === pendingConnection.source)?.name ?? '...'}</div>
+                {pendingConnection.target ? (
+                  <>
+                    <div className="mt-2 text-muted-foreground">Para</div>
+                    <div className="font-semibold">{map.objectives.find((o) => o.id === pendingConnection.target)?.name ?? '...'}</div>
+                  </>
+                ) : (
+                  <div className="mt-2 space-y-1">
+                    <Label>Para qual objetivo?</Label>
+                    <NativeSelect value={pendingTarget} onChange={(event) => setPendingTarget(event.target.value)}>
+                      <option value="">Selecione o objetivo de destino</option>
+                      {map.perspectives.map((perspective) => (
+                        <optgroup key={perspective.id} label={perspective.name}>
+                          {map.objectives
+                            .filter((o) => o.perspectiveId === perspective.id && o.id !== pendingConnection.source)
+                            .map((o) => (
+                              <option key={o.id} value={o.id}>{o.name}</option>
+                            ))}
+                        </optgroup>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="grid gap-2">
               {RELATION_KINDS.map((rel) => (
                 <button
@@ -1959,9 +2133,14 @@ function StrategyMapPageInner() {
             <Button variant="ghost" onClick={() => setPendingConnection(null)}>Cancelar</Button>
             <Button
               onClick={() =>
-                pendingConnection && addRelation.mutate({ connection: pendingConnection, kind: pendingKind, label: pendingLabel })
+                pendingConnection &&
+                addRelation.mutate({
+                  connection: { ...pendingConnection, target: pendingConnection.target || pendingTarget },
+                  kind: pendingKind,
+                  label: pendingLabel,
+                })
               }
-              disabled={!pendingConnection || addRelation.isPending}
+              disabled={!pendingConnection || !(pendingConnection.target || pendingTarget) || addRelation.isPending}
             >
               <Link2 className="mr-2 h-4 w-4" /> Conectar
             </Button>
@@ -2513,96 +2692,133 @@ function clampPercent(value: number | null | undefined) {
   return Math.min(100, Math.max(0, value));
 }
 
-function laneOffsets(map: StrategicMap): { offsetById: Map<string, number>; heightById: Map<string, number>; widthById: Map<string, number> } {
-  const offsetById = new Map<string, number>();
-  const heightById = new Map<string, number>();
-  const widthById = new Map<string, number>();
-  let cursor = 0;
-  for (const perspective of map.perspectives) {
-    const height = perspective.height ?? LANE_HEIGHT;
-    const width = perspective.width ?? LANE_WIDTH;
-    offsetById.set(perspective.id, cursor);
-    heightById.set(perspective.id, height);
-    widthById.set(perspective.id, width);
-    cursor += height;
-  }
-  return { offsetById, heightById, widthById };
+interface CanvasActions {
+  addObjective: (perspectiveId: string) => void;
+  startLink: (objectiveId: string) => void;
+  openDetails: (objectiveId: string) => void;
+  resizeEnd: (objectiveId: string, box: { x: number; y: number; width: number; height: number }) => void;
+  editEdge: (edgeId: string) => void;
+  removeEdge: (edgeId: string) => void;
+  routeEdge: (edgeId: string, offsetX: number, offsetY: number) => void;
 }
 
-function buildNodes(
-  map: StrategicMap,
-  objectives: Objective[],
-  editMode: boolean,
-  selectedId: string | null,
-  onPerspectiveResize?: (perspectiveId: string, width: number, height: number) => void,
-): Node[] {
-  const objectiveByPerspective = new Map<string, Objective[]>();
-  for (const objective of objectives) {
-    const list = objectiveByPerspective.get(objective.perspectiveId) ?? [];
-    list.push(objective);
-    objectiveByPerspective.set(objective.perspectiveId, list);
+function LayoutSaveStatus({ state }: { state: 'idle' | 'saving' | 'saved' | 'error' }) {
+  if (state === 'saving') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Salvando…
+      </span>
+    );
   }
-
-  const { offsetById, heightById, widthById } = laneOffsets(map);
-
-  const lanes: Node[] = map.perspectives.map((perspective) => {
-    const width = widthById.get(perspective.id) ?? LANE_WIDTH;
-    const height = heightById.get(perspective.id) ?? LANE_HEIGHT;
-    const hasSavedPos = (perspective.positionX ?? 0) !== 0 || (perspective.positionY ?? 0) !== 0;
-    return {
-      id: perspective.id,
-      type: 'perspectiveLane',
-      position: {
-        x: hasSavedPos ? (perspective.positionX ?? LANE_X) : LANE_X,
-        y: hasSavedPos ? (perspective.positionY ?? 0) : (offsetById.get(perspective.id) ?? 0),
-      },
-      data: {
-        perspective,
-        objectiveCount: objectiveByPerspective.get(perspective.id)?.length ?? 0,
-        editMode,
-        onResize: onPerspectiveResize ? (w: number, h: number) => onPerspectiveResize(perspective.id, w, h) : undefined,
-      },
-      draggable: editMode,
-      selectable: editMode,
-      style: { width, height: Math.max(height - 20, 130), zIndex: -1 },
-      width,
-      height,
-    } satisfies Node;
-  });
-
-  const objectiveNodes = objectives.map((objective) => {
-    const indexInsideLane = objectiveByPerspective.get(objective.perspectiveId)?.findIndex((item) => item.id === objective.id) ?? 0;
-    const laneY = offsetById.get(objective.perspectiveId) ?? 0;
-    const defaultX = OBJECTIVE_START_X + (indexInsideLane % 3) * 310;
-    const defaultY = laneY + 46 + Math.floor(indexInsideLane / 3) * 96;
-    const hasSavedPosition = objective.positionX !== 0 || objective.positionY !== 0;
-    const width = objective.width ?? 260;
-    const height = objective.height ?? 150;
-    const propagated = (objective.baseLight ?? objective.aggregateLight) !== objective.aggregateLight;
-    return {
-      id: objective.id,
-      type: 'objective',
-      position: {
-        x: hasSavedPosition ? objective.positionX : defaultX,
-        y: hasSavedPosition ? objective.positionY : defaultY,
-      },
-      data: { objective, selected: selectedId === objective.id, editMode, propagated },
-      draggable: editMode,
-      style: { zIndex: 10, width, height },
-      width,
-      height,
-    } satisfies Node;
-  });
-
-  return [...lanes, ...objectiveNodes];
+  if (state === 'error') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-destructive">
+        <AlertTriangle className="h-3.5 w-3.5" /> Falha ao salvar o layout
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <CircleCheck className="h-3.5 w-3.5 text-emerald-600" /> {state === 'saved' ? 'Alterações salvas' : 'Salvamento automático'}
+    </span>
+  );
 }
 
-function toFlowEdge(
-  relation: Objective['outRelations'][number],
-  sourceId: string,
-  onEdgeDragStop?: (edgeId: string, offsetX: number, offsetY: number) => void,
-  editMode?: boolean,
-): Edge {
+function keepSelection<T extends { id: string; selected?: boolean }>(current: T[], next: T[]): T[] {
+  const selected = new Set(current.filter((item) => item.selected).map((item) => item.id));
+  if (!selected.size) return next;
+  return next.map((item) => (selected.has(item.id) ? { ...item, selected: true } : item));
+}
+
+/** Reflete no mapa em cache o que o PATCH de layout grava, inclusive a troca de perspectiva. */
+function applyLayoutChanges(map: StrategicMap, changes: LayoutChanges): StrategicMap {
+  const lanes = new Map(changes.lanes.map((lane) => [lane.id, lane]));
+  const cards = new Map(changes.objectives.map((card) => [card.id, card]));
+  const perspectives = map.perspectives.map((perspective) => ({ ...perspective, ...lanes.get(perspective.id) }));
+  const perspectiveById = new Map(perspectives.map((perspective) => [perspective.id, perspective]));
+  return {
+    ...map,
+    perspectives,
+    objectives: map.objectives.map((objective) => {
+      const card = cards.get(objective.id);
+      if (!card) return objective;
+      return {
+        ...objective,
+        perspectiveId: card.perspectiveId,
+        perspective: perspectiveById.get(card.perspectiveId) ?? objective.perspective,
+        positionX: card.positionX,
+        positionY: card.positionY,
+        width: card.width,
+        height: card.height,
+      };
+    }),
+  };
+}
+
+function buildNodes(map: StrategicMap, layout: MapLayout, objectives: Objective[], editMode: boolean, actions: CanvasActions): Node[] {
+  const counts = new Map<string, number>();
+  for (const card of layout.cards.values()) counts.set(card.perspectiveId, (counts.get(card.perspectiveId) ?? 0) + 1);
+  const perspectiveById = new Map(map.perspectives.map((perspective) => [perspective.id, perspective]));
+
+  // Faixas são fundo: não arrastam, não selecionam e não capturam o mouse.
+  const lanes = layout.lanes.flatMap((lane): Node<LaneData>[] => {
+    const perspective = perspectiveById.get(lane.perspectiveId);
+    if (!perspective) return [];
+    return [
+      {
+        id: perspective.id,
+        type: 'perspectiveLane',
+        position: { x: 0, y: lane.top },
+        data: {
+          perspective,
+          objectiveCount: counts.get(perspective.id) ?? 0,
+          editMode,
+          isDropTarget: false,
+          onAddObjective: actions.addObjective,
+        },
+        draggable: false,
+        selectable: false,
+        connectable: false,
+        deletable: false,
+        focusable: false,
+        zIndex: -1,
+        style: { width: layout.width, height: lane.height, pointerEvents: 'none' },
+        width: layout.width,
+        height: lane.height,
+      },
+    ];
+  });
+
+  const cards = objectives.flatMap((objective): Node<ObjectiveNodeData>[] => {
+    const card = layout.cards.get(objective.id);
+    if (!card) return [];
+    return [
+      {
+        id: objective.id,
+        type: 'objective',
+        position: cardPosition(layout, card),
+        data: {
+          objective,
+          editMode,
+          onResizeEnd: actions.resizeEnd,
+          onStartLink: actions.startLink,
+          onOpenDetails: actions.openDetails,
+        },
+        draggable: editMode,
+        connectable: editMode,
+        deletable: false,
+        zIndex: 10,
+        style: { width: card.width, height: card.height },
+        width: card.width,
+        height: card.height,
+      },
+    ];
+  });
+
+  return [...lanes, ...cards];
+}
+
+function toFlowEdge(relation: Objective['outRelations'][number], sourceId: string, editMode: boolean, actions: CanvasActions): Edge<StrategyEdgeData> {
   const meta = kindMeta(relation.kind);
   let sourceHandle: string | undefined;
   let targetHandle: string | undefined;
@@ -2621,25 +2837,17 @@ function toFlowEdge(
     type: 'strategy',
     sourceHandle,
     targetHandle,
+    markerEnd: { type: MarkerType.ArrowClosed, color: meta.color, width: 16, height: 16, markerUnits: 'userSpaceOnUse' },
     data: {
       kind: relation.kind ?? 'impacta',
       label: relation.label ?? meta.label,
       description: relAny.description,
       editMode,
-      onEdgeDragStop,
+      onRouteChange: actions.routeEdge,
+      onEdit: actions.editEdge,
+      onRemove: actions.removeEdge,
     },
   };
-}
-
-function perspectiveForY(map: StrategicMap | undefined, y: number) {
-  if (!map?.perspectives.length) return null;
-  let cursor = 0;
-  for (const perspective of map.perspectives) {
-    const height = perspective.height ?? LANE_HEIGHT;
-    if (y < cursor + height) return perspective;
-    cursor += height;
-  }
-  return map.perspectives[map.perspectives.length - 1] ?? null;
 }
 
 function movePerspective(map: StrategicMap, perspectiveId: string, direction: -1 | 1, mutate: (ids: string[]) => void) {

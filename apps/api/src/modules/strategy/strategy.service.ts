@@ -628,17 +628,29 @@ export class StrategyService {
       width?: number;
       height?: number;
     }>,
+    lanes: Array<{ id: string; positionX: number; positionY: number; width?: number; height?: number }> = [],
   ) {
     await this.getMapRecord(me.companyId, mapId);
-    if (!nodes?.length) return { ok: true };
-    const objectives = await this.prisma.strategicObjective.findMany({
-      where: { mapId, id: { in: nodes.map((node) => node.id) }, deletedAt: null },
-      select: { id: true, perspectiveId: true, positionX: true, positionY: true, position: true, width: true, height: true },
-    });
+    nodes = nodes ?? [];
+    lanes = lanes ?? [];
+    if (!nodes.length && !lanes.length) return { ok: true };
+    const objectives = nodes.length
+      ? await this.prisma.strategicObjective.findMany({
+          where: { mapId, id: { in: nodes.map((node) => node.id) }, deletedAt: null },
+          select: { id: true, perspectiveId: true, positionX: true, positionY: true, position: true, width: true, height: true },
+        })
+      : [];
     if (objectives.length !== nodes.length) throw new BadRequestException('Layout contem objetivos inválidos');
+    // Arrastar um objetivo para outra faixa troca a perspectiva dele: destino e
+    // faixas gravadas precisam ser perspectivas deste mapa.
+    const perspectiveIds = [...new Set([...nodes.flatMap((node) => (node.perspectiveId ? [node.perspectiveId] : [])), ...lanes.map((lane) => lane.id)])];
+    if (perspectiveIds.length) {
+      const found = await this.prisma.perspective.count({ where: { mapId, id: { in: perspectiveIds }, deletedAt: null } });
+      if (found !== perspectiveIds.length) throw new BadRequestException('Layout contem perspectivas inválidas');
+    }
     const before = objectives;
-    await this.prisma.$transaction(
-      nodes.map((node) =>
+    await this.prisma.$transaction([
+      ...nodes.map((node) =>
         this.prisma.strategicObjective.update({
           where: { id: node.id },
           data: {
@@ -652,8 +664,20 @@ export class StrategyService {
           },
         }),
       ),
-    );
-    await this.audit(me, 'LAYOUT_UPDATE', 'StrategicObjective', mapId, before, nodes, 'Layout do mapa estratégico');
+      ...lanes.map((lane) =>
+        this.prisma.perspective.update({
+          where: { id: lane.id },
+          data: {
+            positionX: lane.positionX,
+            positionY: lane.positionY,
+            ...(lane.width !== undefined ? { width: lane.width } : {}),
+            ...(lane.height !== undefined ? { height: lane.height } : {}),
+            updatedById: me.sub,
+          },
+        }),
+      ),
+    ]);
+    await this.audit(me, 'LAYOUT_UPDATE', 'StrategicObjective', mapId, before, lanes.length ? { nodes, lanes } : nodes, 'Layout do mapa estratégico');
     return { ok: true };
   }
 

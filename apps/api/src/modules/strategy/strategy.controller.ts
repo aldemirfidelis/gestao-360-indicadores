@@ -96,8 +96,8 @@ export class StrategyController {
 
   @Patch('maps/:id/layout')
   @RequirePermissions('strategy:objectives:update')
-  saveLayout(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { nodes: any[] }) {
-    return this.service.saveLayout(me, id, body.nodes ?? []);
+  saveLayout(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: { nodes: any[]; lanes?: any[] }) {
+    return this.service.saveLayout(me, id, body.nodes ?? [], body.lanes ?? []);
   }
 
   @Post('relations')
