@@ -917,3 +917,17 @@ Estratégico. Verificados os 12 módulos ativos; tinham o mesmo tipo de problema
   testes, testes do serviço de ações. Por pedido do usuário, **sem teste em
   navegador nem `tsc` local da API** (pesam o notebook): o usuário testa depois
   do deploy e o `nest build` da imagem, montada antes do deploy, checa os tipos.
+- Publicado em 2026-11-02 a pedido do usuário: commit `3dcaf24`, imagens
+  `0.1.0+3dcaf243` (montadas antes com o site no ar: API 103 s, web 148 s);
+  `make deploy` em 26 s (15:47:06Z a 15:47:32Z), sem migration pendente (153).
+  Backup antes: `db-backups/g360-20261102-154235.dump`. Rollback:
+  `g360-api:rollback-01f67a4-20261102` e `g360-web:rollback-01f67a4-20261102`.
+- Validado depois: containers saudáveis, `migrate status` em dia, health, home,
+  login, demonstração, `/tarefas` e `/okrs` com 200, POST de análise sem token
+  401; código novo confirmado nos chunks da web (Kanban, roteiro, fluxograma,
+  Ishikawa) e a transação no `actions.service.js` da API. Pendente: o teste
+  em navegador pelo usuário.
+- Pegadinha de script: em regex JS com a flag `m`, `^` também casa logo depois
+  de `\r`. Remover linha com `^(\s*)...\r?\n` num arquivo CRLF deixou um `\r`
+  solto; o Git passou a ver o arquivo como não-texto e o diff mostrava o
+  arquivo inteiro. Conferir `git ls-files --eol` depois de editar por script.
