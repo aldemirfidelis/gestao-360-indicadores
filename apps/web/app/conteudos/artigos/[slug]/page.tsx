@@ -12,6 +12,12 @@ export function generateStaticParams() {
 
 const relatedTitles = new Map(solutionPages.map((page) => [page.path, page.title]));
 
+/** Só soluções publicadas: a de um módulo suspenso daria 404. Sem nenhuma, leva à lista de soluções. */
+function relatedLinks(related: string[]) {
+  const published = related.filter((href) => relatedTitles.has(href));
+  return published.length ? published.map((href) => ({ href, title: relatedTitles.get(href)! })) : [{ href: '/solucoes', title: 'Todas as soluções' }];
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const article = getArticle(slug);
@@ -46,7 +52,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
             <h2 className="font-semibold text-slate-950">Próximo passo</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">Veja as soluções relacionadas para entender como esse tema pode ser operacionalizado dentro do Gestão 360.</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              {article.related.map((href) => <Link key={href} href={href} className="border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-800">{relatedTitles.get(href) ?? href.replace('/solucoes/', '').replaceAll('-', ' ')}</Link>)}
+              {relatedLinks(article.related).map(({ href, title }) => <Link key={href} href={href} className="border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-800">{title}</Link>)}
             </div>
           </div>
         </div>

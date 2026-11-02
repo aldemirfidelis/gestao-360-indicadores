@@ -171,8 +171,9 @@ export default function ProjectsPage() {
   const pmo = portfolio.data;
   const timeline = useMemo(() => buildTimeline(projects), [projects]);
 
+  // Filtros na URL desta tela: "/projects" agora é a Ata da reunião e levaria o usuário embora.
   useEffect(() => {
-    router.replace(`/projects${toQueryString(filters)}`, { scroll: false });
+    router.replace(`/projects/cronograma${toQueryString(filters)}`, { scroll: false });
   }, [filters, router]);
 
   const createProject = useMutation({
