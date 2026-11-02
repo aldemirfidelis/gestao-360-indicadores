@@ -1,6 +1,6 @@
 # Memoria Operacional do Projeto
 
-Atualizada em: 2026-10-07
+Atualizada em: 2026-11-01
 
 Este arquivo deve ser lido antes de qualquer tarefa no repositorio
 `gestao-360-indicadores`. Ele registra o estado operacional vigente. Quando
@@ -22,11 +22,112 @@ do repositorio e do droplet antes de executar qualquer comando.
   2026-10-07. Nao trocar de provedor (gerenciado, Neon etc.) sem pedido
   explicito.
 - Nunca apagar o volume `g360_pgdata`: nada de `docker compose down -v`,
-  `docker volume rm` ou `docker volume prune -a` no droplet.
+  `docker volume rm` ou `docker volume prune -a` no servidor de producao (Vultr
+  desde 2026-11-01). O mesmo vale para os volumes `zapfacil_*`.
 - O Postgres de desenvolvimento via `docker-compose.yml` na maquina local foi
   autorizado pelo usuario em 2026-10-07 e nunca deve receber dados reais.
 - Nao executar seeds em producao sem autorizacao especifica. Alguns seeds limpam
   e recriam dados.
+
+## Producao na Vultr (desde 2026-11-01)
+
+Decisao do usuario em 2026-11-01: sair da DigitalOcean para a Vultr, levando
+Gestao 360 **e** ZapFacil. Virada autorizada pelo usuario e feita no mesmo dia.
+**A producao agora e o servidor Vultr `45.32.5.196`.** Onde este arquivo fala
+em "droplet" para operar a aplicacao (pre-flight, deploy, validacao,
+diagnostico), vale o servidor Vultr: mesmo diretorio
+`/opt/gestao-360-indicadores`, mesmo `docker-compose.droplet.yml`, mesmo
+`make deploy`. O ZapFacil fica em `/opt/zapfacil` (`docker compose`, com
+`COMPOSE_FILE` no `.env` incluindo `docker-compose.proxy.yml`, frontend na rede
+`gestao-360-indicadores_g360` como `zapfacil-web`).
+
+Servidor novo:
+
+- IP `45.32.5.196`, regiao New Jersey, 4 vCPU, 8 GB de RAM, 160 GB SSD, swap
+  de 8 GB (ja vem da Vultr), Ubuntu 26.10, kernel 7.3. Auto Backups da Vultr
+  ligado.
+- SSH: alias `g360-vultr` no `~/.ssh/config` da maquina Windows, mesma chave
+  `~/.ssh/g360-droplet` do droplet. Login por senha desligado em
+  `/etc/ssh/sshd_config.d/00-hardening.conf` (`PermitRootLogin
+  prohibit-password`); a senha de root continua valendo so no console web da
+  Vultr. A senha foi colada no chat em 2026-11-01: recomendar troca. Nunca
+  grava-la em arquivo do repositorio.
+- UFW ativo: 22/tcp, 80/tcp, 443/tcp e 443/udp. fail2ban ativo. Docker 29.7,
+  Compose 2.40, buildx, make e git instalados.
+
+Preparacao em 2026-11-01 (antes da virada, sem tocar a producao):
+
+- Repositorio clonado em `/opt/gestao-360-indicadores`, `main` em `25258cb`
+  (o mesmo commit da producao).
+- `.env` copiado do droplet por pipe SSH, sem passar pelo disco local
+  (SHA-256 identico, modo 600).
+- Imagens `g360-api:latest` e `g360-web:latest` construidas com
+  `APP_VERSION=0.1.0+25258cb1` (API 110 s, Web ~150 s).
+- Ensaio da migracao: `pg_dump` do droplet restaurado no `g360-postgres` da
+  Vultr (dump em `db-backups/migracao/ensaio.dump`); 538 tabelas, 153
+  migrations e contagens identicas as da producao. Volumes `g360_storage`
+  (1 arquivo, ~124 MB), `caddy_data` e `caddy_config` copiados com `tar`. So o
+  Postgres esta rodando na Vultr; API, Web e Caddy **nao** foram iniciados
+  (evita jobs agendados em duplicidade e emissao de certificado com o DNS
+  ainda no droplet).
+
+Virada em 2026-11-01 (22:08:51Z a 22:13:12Z, ~4,5 min fora do ar):
+
+- Droplet: parados `g360-web`, `g360-api` e frontend/api/worker do ZapFacil.
+  Dumps finais guardados nos dois servidores em
+  `db-backups/pre-vultr-20261101/` (`g360-20261101T220851Z.dump`, SHA-256
+  `c2de47ab...863b`; `zapfacil-20261101T220851Z.dump`, SHA-256
+  `5c425e99...d36f`). Copia direta servidor a servidor com `ssh -A` (agente
+  local temporario; nenhuma chave deixada no droplet).
+- Vultr: os dois bancos restaurados com contagem exata de linhas identica em
+  todas as tabelas (g360: 538 tabelas / 3474 linhas; ZapFacil: 47 / 860).
+  Volumes `zapfacil_redisdata`, `zapfacil_storage` e `g360_storage`
+  recopiados. Imagens do ZapFacil levadas com `docker save | docker load`
+  (mesmos IDs). Tudo `healthy`, `migrate status` em dia (153), versao
+  `0.1.0+25258cb1`, certificados validos ate 2027-01 (copiados do droplet).
+- Backup diario ligado na Vultr (cron 03:00 UTC, `scripts/backup-db.sh`,
+  testado). Sem backup agendado do ZapFacil (tambem nao havia no droplet).
+- Droplet `165.22.176.248` virou **so repasse**: o `g360-caddy` de la usa
+  `Caddyfile.vultr-proxy` (copia no disco em `Caddyfile`; original em
+  `Caddyfile.antes-vultr`) e manda `gestao360.org`, `www`, `zapfacil.net` e
+  `www.zapfacil.net` para `https://45.32.5.196` mantendo o Host. Bancos e
+  Redis do droplet parados, volumes preservados como contingencia; cron de
+  backup do droplet comentado. Nao destruir o droplet sem OK do usuario.
+- Pegadinha confirmada: o Caddyfile entra no container por bind mount de
+  arquivo. Se o arquivo for trocado por outro inode (`git pull`, editor que
+  regrava), o container continua vendo a versao antiga e `caddy reload` carrega
+  a velha. Depois de mudar o Caddyfile, recriar o container
+  (`docker compose -f docker-compose.droplet.yml up -d --force-recreate caddy`)
+  ou recarregar a partir de uma copia feita com `docker cp`.
+
+DNS (2026-11-02):
+
+- Dominios registrados na HostGator (registrador tecnico PublicDomainRegistry;
+  `gestao360.org` expira 2027-05-27, `zapfacil.net` 2027-10-02). Em
+  2026-11-02 o usuario criou as zonas no DNS da Vultr e trocou os nameservers
+  na HostGator para `ns1.vultr.com`/`ns2.vultr.com`; os registros `.org` e
+  `.net` ja delegam para a Vultr.
+- Zonas na Vultr (TTL 300): `A @ -> 45.32.5.196`, `CNAME * -> <dominio>`
+  (cobre `www`, `collabora` e subdominios de empresa) e um `MX 10 <dominio>`
+  criado automaticamente pela Vultr (nao ha servidor de e-mail; pode ser
+  apagado). Nao ha TXT/SPF/DKIM/DMARC.
+- Certificado sob demanda de empresa emitido na Vultr em 2026-11-02
+  (`demonstracao.gestao360.org`), confirmando que o Let's Encrypt ja ve o DNS
+  novo. `teste.gestao360.org` nao e empresa (allow responde 404), entao nao
+  recebe certificado: comportamento esperado.
+- A zona antiga na DigitalOcean continua com `165.22.176.248`. Quem ainda
+  consulta a DigitalOcean cai no droplet, que repassa para a Vultr. A
+  configuracao de repasse nao grava log de acesso; para medir trafego residual
+  usar `ss -Htn state established "( sport = :443 )"` no droplet.
+
+Pendente (com o usuario):
+
+- Manter o droplet repassando ate a propagacao terminar (delegacao `.net`
+  tem TTL de ate 2 dias): conferir a partir de 2026-11-04. Depois desligar o
+  droplet, apagar as zonas na DigitalOcean e so destruir com OK explicito.
+- Trocar a senha de root da Vultr (exposta no chat).
+- Backup off-site ainda inexistente (Auto Backups da Vultr cobrem o servidor
+  inteiro, mas nao substituem dump fora dele).
 
 ## Situacao na Retomada (2026-10-07)
 
@@ -636,9 +737,24 @@ publicado.
 ## Visitantes do site e da demonstração (2026-10-31)
 
 Pedido do usuário: o mesmo sistema de visitantes do ZapFácil (commit `2555618`
-daquele repositório), adaptado à landing e à demonstração. Commit e push em
-`main` autorizados pelo usuário em 2026-10-31. **Deploy ainda não feito**:
-exige OK próprio e backup antes, por causa da migration nova.
+daquele repositório), adaptado à landing e à demonstração. Commit `25258cb`,
+push e deploy autorizados pelo usuário e feitos em 2026-10-31.
+
+- **Em produção desde 2026-10-31 (BRT 11:49–11:58)**: imagens `0.1.0+25258cb1`,
+  com cerca de 8 min de indisponibilidade (o `deploy.sh` para web e API durante o
+  build). Versão anterior: `0.1.0+f8ba02df`, preservada nas tags
+  `g360-api:rollback-f8ba02d-20261031` e `g360-web:rollback-f8ba02d-20261031`.
+- Backup antes do deploy, protegido da rotação:
+  `db-backups/pre-site-visits-20261031/g360-20261031-144841.dump` (2,0 MB,
+  `pg_restore --list` com 4074 linhas, permissão 600). SHA-256:
+  `0eca572d23a7790ac78f5b2abc22ced1bcd54bab4ff7376b46d679c149d31726`.
+- Validado depois do deploy: containers saudáveis, `migrate status` em dia
+  (153), tabelas e índices novos criados, permissão ligada ao papel
+  `SUPER_ADMIN` pelo bootstrap; health, home, demonstração e portal com 200 e
+  `www` com 301; coleta responde 400 a corpo inválido e 204 a lote válido (a
+  visita de teste, marcada como robô, foi apagada em seguida); painel responde
+  401 sem token; o container da API alcança `download.db-ip.com` e grava no
+  volume de storage.
 
 - Portal Admin Global › **Visitantes do Site** (`platform.site_analytics.view`,
   só Platform Owner e Super Admin). Detalhes de produto no `README.md`.
@@ -678,3 +794,30 @@ exige OK próprio e backup antes, por causa da migration nova.
   O `outputFileTracingRoot` feito com `new URL().pathname` vira `/E:/...` no
   Windows e a saída standalone escapa para `apps/Projetos/...`, que precisa ser
   apagado depois. Nada disso acontece no Linux nem no Docker.
+
+## Auditoria de produção (2026-10-31)
+
+Feita com Chromium contra `https://gestao360.org`, sem login de empresa nem do
+Portal Admin (as senhas ficam só no droplet).
+
+- Site público: as 32 páginas do sitemap e o login abrem sem erro de JS, com
+  title, description, canonical e um h1, sem estouro a 390 px. Robots, sitemap,
+  llms, manifest e ícones respondem 200; HSTS e demais cabeçalhos presentes;
+  certificados válidos até 2027-01.
+- Integração: nenhuma chamada do código ativo a rota inexistente (909 chamadas
+  do web cruzadas com as 857 rotas registradas pela API). As 3 chamadas a
+  módulos suspensos são protegidas por `isProductModuleActive`.
+- Demonstração: 32 telas e 7 detalhes sem erro de JS; escrita bloqueada (403),
+  sem leitura de outra empresa e sem acesso ao Portal Admin.
+- Corrigido no código (ainda não publicado): links de dois artigos para
+  soluções suspensas (404); `/eficacia` redirecionava para `/aprovacoes-cargo`
+  (suspensa) e agora leva a `/actions?effectivenessStatus=PENDING`;
+  `/projects/cronograma` reescrevia a URL para `/projects` e ficava inacessível;
+  `/insights` saiu das rotas da demo (as leituras dela davam 403); Portal Admin
+  sem login disparava consultas 401 antes de ir ao login.
+- Pendências de operação: **sem backup off-site** (só os 14 dumps no próprio
+  droplet); **nenhum envio de e-mail configurado** (sem chave de API, SMTP ou
+  caixa no banco: contato não avisa ninguém, recuperação de senha e convites
+  não saem); DNS sem MX, SPF, DKIM e DMARC; páginas ativas sem item de menu
+  (`/reports`, `/insights`, `/dashboard`, `/periods`, `/treatments`,
+  `/plataforma`); perfil Totem é levado a `/totem`, que está suspensa.
