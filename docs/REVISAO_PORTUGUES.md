@@ -1,6 +1,6 @@
 # Revisão de português do Gestão 360
 
-Data: 02/11/2026. Publicação autorizada pelo usuário; execução em andamento.
+Data: 02/11/2026. Revisão publicada na Vultr com autorização do usuário.
 
 A revisão corrige acentuação, concordância e redação nos textos fornecidos pelo
 sistema, com foco na interface e nas mensagens que chegam aos usuários.
@@ -35,7 +35,7 @@ Cada atualização exige a chave correta e o texto antigo completo. Os perfis
 precisam também ser de sistema. Isso permite corrigir os padrões existentes
 preservando os campos personalizados, os vínculos e as permissões concedidas.
 A migration pode ser executada novamente sem produzir alterações adicionais.
-Ela não modifica a estrutura do banco e ainda não foi aplicada em produção.
+Ela não modifica a estrutura do banco e foi aplicada em produção em 02/11/2026.
 
 ## Validação
 
@@ -61,5 +61,18 @@ Ela não modifica a estrutura do banco e ainda não foi aplicada em produção.
 
 ## Publicação
 
-Commit, push e deploy na Vultr autorizados pelo usuário em 02/11/2026. A execução
-inclui backup do banco antes da migration e verificações após a atualização.
+Publicada na Vultr em 02/11/2026, com autorização do usuário:
+
+- Commit `57a4755396d803561d45f81de9a663eb84e0b210`, versão `0.1.0+57a47553`.
+- Builds finais de API e Web aprovados com o site disponível. Deploy em 28 s,
+  de 21:23:43Z a 21:24:11Z; 154 migrations aplicadas, nenhuma pendente.
+- Backup `db-backups/g360-20261102-211951.dump`, validado por `pg_restore --list`.
+  Imagens anteriores preservadas nas tags de rollback registradas na memória.
+- A migration corrigiu 384 campos padrão encontrados na base. A auditoria não
+  encontrou nenhum texto antigo previsto restante. Os 552 identificadores dos
+  catálogos e 1.172 vínculos de permissões conservaram contagens e hashes.
+- Containers saudáveis e rotas públicas verificadas com HTTP 200. Versão no
+  login confirmada; o assistente continua exigindo autenticação (401 sem token).
+- A API pública da demonstração retornou a frase corrigida do anexo. O aviso de
+  decisão e as quantidades foram conferidos; o JavaScript público do Meu Dia
+  contém as formas corretas e corresponde ao arquivo da imagem implantada.

@@ -987,7 +987,7 @@ portal em Configuracoes. A tela e a API de identidade visual continuam no codigo
   e gravacao da identidade visual sem token com 401; versao publica no login e
   nova rota, titulo e atalho confirmados nos arquivos compilados da imagem.
 
-## Revisão geral de português (2026-11-02, local)
+## Revisão geral de português (2026-11-02, publicado)
 
 Pedido do usuário a partir da recomendação sem acentos no Meu Dia: corrigir
 português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`.
@@ -1009,5 +1009,19 @@ português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`
   imagens `g360-api:portuguese-copy-review-20261102` e Web equivalente.
 - Sem navegador nem tsc local da API, conforme a preferência anterior. Aliases,
   rotas, chaves, eSocial e arquivos fiscais ASCII preservados e conferidos.
-- Publicação autorizada pelo usuário em 2026-11-02. Commit, push e deploy na
-  Vultr em andamento, com backup antes da migration de dados.
+- Publicado na Vultr com OK do usuário: commit `57a4755`, versão
+  `0.1.0+57a47553`. Builds antecipados com o site no ar: API 73 s, web 135 s.
+  `make deploy` em 28 s (21:23:43Z a 21:24:11Z), banco em dia (154 migrations).
+- Backup antes: `db-backups/g360-20261102-211951.dump` (2,1 MB), validado com
+  `pg_restore --list` (4.086 linhas); SHA-256
+  `0995820d2f3a28edec44de9fa38ed087ae273e2ca887b426541f804b8e44a1fe`.
+  Rollback: `g360-api:rollback-60c16c9-portuguese-20261102` e Web equivalente.
+- Auditoria antes/depois: 384 campos padrão corrigidos nos oito catálogos;
+  nenhum texto antigo previsto restante. IDs dos 552 registros e os 1.172
+  vínculos de permissões com contagens e hashes idênticos aos anteriores.
+- API/Web/Postgres saudáveis; health, home, login, demonstração, Meu Dia,
+  configurações, identidade visual e Portal Admin com HTTP 200; sem token, o
+  assistente responde 401. Versão pública conferida no login.
+- A frase do anexo foi confirmada pela API pública da demonstração, com acentos
+  e redação corrigidos. Singular/plural conferidos no shared e no JavaScript
+  do Meu Dia servido publicamente (idêntico ao arquivo da imagem implantada).
