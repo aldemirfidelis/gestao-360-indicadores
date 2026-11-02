@@ -107,6 +107,24 @@ describe('SiteAnalyticsService.ingest', () => {
 });
 
 describe('SiteAnalyticsService (portal)', () => {
+  it('retorna as áreas da demonstração usando o mesmo alias no agrupamento e na ordenação', async () => {
+    const { prisma, service } = setup();
+    const areas = [{ area: 'indicators', visits: 2 }, { area: 'meu-dia', visits: 1 }];
+    prisma.$queryRaw.mockImplementation(async (strings, ...values) => {
+      const query = Prisma.sql(strings, ...values).text;
+      if (query.includes("split_part(p, '/', 2) AS area")) {
+        expect(query).toMatch(/ORDER BY visits DESC, area\s*$/);
+        return areas;
+      }
+      return [];
+    });
+
+    const result = await service.overview({ from: new Date('2026-10-04T03:00:00Z'), to: new Date('2026-11-03T03:00:00Z') });
+
+    expect(result.demo.areas).toEqual(areas);
+    expect(result.daily).toHaveLength(30);
+  });
+
   it('recusa período com início depois do fim', async () => {
     const { service } = setup();
     await expect(service.overview({ from: new Date('2026-10-31'), to: new Date('2026-10-01') })).rejects.toBeInstanceOf(BadRequestException);

@@ -339,7 +339,7 @@ export class SiteAnalyticsService {
     const [areas, demoPages, demoDepth, demoTime, pages, clicks, demoErrors] = await Promise.all([
       this.prisma.$queryRaw<{ area: string; visits: number }[]>`
         SELECT split_part(p, '/', 2) AS area, COUNT(DISTINCT id)::int AS visits
-        FROM "SiteVisit", unnest("demoPaths") AS p WHERE ${base} GROUP BY 1 ORDER BY visits DESC, área`,
+        FROM "SiteVisit", unnest("demoPaths") AS p WHERE ${base} GROUP BY 1 ORDER BY visits DESC, area`,
       this.prisma.$queryRaw<{ path: string; visits: number }[]>`
         SELECT p AS path, COUNT(*)::int AS visits FROM "SiteVisit", unnest("demoPaths") AS p WHERE ${base}
         GROUP BY 1 ORDER BY visits DESC, path LIMIT 20`,

@@ -1025,3 +1025,22 @@ português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`
 - A frase do anexo foi confirmada pela API pública da demonstração, com acentos
   e redação corrigidos. Singular/plural conferidos no shared e no JavaScript
   do Meu Dia servido publicamente (idêntico ao arquivo da imagem implantada).
+
+## Visitantes do Site: regressão na consulta (2026-11-02, correção local)
+
+- O usuário relatou erro 500 em `/platform-admin?section=siteVisitors`.
+  Logs confirmaram `P2010` / Postgres `42703`: `column "área" does not exist`.
+- Causa introduzida pela revisão de português (`57a4755`): o alias SQL `area`
+  foi acentuado indevidamente no ORDER BY de `SiteAnalyticsService.overview`.
+  Restaurado `area`; nenhuma alteração de schema, migration ou dados necessária.
+- Acrescentado teste de regressão do resumo/áreas. Testes de analytics/contexto:
+  dois arquivos, 20 testes aprovados.
+- Auditoria de 115 arquivos da API alterados na revisão: comparados 81 trechos
+  SQL (tagged templates, chamadas raw e literais SQL) com a versão anterior.
+  Após a correção, nenhuma diferença SQL restante, normalizando somente CRLF.
+- Resumo e lista executados com o serviço corrigido em processo isolado na Vultr,
+  em transação `READ ONLY`: todas as consultas funcionaram no período da captura
+  (04/10 a 03/11, 30 dias). Somente agregados de resultado foram exibidos.
+  Arquivos de validação em `/tmp/g360-visitors-*`; app em execução não alterado.
+- Sem navegador nem tsc local da API. Publicação autorizada pelo usuário em
+  2026-11-02; commit, push e deploy desta correção em andamento.

@@ -76,3 +76,15 @@ Publicada na Vultr em 02/11/2026, com autorização do usuário:
 - A API pública da demonstração retornou a frase corrigida do anexo. O aviso de
   decisão e as quantidades foram conferidos; o JavaScript público do Meu Dia
   contém as formas corretas e corresponde ao arquivo da imagem implantada.
+
+## Correção posterior: consulta de visitantes
+
+Detectada uma regressão da revisão em `SiteAnalyticsService.overview`: o alias
+SQL `area` havia sido alterado para `área` no ORDER BY, causando erro 500 ao abrir
+Visitantes do Site. A correção local restaura o identificador técnico original.
+
+O teste de regressão passou junto dos testes de analytics/contexto (20 testes).
+As consultas de resumo e lista corrigidas também passaram no Postgres da Vultr,
+em processo isolado e transação somente leitura. A auditoria dos 81 trechos SQL
+nos arquivos da API revisados não encontrou outras alterações após essa correção.
+A publicação desta correção foi autorizada pelo usuário e está em andamento.
