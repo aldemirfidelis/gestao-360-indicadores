@@ -878,3 +878,42 @@ biblioteca.
 - O notebook travou durante esse trabalho com ~1 GB de memória livre. Antes de
   typecheck, build ou `pnpm dev`, conferir a memória livre e não deixar
   processos Node antigos rodando.
+
+## Modernização das telas de manipulação (2026-11-02)
+
+Pedido do usuário: levar para o resto do projeto o que foi feito no Mapa
+Estratégico. Verificados os 12 módulos ativos; tinham o mesmo tipo de problema
+(arraste difícil, salvamento manual ou concorrente) estas telas:
+
+- **Tarefas (Kanban)** e **roteiro da Reunião Mensal**: trocado o arraste
+  nativo do HTML5 (não funciona no toque, sem indicação de onde cai) por
+  `@dnd-kit` (`core` 6.3.1, `sortable` 10.0.0, `utilities` 3.2.2, versões
+  fixas). Mouse, toque (tocar e segurar no Kanban; alça no roteiro) e teclado
+  (espaço pega/solta, setas movem, Enter abre). Lógica pura de ordem em
+  `apps/web/lib/board-order.ts` (com testes); lista reordenável reutilizável em
+  `components/ui/sortable-list.tsx`. No Kanban, vários arrastes seguidos sem
+  bloqueio; a lista só recarrega quando termina o último movimento pendente.
+- **Fluxograma de OKRs**: layout em árvore (`lib/okr-tree-layout.ts`, com
+  testes; filhos sob o pai, sem linhas cruzadas, ciclos tratados), cards fixos
+  (antes pareciam arrastáveis e não se moviam), recolher/expandir ramos,
+  destaque da linhagem do objetivo clicado, zoom e mini mapa.
+- **Ishikawa** (Plano de Ação e Reuniões): causas empilhadas na espinha da
+  categoria (sem sobreposição; o desenho cresce), arraste do card inteiro para
+  reordenar ou trocar de categoria, espinhas desenhadas a partir das posições
+  reais dos cards, salvamento automático em fila com status e "Tentar de
+  novo", id definitivo gerado no navegador (a seleção não pula mais). Ordem e
+  categoria definem `orderIndex`; `positionX/Y` continuam gravados no formato
+  antigo.
+- **Salvamento das análises**: o Plano de Ação passou a avisar falhas (antes
+  falhava calado) e os salvamentos automáticos do Ishikawa não mostram mais
+  "Análise salva" a cada arraste. Na API, `saveAnalysis` grava a sessão e as
+  linhas da ferramenta numa transação (o upsert trava a sessão), evitando
+  causas duplicadas em salvamentos seguidos. Sem migration.
+- Fora do escopo (sem problema de manipulação ou módulo suspenso): Gantt
+  (só leitura), estrutura do banco (admin), organograma, automações,
+  segurança de alimentos e demais módulos suspensos. No 5W2H sobrou código
+  morto do arraste antigo (os blocos já são uma grade).
+- Validado na máquina Windows: `tsc` e lint da web, web 15 arquivos / 111
+  testes, testes do serviço de ações. Por pedido do usuário, **sem teste em
+  navegador nem `tsc` local da API** (pesam o notebook): o usuário testa depois
+  do deploy e o `nest build` da imagem, montada antes do deploy, checa os tipos.

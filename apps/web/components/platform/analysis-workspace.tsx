@@ -51,6 +51,11 @@ export interface AnalysisPayload {
   fiveW2H?: any;
 }
 
+/** `silent`: salvamento automático (arraste, edição no lugar) — sem aviso de sucesso. */
+export interface AnalysisSaveOptions {
+  silent?: boolean;
+}
+
 export function AnalysisWorkspace({
   action,
   onSave,
@@ -63,7 +68,8 @@ export function AnalysisWorkspace({
   description = 'Preencha a ferramenta escolhida, salve a análise e use a IA como facilitadora antes de confirmar.',
 }: {
   action: AnalysisWorkspaceAction;
-  onSave: (payload: AnalysisPayload) => void;
+  /** Pode devolver a promessa do salvamento; quem salva avisa as falhas. */
+  onSave: (payload: AnalysisPayload, options?: AnalysisSaveOptions) => Promise<unknown> | void;
   saving: boolean;
   onAskAi?: () => void;
   onEnsureActionPlan?: () => Promise<string>;
@@ -75,6 +81,11 @@ export function AnalysisWorkspace({
   // Sem análise ainda → abre no passo 1 da sequência (Pareto, opcional);
   // com análise salva → volta para a ferramenta usada; método legado
   // não-visível (ex.: MASP) → cai no Ishikawa.
+  // O Ishikawa espera cada salvamento terminar (fila); as demais ferramentas só disparam.
+  const persist = (payload: AnalysisPayload, options?: AnalysisSaveOptions) => Promise.resolve(onSave(payload, options));
+  const fire = (payload: AnalysisPayload) => {
+    persist(payload).catch(() => undefined);
+  };
   const preferredMethod = action.analysisTool ?? action.analysisSessions[0]?.method ?? 'PARETO';
   const initialMethod = isVisibleAnalysisMethod(preferredMethod) ? preferredMethod : 'ISHIKAWA';
   const session =
@@ -151,7 +162,7 @@ export function AnalysisWorkspace({
             setMethod('ISHIKAWA');
           }}
           onSave={(items: ParetoItem[]) =>
-            onSave({ method: 'PARETO', problem, rootCause: consolidatedRootText() || rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items } })
+            fire({ method: 'PARETO', problem, rootCause: consolidatedRootText() || rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps, data: { items } })
           }
         />
       )}
@@ -180,7 +191,7 @@ export function AnalysisWorkspace({
             );
             ishikawaRef.current = nextCauses;
             setIshikawa(nextCauses);
-            onSave({ method: 'ISHIKAWA', problem, rootCause: consolidateRootCauses(nextCauses), fiveWhys, ishikawaCauses: nextCauses, maspSteps, pdcaSteps });
+            fire({ method: 'ISHIKAWA', problem, rootCause: consolidateRootCauses(nextCauses), fiveWhys, ishikawaCauses: nextCauses, maspSteps, pdcaSteps });
           }}
           onSave={(whyItems, nextRootCause = rootCause, extra) => {
             setFiveWhys(whyItems);
@@ -191,10 +202,10 @@ export function AnalysisWorkspace({
               );
               ishikawaRef.current = nextCauses;
               setIshikawa(nextCauses);
-              onSave({ method: 'ISHIKAWA', problem, rootCause: consolidateRootCauses(nextCauses), fiveWhys, ishikawaCauses: nextCauses, maspSteps, pdcaSteps });
+              fire({ method: 'ISHIKAWA', problem, rootCause: consolidateRootCauses(nextCauses), fiveWhys, ishikawaCauses: nextCauses, maspSteps, pdcaSteps });
               return;
             }
-            onSave({ method: 'FIVE_WHYS', problem, rootCause: consolidatedRootText() || nextRootCause, fiveWhys: deriveLegacyWhys(whyItems), ishikawaCauses: ishikawaRef.current, maspSteps, pdcaSteps, data: { items: whyItems, ...(extra ?? {}) } });
+            fire({ method: 'FIVE_WHYS', problem, rootCause: consolidatedRootText() || nextRootCause, fiveWhys: deriveLegacyWhys(whyItems), ishikawaCauses: ishikawaRef.current, maspSteps, pdcaSteps, data: { items: whyItems, ...(extra ?? {}) } });
           }}
         />
       )}
@@ -227,7 +238,10 @@ export function AnalysisWorkspace({
           onSave={(causes, nextRootCause = rootCause) => {
             setIshikawa(causes);
             ishikawaRef.current = causes;
-            onSave({ method: 'ISHIKAWA', problem, rootCause: consolidateRootCauses(causes) || nextRootCause, fiveWhys, ishikawaCauses: causes, maspSteps, pdcaSteps });
+            return persist(
+              { method: 'ISHIKAWA', problem, rootCause: consolidateRootCauses(causes) || nextRootCause, fiveWhys, ishikawaCauses: causes, maspSteps, pdcaSteps },
+              { silent: true },
+            );
           }}
         />
       )}
@@ -247,7 +261,7 @@ export function AnalysisWorkspace({
           onRootCauseChange={setRootCause}
           onSave={(stages, nextRootCause = rootCause) => {
             setPdcaSteps(stages);
-            onSave({ method, problem, rootCause: consolidatedRootText() || nextRootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps: stages });
+            fire({ method, problem, rootCause: consolidatedRootText() || nextRootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps: stages });
           }}
         />
       )}
@@ -266,7 +280,7 @@ export function AnalysisWorkspace({
           // (voltar ao 5W2H para a próxima tarefa é 1 clique na faixa-guia).
           onTaskCreated={() => setMethod('PDCA')}
           onSave={(items, history) =>
-            onSave({
+            fire({
               method: 'FIVE_W_TWO_H',
               problem,
               rootCause,
@@ -290,7 +304,7 @@ export function AnalysisWorkspace({
             <Textarea rows={3} value={rootCause} onChange={(e) => setRootCause(e.target.value)} />
           </div>
           <div className="mt-4 flex justify-end">
-            <Button disabled={saving || !canEdit} onClick={() => onSave({ method, problem, rootCause: consolidatedRootText() || rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps })}>
+            <Button disabled={saving || !canEdit} onClick={() => fire({ method, problem, rootCause: consolidatedRootText() || rootCause, fiveWhys, ishikawaCauses: ishikawa, maspSteps, pdcaSteps })}>
               <Save className="mr-2 h-4 w-4" />
               {saving ? 'Salvando...' : 'Salvar análise'}
             </Button>

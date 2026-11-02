@@ -14,7 +14,6 @@ import {
   Clock3,
   FileDown,
   Gauge,
-  GripVertical,
   ListChecks,
   Maximize2,
   Minimize2,
@@ -38,6 +37,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { SortableHandle, SortableList } from '@/components/ui/sortable-list';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
@@ -439,79 +439,63 @@ function ChecklistCard({ meeting, can, run }: { meeting: MeetingDetail; can: Can
 }
 
 function AgendaCard({ meeting, options, can, run }: { meeting: MeetingDetail; options?: MonthlyOptions; can: Can; run: Run }) {
-  const [order, setOrder] = useState(meeting.agendaItems);
-  const dragIndex = useRef<number | null>(null);
-
-  useEffect(() => {
-    setOrder(meeting.agendaItems);
-  }, [meeting.agendaItems]);
-
-  function handleDrop(targetIdx: number) {
-    const from = dragIndex.current;
-    dragIndex.current = null;
-    if (from === null || from === targetIdx) return;
-    const next = [...order];
-    const [moved] = next.splice(from, 1);
-    next.splice(targetIdx, 0, moved);
-    setOrder(next);
-    run(`/monthly-results/meetings/${meeting.id}/agenda/reorder`, 'POST', { orderedIds: next.map((i) => i.id) }, 'Roteiro reordenado');
-  }
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Roteiro da reunião</CardTitle>
-        {can.update && <p className="text-xs text-muted-foreground">Arraste para reordenar. A ordem define a sequência da apresentação em Conduzir.</p>}
+        {can.update && <p className="text-xs text-muted-foreground">Arraste pela alça para reordenar. A ordem define a sequência da apresentação em Conduzir.</p>}
       </CardHeader>
-      <CardContent className="space-y-2">
-        {order.map((item, index) => (
-          <div
-            key={item.id}
-            draggable={can.update}
-            onDragStart={() => { dragIndex.current = index; }}
-            onDragOver={(e) => can.update && e.preventDefault()}
-            onDrop={() => handleDrop(index)}
-            className={cn('flex items-center justify-between gap-2 rounded-md border bg-card p-2.5', can.update && 'cursor-move')}
-          >
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              {can.update && <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-slate-300" />}
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold">{index + 1}</span>
-              <div className="min-w-0 flex-1">
+      <CardContent>
+        <SortableList
+          items={meeting.agendaItems}
+          disabled={!can.update}
+          getLabel={(item) => item.topic}
+          className="space-y-2"
+          onReorder={(orderedIds) =>
+            run(`/monthly-results/meetings/${meeting.id}/agenda/reorder`, 'POST', { orderedIds }, 'Roteiro reordenado')
+          }
+          renderItem={(item, index, handle) => (
+              <div className="flex items-center justify-between gap-2 rounded-md border bg-card p-2.5">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <SortableHandle handle={handle} label={`Reordenar ${item.topic}`} />
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold">{index + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    {can.update ? (
+                      <Input
+                        defaultValue={item.topic}
+                        key={`${item.id}-${item.topic}`}
+                        className="h-8"
+                        onBlur={(e) => {
+                          const v = e.target.value.trim();
+                          if (v && v !== item.topic) run(`/monthly-results/agenda/${item.id}`, 'PATCH', { topic: v }, undefined);
+                        }}
+                      />
+                    ) : (
+                      <p className="min-w-0 break-words text-sm font-medium">{item.topic}</p>
+                    )}
+                    {item.presenter && <p className="mt-0.5 text-xs text-muted-foreground">{item.presenter.name}</p>}
+                  </div>
+                </div>
                 {can.update ? (
-                  <Input
-                    defaultValue={item.topic}
-                    key={`${item.id}-${item.topic}`}
-                    className="h-8"
-                    onBlur={(e) => {
-                      const v = e.target.value.trim();
-                      if (v && v !== item.topic) run(`/monthly-results/agenda/${item.id}`, 'PATCH', { topic: v }, undefined);
-                    }}
-                  />
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Input
+                      type="number"
+                      defaultValue={item.plannedMinutes}
+                      className="h-8 w-16"
+                      onBlur={(e) => {
+                        const v = Number(e.target.value);
+                        if (v !== item.plannedMinutes) run(`/monthly-results/agenda/${item.id}`, 'PATCH', { plannedMinutes: v }, undefined);
+                      }}
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                  </div>
                 ) : (
-                  <p className="min-w-0 break-words text-sm font-medium">{item.topic}</p>
+                  <Badge variant="secondary" className="shrink-0">{item.plannedMinutes} min</Badge>
                 )}
-                {item.presenter && <p className="mt-0.5 text-xs text-muted-foreground">{item.presenter.name}</p>}
               </div>
-            </div>
-            {can.update ? (
-              <div className="flex shrink-0 items-center gap-1">
-                <Input
-                  type="number"
-                  defaultValue={item.plannedMinutes}
-                  className="h-8 w-16"
-                  onBlur={(e) => {
-                    const v = Number(e.target.value);
-                    if (v !== item.plannedMinutes) run(`/monthly-results/agenda/${item.id}`, 'PATCH', { plannedMinutes: v }, undefined);
-                  }}
-                />
-                <span className="text-xs text-muted-foreground">min</span>
-              </div>
-            ) : (
-              <Badge variant="secondary" className="shrink-0">{item.plannedMinutes} min</Badge>
-            )}
-          </div>
-        ))}
-        {order.length === 0 && <p className="text-sm text-muted-foreground">Sem itens no roteiro.</p>}
+          )}
+        />
+        {meeting.agendaItems.length === 0 && <p className="text-sm text-muted-foreground">Sem itens no roteiro.</p>}
       </CardContent>
     </Card>
   );

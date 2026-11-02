@@ -539,29 +539,34 @@ export class ActionsService {
     if (!action || action.deletedAt) throw new NotFoundException('Ação nao encontrada');
     if (userId) await this.access.assertCanWrite(userId, action.ownerNodeId, 'action_plans', 'edit');
 
-    const session = await this.prisma.actionAnalysisSession.upsert({
-      where: { actionId_method: { actionId, method } },
-      create: {
-        actionId,
-        method,
-        status: body.status ?? ActionToolStatus.IN_PROGRESS,
-        problem: body.problem ?? action.problemDescription ?? action.description ?? null,
-        rootCause: body.rootCause ?? action.rootCause ?? null,
-        responsibleUserId: body.responsibleUserId ?? action.responsibleUserId ?? null,
-        data: body.data ?? undefined,
-        aiSummary: body.aiSummary ?? null,
-      },
-      update: {
-        status: body.status ?? ActionToolStatus.IN_PROGRESS,
-        problem: body.problem ?? null,
-        rootCause: body.rootCause ?? null,
-        responsibleUserId: body.responsibleUserId ?? null,
-        data: body.data ?? undefined,
-        aiSummary: body.aiSummary ?? null,
-      },
+    // Sessão e linhas da ferramenta na mesma transação: o upsert trava a linha da
+    // sessão até o commit, então dois salvamentos seguidos não intercalam o
+    // apaga-e-recria das linhas (antes podiam duplicar causas do Ishikawa).
+    const session = await this.prisma.$transaction(async (tx) => {
+      const saved = await tx.actionAnalysisSession.upsert({
+        where: { actionId_method: { actionId, method } },
+        create: {
+          actionId,
+          method,
+          status: body.status ?? ActionToolStatus.IN_PROGRESS,
+          problem: body.problem ?? action.problemDescription ?? action.description ?? null,
+          rootCause: body.rootCause ?? action.rootCause ?? null,
+          responsibleUserId: body.responsibleUserId ?? action.responsibleUserId ?? null,
+          data: body.data ?? undefined,
+          aiSummary: body.aiSummary ?? null,
+        },
+        update: {
+          status: body.status ?? ActionToolStatus.IN_PROGRESS,
+          problem: body.problem ?? null,
+          rootCause: body.rootCause ?? null,
+          responsibleUserId: body.responsibleUserId ?? null,
+          data: body.data ?? undefined,
+          aiSummary: body.aiSummary ?? null,
+        },
+      });
+      await this.replaceToolRows(tx, saved.id, method, body);
+      return saved;
     });
-
-    await this.replaceToolRows(session.id, method, body);
     await this.prisma.actionPlan.update({
       where: { id: actionId },
       data: {
@@ -1649,9 +1654,9 @@ ${currentStages || '- nenhuma'}`;
     return data;
   }
 
-  private async replaceToolRows(sessionId: string, method: ActionAnalysisTool, body: any) {
+  private async replaceToolRows(db: Prisma.TransactionClient, sessionId: string, method: ActionAnalysisTool, body: any) {
     if (method === ActionAnalysisTool.FIVE_WHYS) {
-      await this.prisma.actionFiveWhy.deleteMany({ where: { sessionId } });
+      await db.actionFiveWhy.deleteMany({ where: { sessionId } });
       const rows = (body.fiveWhys ?? []).map((item: any, index: number) => ({
         sessionId,
         position: item.position ?? index + 1,
@@ -1661,10 +1666,10 @@ ${currentStages || '- nenhuma'}`;
         aiPrompt: item.aiPrompt ?? null,
         isRootCause: item.isRootCause ?? false,
       }));
-      if (rows.length > 0) await this.prisma.actionFiveWhy.createMany({ data: rows });
+      if (rows.length > 0) await db.actionFiveWhy.createMany({ data: rows });
     }
     if (method === ActionAnalysisTool.ISHIKAWA) {
-      await this.prisma.actionIshikawaCause.deleteMany({ where: { sessionId } });
+      await db.actionIshikawaCause.deleteMany({ where: { sessionId } });
       const rows: Prisma.ActionIshikawaCauseCreateManyInput[] = (body.ishikawaCauses ?? [])
         .map((item: any, index: number) => {
           const title = nonEmptyText(item.title) ?? nonEmptyText(item.description);
@@ -1696,10 +1701,10 @@ ${currentStages || '- nenhuma'}`;
           };
         })
         .filter((item: Prisma.ActionIshikawaCauseCreateManyInput | null): item is Prisma.ActionIshikawaCauseCreateManyInput => Boolean(item));
-      if (rows.length > 0) await this.prisma.actionIshikawaCause.createMany({ data: rows });
+      if (rows.length > 0) await db.actionIshikawaCause.createMany({ data: rows });
     }
     if (method === ActionAnalysisTool.MASP) {
-      await this.prisma.actionMaspStep.deleteMany({ where: { sessionId } });
+      await db.actionMaspStep.deleteMany({ where: { sessionId } });
       const rows = (body.maspSteps ?? defaultMaspSteps()).map((item: any, index: number) => ({
         sessionId,
         step: item.step ?? index + 1,
@@ -1712,10 +1717,10 @@ ${currentStages || '- nenhuma'}`;
         status: item.status ?? ActionStepStatus.PENDING,
         validated: item.validated ?? false,
       }));
-      await this.prisma.actionMaspStep.createMany({ data: rows });
+      await db.actionMaspStep.createMany({ data: rows });
     }
     if (method === ActionAnalysisTool.PDCA) {
-      await this.prisma.actionPdcaStep.deleteMany({ where: { sessionId } });
+      await db.actionPdcaStep.deleteMany({ where: { sessionId } });
       const rows: Prisma.ActionPdcaStepCreateManyInput[] = (body.pdcaSteps ?? defaultPdcaSteps()).map((item: any, index: number) => {
         const phase = normalizePdcaPhase(item.phase, index);
         const status = normalizeActionStepStatus(item.status);
@@ -1744,12 +1749,12 @@ ${currentStages || '- nenhuma'}`;
           completedAt: item.completedAt ? coerceDate(item.completedAt) : (status === ActionStepStatus.DONE || status === ActionStepStatus.VALIDATED ? new Date() : null),
         };
       });
-      await this.prisma.actionPdcaStep.createMany({ data: rows });
+      await db.actionPdcaStep.createMany({ data: rows });
     }
     if (method === ActionAnalysisTool.FIVE_W_TWO_H) {
-      await this.prisma.actionFiveW2H.deleteMany({ where: { sessionId } });
+      await db.actionFiveW2H.deleteMany({ where: { sessionId } });
       const item = body.fiveW2H ?? {};
-      await this.prisma.actionFiveW2H.create({
+      await db.actionFiveW2H.create({
         data: {
           sessionId,
           what: item.what ?? null,

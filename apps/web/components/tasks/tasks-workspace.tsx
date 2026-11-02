@@ -127,6 +127,7 @@ export function TasksWorkspace() {
     onError: notifyError,
   });
   const move = useMutation({
+    mutationKey: ['task-move'],
     mutationFn: ({ task, columnId, position }: { task: TaskRecord; columnId: string; position?: number }) =>
       api(`/tasks/${task.id}/move`, { method: 'POST', json: { columnId, position } }),
     onMutate: async ({ task, columnId, position }) => {
@@ -158,10 +159,12 @@ export function TasksWorkspace() {
       notifyError(error);
     },
     onSettled: async (_data, _error, variables) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['task-board'] }),
-        queryClient.invalidateQueries({ queryKey: ['task-detail', variables.task.id] }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: ['task-detail', variables.task.id] });
+      // Com outro movimento ainda a caminho, recarregar agora traria a ordem antiga
+      // de volta por um instante; quem recarrega é o último a terminar.
+      if (queryClient.isMutating({ mutationKey: ['task-move'] }) === 1) {
+        await queryClient.invalidateQueries({ queryKey: ['task-board'] });
+      }
     },
   });
   const saveWiki = useMutation({
@@ -291,7 +294,6 @@ export function TasksWorkspace() {
         <TaskKanbanBoard
           board={data.board}
           tasks={data.tasks}
-          moving={move.isPending}
           onOpen={openTask}
           onMove={(task, columnId, position) => move.mutate({ task, columnId, position })}
           onAdd={openCreate}

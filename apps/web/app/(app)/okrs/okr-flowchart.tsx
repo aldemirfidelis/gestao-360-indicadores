@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
+  Controls,
   Handle,
+  MiniMap,
   Position,
   MarkerType,
   getRectOfNodes,
@@ -14,9 +16,10 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { toPng } from 'html-to-image';
-import { Download, RefreshCw, GitBranch, X } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, Download, Minus, Plus, RefreshCw, GitBranch, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/select';
+import { anchorLayout, layoutTree, lineageOf } from '@/lib/okr-tree-layout';
 import { cn, formatPercent } from '@/lib/utils';
 
 interface Checkin {
@@ -90,9 +93,10 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const NODE_W = 244;
-const NODE_H = 116;
+const NODE_H = 132;
 const GAP_X = 36;
-const GAP_Y = 88;
+const GAP_Y = 80;
+const TREE_SIZES = { nodeWidth: NODE_W, nodeHeight: NODE_H, gapX: GAP_X, gapY: GAP_Y };
 
 interface OkrNodeData {
   name: string;
@@ -105,6 +109,12 @@ interface OkrNodeData {
   areaLabel?: string | null;
   indicatorCount?: number;
   paceLabel?: string | null;
+  childCount: number;
+  hiddenCount: number;
+  selected: boolean;
+  /** Fora da linhagem do objetivo selecionado: fica em segundo plano. */
+  dimmed: boolean;
+  onToggle: (id: string) => void;
 }
 
 const PACE_LABEL: Record<string, { label: string; color: string }> = {
@@ -114,15 +124,20 @@ const PACE_LABEL: Record<string, { label: string; color: string }> = {
   AT_RISK: { label: 'Em risco', color: '#dc2626' },
 };
 
-function OkrNode({ data }: NodeProps<OkrNodeData>) {
+function OkrNode({ id, data }: NodeProps<OkrNodeData>) {
   const color = STATUS_COLOR[data.status] ?? '#94a3b8';
   const delta = data.progressAt !== null ? data.progressNow - data.progressAt : null;
+  const collapsed = data.hiddenCount > 0;
   return (
     <div
-      className="rounded-lg border bg-card shadow-sm"
+      className={cn(
+        'relative cursor-pointer rounded-lg border bg-card shadow-sm transition-[opacity,box-shadow] hover:shadow-md',
+        data.selected && 'shadow-lg ring-4 ring-primary/40',
+        data.dimmed && 'opacity-35',
+      )}
       style={{ width: NODE_W, borderTopColor: color, borderTopWidth: 3 }}
     >
-      <Handle type="target" position={Position.Top} className="!h-2 !w-2 !bg-muted-foreground" />
+      <Handle type="target" position={Position.Top} isConnectable={false} className="!h-2 !w-2 !border-0 !bg-muted-foreground/60" />
       <div className="space-y-1.5 p-3">
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
@@ -162,7 +177,28 @@ function OkrNode({ data }: NodeProps<OkrNodeData>) {
           )}
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !bg-muted-foreground" />
+      <Handle type="source" position={Position.Bottom} isConnectable={false} className="!h-2 !w-2 !border-0 !bg-muted-foreground/60" />
+      {data.childCount > 0 && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            data.onToggle(id);
+          }}
+          title={collapsed ? `Mostrar ${data.hiddenCount} objetivo(s) abaixo` : 'Recolher os objetivos abaixo'}
+          aria-label={collapsed ? `Expandir ${data.name}` : `Recolher ${data.name}`}
+          className="nodrag nopan absolute -bottom-3 left-1/2 z-10 inline-flex h-6 min-w-6 -translate-x-1/2 items-center justify-center gap-0.5 rounded-full border bg-background px-1.5 text-[10px] font-semibold text-muted-foreground shadow-sm transition hover:border-primary hover:text-primary"
+        >
+          {collapsed ? (
+            <>
+              <Plus className="h-3 w-3" />
+              {data.hiddenCount}
+            </>
+          ) : (
+            <Minus className="h-3 w-3" />
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -177,78 +213,62 @@ function progressAtPeriod(obj: FlowObjective, periodRef: string | null): number 
   return cks[cks.length - 1].progress;
 }
 
-function buildGraph(objectives: FlowObjective[], periodRef: string | null): { nodes: Node[]; edges: Edge[] } {
-  const ids = new Set(objectives.map((o) => o.id));
+interface GraphOptions {
+  periodRef: string | null;
+  collapsed: ReadonlySet<string>;
+  selectedId: string | null;
+  anchor: { id: string; x: number; y: number } | null;
+  onToggle: (id: string) => void;
+}
+
+function buildGraph(objectives: FlowObjective[], options: GraphOptions): { nodes: Node<OkrNodeData>[]; edges: Edge[] } {
   const byId = new Map(objectives.map((o) => [o.id, o]));
-  const childrenMap = new Map<string, string[]>();
-  const roots: string[] = [];
-  for (const o of objectives) {
-    const pid = o.parentId && ids.has(o.parentId) ? o.parentId : null;
-    if (pid) {
-      const arr = childrenMap.get(pid) ?? [];
-      arr.push(o.id);
-      childrenMap.set(pid, arr);
-    } else {
-      roots.push(o.id);
-    }
-  }
+  const layout = anchorLayout(layoutTree(objectives, options.collapsed, TREE_SIZES), options.anchor);
+  const lineage = lineageOf(objectives, options.selectedId);
+  const highlighting = lineage.size > 0;
 
-  const levels: string[][] = [];
-  const visited = new Set<string>();
-  const queue: Array<{ id: string; d: number }> = roots.map((id) => ({ id, d: 0 }));
-  while (queue.length) {
-    const { id, d } = queue.shift()!;
-    if (visited.has(id)) continue;
-    visited.add(id);
-    (levels[d] ??= []).push(id);
-    for (const c of childrenMap.get(id) ?? []) queue.push({ id: c, d: d + 1 });
-  }
-  // Nós em ciclo ou órfãos: jogamos na raiz
-  for (const o of objectives) {
-    if (!visited.has(o.id)) {
-      visited.add(o.id);
-      (levels[0] ??= []).push(o.id);
-    }
-  }
-
-  const nodes: Node[] = [];
-  levels.forEach((level, d) => {
-    const totalW = level.length * NODE_W + (level.length - 1) * GAP_X;
-    level.forEach((id, i) => {
-      const o = byId.get(id)!;
-      nodes.push({
-        id,
-        type: 'okr',
-        position: { x: i * (NODE_W + GAP_X) - totalW / 2, y: d * (NODE_H + GAP_Y) },
-        data: {
-          name: o.name,
-          status: o.status,
-          owner: o.ownerUser?.name ?? o.ownerName ?? o.team ?? null,
-          progressNow: o.progress,
-          progressAt: progressAtPeriod(o, periodRef),
-          hasPeriod: !!periodRef,
-          strategyLabel: o.strategicObj?.perspective?.name ?? o.strategicObj?.name ?? null,
-          areaLabel: o.area?.name ?? o.ownerNode?.name ?? o.strategicObj?.ownerNode?.name ?? null,
-          indicatorCount: o.strategicObj?.indicators?.length ?? 0,
-          paceLabel: o.paceLabel ?? null,
-        } satisfies OkrNodeData,
-      });
-    });
+  const nodes = layout.nodes.map((box): Node<OkrNodeData> => {
+    const o = byId.get(box.id)!;
+    return {
+      id: box.id,
+      type: 'okr',
+      position: { x: box.x, y: box.y },
+      draggable: false,
+      connectable: false,
+      data: {
+        name: o.name,
+        status: o.status,
+        owner: o.ownerUser?.name ?? o.ownerName ?? o.team ?? null,
+        progressNow: o.progress,
+        progressAt: progressAtPeriod(o, options.periodRef),
+        hasPeriod: !!options.periodRef,
+        strategyLabel: o.strategicObj?.perspective?.name ?? o.strategicObj?.name ?? null,
+        areaLabel: o.area?.name ?? o.ownerNode?.name ?? o.strategicObj?.ownerNode?.name ?? null,
+        indicatorCount: o.strategicObj?.indicators?.length ?? 0,
+        paceLabel: o.paceLabel ?? null,
+        childCount: box.childCount,
+        hiddenCount: box.hiddenCount,
+        selected: box.id === options.selectedId,
+        dimmed: highlighting && !lineage.has(box.id),
+        onToggle: options.onToggle,
+      },
+    };
   });
 
-  const edges: Edge[] = [];
-  for (const [pid, kids] of childrenMap) {
-    for (const c of kids) {
-      edges.push({
-        id: `${pid}-${c}`,
-        source: pid,
-        target: c,
-        type: 'smoothstep',
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { stroke: '#94a3b8' },
-      });
-    }
-  }
+  const edges = layout.edges.map(({ source, target }): Edge => {
+    const strong = highlighting && lineage.has(source) && lineage.has(target);
+    const color = strong ? '#2563eb' : '#94a3b8';
+    return {
+      id: `${source}-${target}`,
+      source,
+      target,
+      type: 'smoothstep',
+      pathOptions: { borderRadius: 12 },
+      markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16 },
+      style: { stroke: color, strokeWidth: strong ? 2.5 : 1.5, opacity: highlighting && !strong ? 0.35 : 1 },
+      zIndex: strong ? 1 : 0,
+    };
+  });
   return { nodes, edges };
 }
 
@@ -263,8 +283,12 @@ export function OkrFlowchart({
 }) {
   const [period, setPeriod] = useState<string>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
+  const [anchor, setAnchor] = useState<GraphOptions['anchor']>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const nodesRef = useRef<Node<OkrNodeData>[]>([]);
   const selected = useMemo(() => objectives.find((o) => o.id === selectedId) ?? null, [objectives, selectedId]);
+  const parentIds = useMemo(() => new Set(objectives.flatMap((o) => (o.parentId ? [o.parentId] : []))), [objectives]);
 
   const periodOptions = useMemo(() => {
     const set = new Set<string>();
@@ -272,14 +296,29 @@ export function OkrFlowchart({
     return Array.from(set).sort();
   }, [objectives]);
 
-  const { nodes, edges } = useMemo(
-    () => buildGraph(objectives, period || null),
-    [objectives, period],
-  );
+  // Recolher/expandir mantém parado o card clicado; o resto da árvore se ajusta em volta.
+  const toggleBranch = useCallback((id: string) => {
+    const node = nodesRef.current.find((item) => item.id === id);
+    if (node) setAnchor({ id, x: node.position.x, y: node.position.y });
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
-  // Muda quando a ESTRUTURA muda (objetivos add/removidos) -> remonta e re-enquadra.
-  // Nao muda ao trocar de periodo (mesmos ids) -> preserva o zoom/scroll.
-  const flowKey = useMemo(() => nodes.map((n) => n.id).join('|'), [nodes]);
+  const { nodes, edges } = useMemo(
+    () => buildGraph(objectives, { periodRef: period || null, collapsed, selectedId, anchor, onToggle: toggleBranch }),
+    [objectives, period, collapsed, selectedId, anchor, toggleBranch],
+  );
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
+  // Muda quando os objetivos mudam (criados/removidos/filtrados) -> remonta e re-enquadra.
+  // Nao muda ao trocar de periodo nem ao recolher ramos -> preserva o zoom/scroll.
+  const flowKey = useMemo(() => objectives.map((o) => `${o.id}:${o.parentId ?? ''}`).join('|'), [objectives]);
 
   const exportPng = useCallback(async () => {
     const viewport = wrapperRef.current?.querySelector<HTMLElement>('.react-flow__viewport');
@@ -331,7 +370,36 @@ export function OkrFlowchart({
             </option>
           ))}
         </NativeSelect>
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          {parentIds.size > 0 && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setAnchor(null);
+                  setCollapsed(new Set());
+                }}
+                disabled={collapsed.size === 0}
+                title="Mostrar todos os objetivos"
+              >
+                <ChevronsUpDown className="mr-1.5 h-3.5 w-3.5" />
+                Expandir tudo
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setAnchor(null);
+                  setCollapsed(new Set(parentIds));
+                }}
+                title="Mostrar só os objetivos de topo; abra cada ramo pelo botão + do card"
+              >
+                <ChevronsDownUp className="mr-1.5 h-3.5 w-3.5" />
+                Recolher tudo
+              </Button>
+            </>
+          )}
           <Button size="sm" variant="outline" onClick={onRefresh} disabled={isFetching} title="Atualizar dados">
             <RefreshCw className={cn('mr-1.5 h-3.5 w-3.5', isFetching && 'animate-spin')} />
             Atualizar
@@ -344,24 +412,43 @@ export function OkrFlowchart({
       </div>
 
       <div ref={wrapperRef} className="relative h-[68vh] overflow-hidden rounded-lg border bg-muted/5">
+        {/* Layout automático: os cards não arrastam (antes pareciam arrastáveis e voltavam
+            ao lugar). Arrastar o fundo navega; a roda do mouse aproxima. */}
         <ReactFlow
           key={flowKey}
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
           fitView
-          minZoom={0.2}
+          fitViewOptions={{ padding: 0.12 }}
+          minZoom={0.1}
           maxZoom={2}
+          nodesDraggable={false}
           nodesConnectable={false}
+          elementsSelectable={false}
           proOptions={{ hideAttribution: true }}
-          onNodeClick={(_, node) => setSelectedId(node.id)}
+          onNodeClick={(_, node) => setSelectedId((current) => (current === node.id ? null : node.id))}
           onPaneClick={() => setSelectedId(null)}
         >
           <Background gap={20} size={1} color="#cbd5e1" className="opacity-45" />
+          <Controls showInteractive={false} position="bottom-left" />
+          {!selected && (
+            <MiniMap
+              pannable
+              zoomable
+              position="bottom-right"
+              className="hidden md:block"
+              maskColor="rgba(15, 23, 42, 0.08)"
+              nodeBorderRadius={6}
+              nodeColor={(node) => STATUS_COLOR[(node.data as OkrNodeData).status] ?? '#94a3b8'}
+            />
+          )}
         </ReactFlow>
         {selected && <OkrDetailPanel obj={selected} periodRef={period || null} onClose={() => setSelectedId(null)} />}
       </div>
-      <p className="px-1 text-[11px] text-muted-foreground">Clique em um objetivo no fluxograma para ver os detalhes (planos, tarefas e KRs).</p>
+      <p className="px-1 text-[11px] text-muted-foreground">
+        Clique em um objetivo para ver os detalhes e destacar a linha dele; use o botão +/− embaixo do card para abrir ou recolher um ramo. Arraste o fundo para navegar.
+      </p>
     </div>
   );
 }

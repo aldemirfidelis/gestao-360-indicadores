@@ -1,8 +1,28 @@
 'use client';
 
 import { useAuth } from '@/components/auth/auth-provider';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  closestCorners,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type DraggableAttributes,
+  type DraggableSyntheticListeners,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+  type UniqueIdentifier,
+} from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   AlertTriangle,
   Bot,
@@ -28,6 +48,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { findContainer, moveItem, placement, type Containers } from '@/lib/board-order';
 import { cn, formatDate } from '@/lib/utils';
 import type { TaskBoardData, TaskColumn, TaskRecord } from './task-types';
 import {
@@ -42,96 +63,188 @@ import {
 interface Props {
   board: TaskBoardData;
   tasks: TaskRecord[];
-  moving: boolean;
   onOpen: (task: TaskRecord) => void;
-  onMove: (task: TaskRecord, columnId: string, position?: number) => void;
+  onMove: (task: TaskRecord, columnId: string, position: number) => void;
   onAdd: (columnId: string) => void;
 }
 
-export function TaskKanbanBoard({ board, tasks, moving, onOpen, onMove, onAdd }: Props) {
+/** Ids das tarefas por coluna, na ordem do servidor: posição crescente, empates na ordem recebida. */
+function columnsOf(board: TaskBoardData, tasks: TaskRecord[]): Containers {
+  const containers: Containers = Object.fromEntries(board.columns.map((column) => [column.id, [] as string[]]));
+  const ordered = tasks.map((task, index) => ({ task, index })).sort((a, b) => a.task.position - b.task.position || a.index - b.index);
+  for (const { task } of ordered) containers[task.columnId]?.push(task.id);
+  return containers;
+}
+
+const SCREEN_READER_INSTRUCTIONS = {
+  draggable: 'Para mover a tarefa, pressione espaço, use as setas para escolher a etapa e a posição e pressione espaço de novo para soltar. Esc cancela.',
+};
+
+/**
+ * Kanban com arraste por ponteiro (@dnd-kit): mouse, toque (tocar e segurar) e
+ * teclado. Enquanto arrasta, a ordem exibida é local; ao soltar, só a posição
+ * final vai para o servidor e a ordem local segue até o cache refletir a mudança.
+ */
+export function TaskKanbanBoard({ board, tasks, onOpen, onMove, onAdd }: Props) {
+  const { user } = useAuth();
+  const readOnly = Boolean(user?.isDemo);
+  const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
+  const columnById = useMemo(() => new Map(board.columns.map((column) => [column.id, column])), [board.columns]);
+  const base = useMemo(() => columnsOf(board, tasks), [board, tasks]);
+  const [draft, setDraftState] = useState<Containers | null>(null);
+  const draftRef = useRef<Containers | null>(null);
+  const startRef = useRef<Containers | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [overColumnId, setOverColumnId] = useState<string | null>(null);
-  const activeTask = tasks.find((task) => task.id === activeId) ?? null;
-  const tasksByColumn = useMemo(
-    () => new Map(board.columns.map((column) => [column.id, tasks.filter((task) => task.columnId === column.id)])),
-    [board.columns, tasks],
+  const containers = draft ?? base;
+  const activeTask = activeId ? taskById.get(activeId) ?? null : null;
+  const activeColumnId = activeId ? findContainer(containers, activeId) ?? null : null;
+  const startColumnId = activeId && startRef.current ? findContainer(startRef.current, activeId) ?? null : null;
+
+  function setDraft(next: Containers | null) {
+    draftRef.current = next;
+    setDraftState(next);
+  }
+
+  // O cache mudou (movimento otimista, desfeito ou dados novos): volta a seguir o servidor.
+  useEffect(() => {
+    if (!startRef.current) setDraft(null);
+  }, [tasks]);
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    // Enter abre a tarefa; espaço pega e solta.
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+      keyboardCodes: { start: ['Space'], cancel: ['Escape'], end: ['Space'] },
+    }),
   );
 
-  function drop(columnId: string, position?: number) {
-    const task = activeTask;
+  const titleOf = (id: UniqueIdentifier) => taskById.get(String(id))?.title ?? 'tarefa';
+  const placeOf = (id: UniqueIdentifier) => {
+    const current = draftRef.current ?? base;
+    const columnId = findContainer(current, String(id));
+    const column = columnId ? columnById.get(columnId) : undefined;
+    if (!column || !columnId) return 'fora das etapas';
+    const index = current[columnId].indexOf(String(id));
+    return index >= 0 ? `${column.name}, posição ${index + 1} de ${current[columnId].length}` : column.name;
+  };
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Tarefa "${titleOf(active.id)}" pega em ${placeOf(active.id)}.`,
+    onDragOver: ({ active }) => `Tarefa "${titleOf(active.id)}" em ${placeOf(active.id)}.`,
+    onDragEnd: ({ active, over }) => (over ? `Tarefa "${titleOf(active.id)}" solta em ${placeOf(active.id)}.` : `Tarefa "${titleOf(active.id)}" voltou ao lugar.`),
+    onDragCancel: ({ active }) => `Movimento cancelado. A tarefa "${titleOf(active.id)}" voltou ao lugar.`,
+  };
+
+  function handleDragStart({ active }: DragStartEvent) {
+    startRef.current = containers;
+    setDraft(containers);
+    setActiveId(String(active.id));
+  }
+
+  function handleDragOver({ active, over }: DragOverEvent) {
+    const current = draftRef.current;
+    if (!over || !current) return;
+    const from = findContainer(current, String(active.id));
+    const to = findContainer(current, String(over.id));
+    // Dentro da coluna quem anima é o SortableContext; aqui só a troca de etapa.
+    if (!from || !to || from === to) return;
+    setDraft(moveItem(current, String(active.id), String(over.id)));
+  }
+
+  function handleDragEnd({ active, over }: DragEndEvent) {
+    const id = String(active.id);
+    const start = startRef.current;
+    const current = draftRef.current ?? base;
+    startRef.current = null;
     setActiveId(null);
-    setOverColumnId(null);
-    if (!task || (columnId === task.columnId && position === undefined)) return;
-    onMove(task, columnId, position);
+    const final = over ? moveItem(current, id, String(over.id)) : current;
+    const task = taskById.get(id);
+    const result = task && start ? placement(start, final, id, (otherId) => taskById.get(otherId)?.position) : null;
+    if (!task || !result) {
+      setDraft(null);
+      return;
+    }
+    setDraft(final);
+    onMove(task, result.container, result.position);
+  }
+
+  function handleDragCancel() {
+    startRef.current = null;
+    setActiveId(null);
+    setDraft(null);
   }
 
   return (
-    <div className="pb-2">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 xl:gap-3.5">
-        {board.columns.map((column) => (
-          <TaskBoardColumn
-            key={column.id}
-            column={column}
-            tasks={tasksByColumn.get(column.id) ?? []}
-            activeTask={activeTask}
-            over={overColumnId === column.id}
-            moving={moving}
-            onOpen={onOpen}
-            onAdd={onAdd}
-            onDragStart={(task) => setActiveId(task.id)}
-            onDragEnd={() => {
-              setActiveId(null);
-              setOverColumnId(null);
-            }}
-            onDragOver={() => setOverColumnId(column.id)}
-            onDrop={(position) => drop(column.id, position)}
-          />
-        ))}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      accessibility={{ announcements, screenReaderInstructions: SCREEN_READER_INSTRUCTIONS }}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="pb-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 xl:gap-3.5">
+          {board.columns.map((column) => (
+            <TaskBoardColumn
+              key={column.id}
+              column={column}
+              taskIds={containers[column.id] ?? []}
+              taskById={taskById}
+              dragging={Boolean(activeTask)}
+              over={activeColumnId === column.id}
+              doneTarget={column.isDoneColumn && activeColumnId === column.id && startColumnId !== column.id}
+              readOnly={readOnly}
+              onOpen={onOpen}
+              onAdd={onAdd}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+      <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' }}>
+        {activeTask ? (
+          <div className="rotate-2 scale-[1.03] cursor-grabbing drop-shadow-2xl">
+            <TaskStickyCard task={activeTask} />
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
 
 function TaskBoardColumn({
   column,
-  tasks,
-  activeTask,
+  taskIds,
+  taskById,
+  dragging,
   over,
-  moving,
+  doneTarget,
+  readOnly,
   onOpen,
   onAdd,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  onDrop,
 }: {
   column: TaskColumn;
-  tasks: TaskRecord[];
-  activeTask: TaskRecord | null;
+  taskIds: string[];
+  taskById: Map<string, TaskRecord>;
+  dragging: boolean;
   over: boolean;
-  moving: boolean;
+  doneTarget: boolean;
+  readOnly: boolean;
   onOpen: (task: TaskRecord) => void;
   onAdd: (columnId: string) => void;
-  onDragStart: (task: TaskRecord) => void;
-  onDragEnd: () => void;
-  onDragOver: () => void;
-  onDrop: (position?: number) => void;
 }) {
-  const { user } = useAuth();
+  const { setNodeRef } = useDroppable({ id: column.id, disabled: readOnly });
   const Icon = columnIcon(column.statusKey);
-  const doneTarget = column.isDoneColumn && Boolean(activeTask) && over;
+  const tasks = taskIds.flatMap((id) => {
+    const task = taskById.get(id);
+    return task ? [task] : [];
+  });
 
   return (
     <section
-      onDragOver={(event) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        onDragOver();
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        onDrop();
-      }}
+      ref={setNodeRef}
       className={cn(
         'flex min-h-[460px] flex-col rounded-2xl border bg-muted/25 p-2 transition-all',
         over && 'border-primary/50 bg-primary/[0.04] shadow-md',
@@ -158,65 +271,79 @@ function TaskBoardColumn({
         </div>
       )}
 
-      <div className="flex flex-1 flex-col gap-3">
-        {tasks.map((task) => (
-          <div
-            key={task.id}
-            draggable={!moving && !user?.isDemo}
-            onDragOver={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onDragOver();
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onDrop(task.position - 0.5);
-            }}
-            onDragStart={(event) => {
-              event.dataTransfer.effectAllowed = 'move';
-              event.dataTransfer.setData('text/plain', task.id);
-              onDragStart(task);
-            }}
-            onDragEnd={onDragEnd}
-            className={cn('transition', activeTask?.id === task.id && 'rotate-2 scale-[1.02] opacity-40')}
-          >
-            <TaskStickyCard task={task} onOpen={() => onOpen(task)} />
-          </div>
-        ))}
-        {!tasks.length && !doneTarget && (
-          <div className={cn('grid min-h-32 flex-1 place-items-center rounded-xl border border-dashed px-5 text-center', activeTask && 'border-primary/40 bg-background/50')}>
-            <div>
-              <Sparkles className="mx-auto mb-2 h-5 w-5 text-muted-foreground/60" />
-              <p className="text-xs text-muted-foreground">{activeTask ? 'Solte o post-it nesta coluna' : 'Nenhuma tarefa nesta etapa'}</p>
+      <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+        <div className="flex flex-1 flex-col gap-3">
+          {tasks.map((task) => (
+            <SortableTask key={task.id} task={task} disabled={readOnly} onOpen={onOpen} />
+          ))}
+          {!tasks.length && !doneTarget && (
+            <div className={cn('grid min-h-32 flex-1 place-items-center rounded-xl border border-dashed px-5 text-center', dragging && 'border-primary/40 bg-background/50')}>
+              <div>
+                <Sparkles className="mx-auto mb-2 h-5 w-5 text-muted-foreground/60" />
+                <p className="text-xs text-muted-foreground">{dragging ? 'Solte o post-it nesta coluna' : 'Nenhuma tarefa nesta etapa'}</p>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-      <Button variant="ghost" size="sm" className="mt-2 w-full border border-dashed bg-background/50 text-xs" disabled={user?.isDemo} onClick={() => onAdd(column.id)}>
+          )}
+        </div>
+      </SortableContext>
+      <Button variant="ghost" size="sm" className="mt-2 w-full border border-dashed bg-background/50 text-xs" disabled={readOnly} onClick={() => onAdd(column.id)}>
         <Plus className="mr-1.5 h-3.5 w-3.5" />Adicionar tarefa
       </Button>
     </section>
   );
 }
 
-export function TaskStickyCard({ task, onOpen }: { task: TaskRecord; onOpen?: () => void }) {
+function SortableTask({ task, disabled, onOpen }: { task: TaskRecord; disabled: boolean; onOpen: (task: TaskRecord) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, disabled });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      // O lugar onde o card vai cair fica marcado enquanto a cópia flutua com o ponteiro.
+      className={cn('touch-manipulation rounded-[14px]', isDragging && 'opacity-40 outline-dashed outline-2 outline-offset-2 outline-primary/60')}
+    >
+      <TaskStickyCard task={task} onOpen={() => onOpen(task)} dragAttributes={disabled ? undefined : attributes} dragListeners={disabled ? undefined : listeners} />
+    </div>
+  );
+}
+
+export function TaskStickyCard({
+  task,
+  onOpen,
+  dragAttributes,
+  dragListeners,
+}: {
+  task: TaskRecord;
+  onOpen?: () => void;
+  dragAttributes?: DraggableAttributes;
+  dragListeners?: DraggableSyntheticListeners;
+}) {
   const overdue = taskIsOverdue(task);
   const checklist = checklistProgress(task);
   const rotation = ((task.id.charCodeAt(0) + task.id.charCodeAt(task.id.length - 1)) % 5) - 2;
   const SourceIcon = sourceIcon(task.sourceType);
   const counts = task._count ?? { comments: 0, attachments: 0, checklistItems: 0, links: 0 };
+  const draggable = Boolean(dragListeners);
 
   return (
     <article
       role="button"
       tabIndex={0}
+      {...dragAttributes}
+      {...dragListeners}
+      aria-roledescription={draggable ? 'tarefa arrastável' : undefined}
       onClick={onOpen}
       onKeyDown={(event) => {
-        if ((event.key === 'Enter' || event.key === ' ') && onOpen) onOpen();
+        if (event.key === 'Enter' && onOpen) {
+          event.preventDefault();
+          onOpen();
+          return;
+        }
+        dragListeners?.onKeyDown?.(event);
       }}
       className={cn(
-        'group relative cursor-grab overflow-hidden rounded-[14px] border p-3 shadow-[0_5px_14px_rgba(15,23,42,.10)] outline-none transition duration-200 hover:-translate-y-1 hover:rotate-0 hover:shadow-[0_12px_26px_rgba(15,23,42,.16)] focus:ring-2 focus:ring-primary active:cursor-grabbing',
+        'group relative overflow-hidden rounded-[14px] border p-3 shadow-[0_5px_14px_rgba(15,23,42,.10)] outline-none transition duration-200 hover:-translate-y-1 hover:rotate-0 hover:shadow-[0_12px_26px_rgba(15,23,42,.16)] focus:ring-2 focus:ring-primary',
+        draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
         STICKY_CLASS[task.color] ?? STICKY_CLASS.yellow,
         task.priority === 'CRITICAL' && 'ring-1 ring-rose-400/80',
       )}
@@ -234,7 +361,7 @@ export function TaskStickyCard({ task, onOpen }: { task: TaskRecord; onOpen?: ()
           {task.priority === 'CRITICAL' && <ShieldAlert className="mr-1 h-3 w-3" />}
           {PRIORITY_LABEL[task.priority]}
         </Badge>
-        <GripVertical className="h-4 w-4 text-foreground/30 opacity-0 transition group-hover:opacity-100" />
+        {draggable && <GripVertical className="h-4 w-4 text-foreground/30 opacity-0 transition group-hover:opacity-100" />}
       </div>
 
       <h3 className="line-clamp-3 text-[14px] font-semibold leading-snug text-slate-900 dark:text-slate-50">{task.title}</h3>

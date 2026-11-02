@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import { SUGGESTION_STATUS_LABEL, SUGGESTION_TYPE_LABEL, ACTION_STATUS_LABEL, ACTION_PRIORITY_LABEL, ACTION_ORIGIN_LABEL, ACTION_CRITICALITY_LABEL, EFFECTIVENESS_STATUS_LABEL, TRACE_EVENT_LABEL, TRACE_FIELD_LABEL, ANALYSIS_METHOD_LABEL } from '@/lib/labels';
-import { AnalysisWorkspace } from '@/components/platform/analysis-workspace';
+import { AnalysisWorkspace, type AnalysisPayload, type AnalysisSaveOptions } from '@/components/platform/analysis-workspace';
 import { exportNodeToPng } from '@/lib/export-image';
 import { useAuth } from '@/components/auth/auth-provider';
 
@@ -214,10 +214,16 @@ export function ActionDetailView({
   const saveAnalysis = useMutation({
     mutationFn: (payload: any) => api(`/actions/${id}/analysis`, { method: 'POST', json: payload }),
     onSuccess: () => {
-      toast.success('Análise salva');
       qc.invalidateQueries({ queryKey: ['action', id] });
     },
+    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a análise'),
   });
+  // Salvamentos automáticos (arraste, edição no lugar) não mostram aviso de sucesso.
+  const persistAnalysis = (payload: AnalysisPayload, options?: AnalysisSaveOptions) =>
+    saveAnalysis.mutateAsync(payload).then((result) => {
+      if (!options?.silent) toast.success('Análise salva');
+      return result;
+    });
   const validate = useMutation({
     mutationFn: () => api(`/actions/${id}/effectiveness`, { method: 'POST', json: effectiveness }),
     onSuccess: () => {
@@ -389,7 +395,7 @@ export function ActionDetailView({
           action={a}
           users={users}
           canEdit={canEditAnalysis}
-          onSave={saveAnalysis.mutate}
+          onSave={persistAnalysis}
           saving={saveAnalysis.isPending}
           onAskAi={canUseActionAi ? () => aiAssist.mutate('analysis') : undefined}
         />

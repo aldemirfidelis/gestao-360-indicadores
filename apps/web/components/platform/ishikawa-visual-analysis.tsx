@@ -1,24 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { exportNodeToPng } from '@/lib/export-image';
-import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  ArrowRight,
-  Download,
-  GripVertical,
-  LayoutGrid,
-  Maximize,
-  Plus,
-  Rocket,
-  Save,
-  Sparkles,
-  Target,
-  Trash2,
-  ZoomIn,
-  ZoomOut,
-} from 'lucide-react';
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  closestCorners,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type DraggableAttributes,
+  type DraggableSyntheticListeners,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+  type UniqueIdentifier,
+} from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { AlertTriangle, ArrowRight, CircleCheck, Download, GripVertical, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -27,10 +32,12 @@ import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
+import { findContainer, moveItem, type Containers } from '@/lib/board-order';
 import { cn } from '@/lib/utils';
 
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 type CauseStatus = 'DRAFT' | 'IN_REVIEW' | 'LIKELY_CAUSE' | 'ROOT_CAUSE' | 'DISCARDED' | 'CONVERTED_TO_ACTION';
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 interface IshikawaCause {
   id: string;
@@ -72,20 +79,28 @@ interface UserOption {
   email?: string;
 }
 
-const CANVAS_WIDTH = 1120;
-const CANVAS_HEIGHT = 650;
-const SPINE_Y = 318;
-const SPINE_START = 54;
-const SPINE_END = 850;
-
+/**
+ * As 6 espinhas (6M): três acima e três abaixo da espinha central. `legacyX/Y`
+ * reproduzem onde o desenho antigo (posição livre) punha a 1ª causa; continuam
+ * gravados para quem ainda lê a posição.
+ */
 const CATEGORIES = [
-  { key: 'METHOD', label: 'Método', color: '#2563eb', soft: 'bg-blue-50 text-blue-700 border-blue-200', icon: '⚙', anchorX: 140, anchorY: SPINE_Y, labelX: 78, labelY: 34, cardX: 140, cardY: 72, side: 'top' },
-  { key: 'MACHINE', label: 'Máquina', color: '#16a34a', soft: 'bg-green-50 text-green-700 border-green-200', icon: '●', anchorX: 372, anchorY: SPINE_Y, labelX: 330, labelY: 34, cardX: 390, cardY: 72, side: 'top' },
-  { key: 'MANPOWER', label: 'Mão de obra', color: '#f97316', soft: 'bg-orange-50 text-orange-700 border-orange-200', icon: '▣', anchorX: 612, anchorY: SPINE_Y, labelX: 590, labelY: 34, cardX: 650, cardY: 72, side: 'top' },
-  { key: 'MATERIAL', label: 'Material', color: '#7c3aed', soft: 'bg-violet-50 text-violet-700 border-violet-200', icon: '◇', anchorX: 140, anchorY: SPINE_Y, labelX: 78, labelY: 566, cardX: 150, cardY: 350, side: 'bottom' },
-  { key: 'ENVIRONMENT', label: 'Meio ambiente', color: '#0f766e', soft: 'bg-teal-50 text-teal-700 border-teal-200', icon: '◒', anchorX: 372, anchorY: SPINE_Y, labelX: 330, labelY: 566, cardX: 400, cardY: 350, side: 'bottom' },
-  { key: 'MEASUREMENT', label: 'Medição', color: '#f59e0b', soft: 'bg-amber-50 text-amber-700 border-amber-200', icon: '◈', anchorX: 612, anchorY: SPINE_Y, labelX: 610, labelY: 566, cardX: 660, cardY: 350, side: 'bottom' },
+  { key: 'METHOD', label: 'Método', color: '#2563eb', soft: 'bg-blue-50 text-blue-700 border-blue-200', icon: '⚙', side: 'top', legacyX: 140, legacyY: 72 },
+  { key: 'MACHINE', label: 'Máquina', color: '#16a34a', soft: 'bg-green-50 text-green-700 border-green-200', icon: '●', side: 'top', legacyX: 390, legacyY: 72 },
+  { key: 'MANPOWER', label: 'Mão de obra', color: '#f97316', soft: 'bg-orange-50 text-orange-700 border-orange-200', icon: '▣', side: 'top', legacyX: 650, legacyY: 72 },
+  { key: 'MATERIAL', label: 'Material', color: '#7c3aed', soft: 'bg-violet-50 text-violet-700 border-violet-200', icon: '◇', side: 'bottom', legacyX: 150, legacyY: 350 },
+  { key: 'ENVIRONMENT', label: 'Meio ambiente', color: '#0f766e', soft: 'bg-teal-50 text-teal-700 border-teal-200', icon: '◒', side: 'bottom', legacyX: 400, legacyY: 350 },
+  { key: 'MEASUREMENT', label: 'Medição', color: '#f59e0b', soft: 'bg-amber-50 text-amber-700 border-amber-200', icon: '◈', side: 'bottom', legacyX: 660, legacyY: 350 },
 ] as const;
+
+type Category = (typeof CATEGORIES)[number];
+
+const TOP_CATEGORIES = CATEGORIES.filter((category) => category.side === 'top');
+const BOTTOM_CATEGORIES = CATEGORIES.filter((category) => category.side === 'bottom');
+
+/** Recuo da espinha da categoria na coluna e quanto ela inclina até a espinha central. */
+const BONE_INSET = 14;
+const BONE_MAX_SLANT = 44;
 
 const CATEGORY_HINTS: Record<string, string> = {
   METHOD: 'Processos, procedimentos, instruções de trabalho e fluxo. Ex.: falta de padrão, etapa fora de sequência.',
@@ -103,26 +118,27 @@ const PRIORITY_LABEL: Record<Priority, string> = {
   CRITICAL: 'Crítica',
 };
 
-const STATUS_LABEL: Record<CauseStatus, string> = {
-  DRAFT: 'Rascunho',
-  IN_REVIEW: 'Em análise',
-  LIKELY_CAUSE: 'Causa provável',
-  ROOT_CAUSE: 'Causa raiz',
-  DISCARDED: 'Descartada',
-  CONVERTED_TO_ACTION: 'Convertida em plano de ação',
+const SCREEN_READER_INSTRUCTIONS = {
+  draggable: 'Para mover a causa, pressione espaço, use as setas para escolher a categoria e a posição e pressione espaço de novo para soltar. Esc cancela. Enter abre a edição.',
 };
+
+interface Geometry {
+  width: number;
+  height: number;
+  spine: { x1: number; x2: number; y: number } | null;
+  bones: Array<{ key: string; color: string; x1: number; y1: number; x2: number; y2: number }>;
+  ribs: Array<{ id: string; color: string; x1: number; x2: number; y: number }>;
+}
 
 export function IshikawaVisualAnalysis({
   actionId,
   session,
   problem,
   rootCause,
-  users = [],
   saving,
   canEdit = true,
   seedCauses,
   onSeedConsumed,
-  onRootCauseChange,
   onSendToFiveWhys,
   onSave,
 }: {
@@ -138,86 +154,127 @@ export function IshikawaVisualAnalysis({
   onSeedConsumed?: () => void;
   onRootCauseChange: (value: string) => void;
   onSendToFiveWhys?: (text: string, causeId: string) => void;
-  onSave: (causes: IshikawaCause[], rootCause?: string) => void;
+  /** Devolve a promessa do salvamento: a fila espera um terminar para mandar o próximo. */
+  onSave: (causes: IshikawaCause[], rootCause?: string) => Promise<unknown> | void;
 }) {
-  const qc = useQueryClient();
-  const canvasRef = useRef<HTMLDivElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const diagramRef = useRef<HTMLDivElement | null>(null);
+  const spineRef = useRef<HTMLDivElement | null>(null);
+  const tailRef = useRef<HTMLDivElement | null>(null);
+  const headRef = useRef<HTMLDivElement | null>(null);
   const causesRef = useRef<IshikawaCause[]>([]);
-  const dragRef = useRef<{ id: string; startX: number; startY: number; originX: number; originY: number; moved: boolean } | null>(null);
   const [causes, setCauses] = useState<IshikawaCause[]>(() => normalizeCauses(session?.ishikawaCauses));
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState({ category: 'METHOD', title: '' });
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loadingAi, setLoadingAi] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [geometry, setGeometry] = useState<Geometry | null>(null);
+
+  // Ordem durante o arraste (antes de virar estado salvo).
+  const [dragOrder, setDragOrderState] = useState<Containers | null>(null);
+  const dragOrderRef = useRef<Containers | null>(null);
+  const dragStartRef = useRef<Containers | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Fila de salvamento: um por vez; enquanto houver mudança local não enviada ou
+  // salvamento a caminho, o retrato que volta do servidor não sobrescreve a tela.
+  const onSaveRef = useRef(onSave);
+  const rootCauseRef = useRef(rootCause);
+  const queueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const pendingRef = useRef(0);
+  const waitingRef = useRef(false);
+  const dirtyRef = useRef(false);
 
   useEffect(() => {
-    const next = normalizeCauses(session?.ishikawaCauses);
-    setCauses(next);
-    setSelectedId((current) => (current && next.some((cause) => cause.id === current) ? current : next[0]?.id ?? null));
-  }, [session?.id, session?.ishikawaCauses]);
-
+    onSaveRef.current = onSave;
+  }, [onSave]);
+  useEffect(() => {
+    rootCauseRef.current = rootCause;
+  }, [rootCause]);
   useEffect(() => {
     causesRef.current = causes;
   }, [causes]);
 
-  const selectedCause = causes.find((cause) => cause.id === selectedId) ?? null;
-  const causesByCategory = useMemo(() => {
-    const map = new Map<string, IshikawaCause[]>();
-    CATEGORIES.forEach((category) => map.set(category.key, []));
-    causes.forEach((cause) => {
-      const key = normalizeCategory(cause.category);
-      map.set(key, [...(map.get(key) ?? []), cause]);
-    });
-    return map;
-  }, [causes]);
+  useEffect(() => {
+    // Inclusive quando a sessão acaba de nascer (1º salvamento): o retrato que chega
+    // pode ser anterior a uma causa adicionada enquanto ele estava a caminho.
+    if (dirtyRef.current || pendingRef.current > 0) return;
+    const next = normalizeCauses(session?.ishikawaCauses);
+    causesRef.current = next;
+    setCauses(next);
+    setSelectedId((current) => (current && next.some((cause) => cause.id === current) ? current : null));
+  }, [session?.id, session?.ishikawaCauses]);
 
-  const handleSave = useCallback(
-    (nextCauses = causesRef.current, nextRootCause = rootCause) => {
-      onSave(nextCauses, nextRootCause);
-      setLastSavedAt(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+  function setDragOrder(next: Containers | null) {
+    dragOrderRef.current = next;
+    setDragOrderState(next);
+  }
+
+  const queueSave = useCallback(() => {
+    if (!canEdit) return;
+    setSaveState('saving');
+    // Já há um salvamento esperando na fila: ele vai levar o estado mais recente.
+    if (waitingRef.current) return;
+    const idle = pendingRef.current === 0;
+    waitingRef.current = true;
+    pendingRef.current += 1;
+    const run = async () => {
+      waitingRef.current = false;
+      dirtyRef.current = false;
+      await onSaveRef.current(causesRef.current, rootCauseRef.current);
+    };
+    // Sem nada na fila, salva já (na mesma chamada): trocar para os 5 Porquês logo em
+    // seguida desmonta esta tela, mas o salvamento já saiu.
+    const job = idle ? run() : queueRef.current.catch(() => undefined).then(run);
+    queueRef.current = job.then(
+      () => {
+        pendingRef.current -= 1;
+        if (pendingRef.current === 0 && !dirtyRef.current) {
+          setSaveState('saved');
+          setLastSavedAt(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+        }
+      },
+      () => {
+        pendingRef.current -= 1;
+        // A tela continua com a versão local; "Tentar de novo" reenvia.
+        dirtyRef.current = true;
+        setSaveState('error');
+      },
+    );
+  }, [canEdit]);
+
+  /** Mudança local que já deve ser gravada (arraste, nova causa, exclusão...). */
+  const commit = useCallback(
+    (next: IshikawaCause[], nextRootCause?: string) => {
+      const ordered = applyContainers(next, containersOf(next));
+      causesRef.current = ordered;
+      setCauses(ordered);
+      if (nextRootCause !== undefined) rootCauseRef.current = nextRootCause;
+      dirtyRef.current = true;
+      queueSave();
     },
-    [onSave, rootCause],
+    [queueSave],
   );
 
-  useEffect(() => {
-    function onMove(event: PointerEvent) {
-      const drag = dragRef.current;
-      if (!drag) return;
-      const dx = (event.clientX - drag.startX) / zoom;
-      const dy = (event.clientY - drag.startY) / zoom;
-      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
-      setCauses((current) =>
-        current.map((cause) =>
-          cause.id === drag.id
-            ? {
-                ...cause,
-                positionX: Math.max(72, Math.min(CANVAS_WIDTH - 250, drag.originX + dx)),
-                positionY: Math.max(52, Math.min(CANVAS_HEIGHT - 92, drag.originY + dy)),
-              }
-            : cause,
-        ),
-      );
-    }
-    function onUp() {
-      const drag = dragRef.current;
-      dragRef.current = null;
-      if (drag?.moved) handleSave(causesRef.current);
-    }
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-    };
-  }, [handleSave, zoom]);
+  /** Edição em andamento (digitação): só marca; grava ao sair do campo. */
+  function updateCause(id: string, patch: Partial<IshikawaCause>) {
+    dirtyRef.current = true;
+    setCauses((current) => {
+      const next = current.map((cause) => (cause.id === id ? { ...cause, ...patch } : cause));
+      causesRef.current = next;
+      return next;
+    });
+  }
 
-  // Semeadura vinda do Pareto: adiciona as causas vitais na espinha da
-  // categoria correspondente (dedupe por título; posiciona como o addCause).
+  function saveIfDirty() {
+    if (dirtyRef.current) queueSave();
+  }
+
+  // Semeadura vinda do Pareto: adiciona as causas vitais na espinha da categoria
+  // correspondente (sem repetir títulos já existentes).
   const seedConsumedRef = useRef(false);
   useEffect(() => {
     if (!seedCauses?.length) {
@@ -233,24 +290,10 @@ export function IshikawaVisualAnalysis({
       const title = String(seed.title ?? '').trim();
       if (!title || existingTitles.has(title.toLowerCase())) continue;
       existingTitles.add(title.toLowerCase());
-      const category = getCategory(seed.category ?? 'METHOD');
-      const countInCategory =
-        causesRef.current.filter((cause) => normalizeCategory(cause.category) === category.key).length +
-        additions.filter((cause) => normalizeCategory(cause.category) === category.key).length;
-      additions.push(
-        makeCause({
-          category: category.key,
-          title,
-          orderIndex: causesRef.current.length + additions.length,
-          positionX: category.cardX + (countInCategory % 2 === 0 ? 0 : 18),
-          positionY: category.cardY + countInCategory * 58,
-        }),
-      );
+      additions.push(makeCause({ category: getCategory(seed.category ?? 'METHOD').key, title }));
     }
     if (additions.length) {
-      const next = [...causesRef.current, ...additions];
-      setCauses(next);
-      handleSave(next);
+      commit([...causesRef.current, ...additions]);
       toast.success(`${additions.length} causa(s) vital(is) do Pareto adicionada(s) ao Ishikawa`);
     } else {
       toast.info('As causas vitais do Pareto já estão no Ishikawa.');
@@ -258,10 +301,6 @@ export function IshikawaVisualAnalysis({
     onSeedConsumed?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedCauses, canEdit]);
-
-  function updateCause(id: string, patch: Partial<IshikawaCause>) {
-    setCauses((current) => current.map((cause) => (cause.id === id ? { ...cause, ...patch } : cause)));
-  }
 
   function openAdd(category = 'METHOD') {
     setDraft({ category, title: '' });
@@ -274,64 +313,36 @@ export function IshikawaVisualAnalysis({
       toast.error('Informe o nome da causa.');
       return;
     }
-    // Posiciona a nova causa já na espinha da categoria escolhida (empilha sem sobrepor).
-    const category = getCategory(draft.category);
-    const countInCategory = causes.filter((cause) => normalizeCategory(cause.category) === category.key).length;
-    const created = makeCause({
-      category: draft.category,
-      title,
-      orderIndex: causes.length,
-      positionX: category.cardX + (countInCategory % 2 === 0 ? 0 : 18),
-      positionY: category.cardY + countInCategory * 58,
-    });
-    const next = [...causes, created];
-    setCauses(next);
+    const created = makeCause({ category: draft.category, title });
+    commit([...causesRef.current, created]);
     setSelectedId(created.id);
     setAddOpen(false);
-    handleSave(next);
   }
 
   function deleteCause(cause: IshikawaCause) {
     if (cause.convertedToTaskId && !window.confirm('Esta causa já foi convertida em tarefa. Deseja remover mesmo assim?')) return;
-    const next = causes.filter((item) => item.id !== cause.id);
-    setCauses(next);
-    setSelectedId(next[0]?.id ?? null);
-    handleSave(next, rootCause === cause.title ? '' : rootCause);
+    commit(
+      causesRef.current.filter((item) => item.id !== cause.id),
+      rootCauseRef.current === cause.title ? '' : undefined,
+    );
+    setSelectedId(null);
   }
 
-  function markRootCause(cause: IshikawaCause) {
-    const next = causes.map((item) => ({
-      ...item,
-      isRootCause: item.id === cause.id,
-      status: item.id === cause.id ? 'ROOT_CAUSE' as CauseStatus : item.status === 'ROOT_CAUSE' ? 'IN_REVIEW' as CauseStatus : item.status,
-    }));
-    setCauses(next);
-    onRootCauseChange(cause.title);
-    handleSave(next, cause.title);
+  function changeCategory(cause: IshikawaCause, category: string) {
+    if (normalizeCategory(category) === normalizeCategory(cause.category)) return;
+    // Vai para o fim da espinha de destino.
+    commit([...causesRef.current.filter((item) => item.id !== cause.id), { ...cause, category: normalizeCategory(category) }]);
   }
 
-  async function convertToAction(cause: IshikawaCause) {
-    if (!actionId || cause.id.startsWith('temp-')) {
-      toast.error('Salve a análise antes de transformar esta causa em ação.');
-      return;
-    }
-    try {
-      await api(`/actions/${actionId}/analysis/ishikawa/causes/${cause.id}/convert-to-action`, {
-        method: 'POST',
-        json: { markRootCause: cause.isRootCause || cause.status === 'ROOT_CAUSE' },
-      });
-      toast.success('Causa transformada em tarefa do plano');
-      const next = causes.map((item) => (item.id === cause.id ? { ...item, status: 'CONVERTED_TO_ACTION' as CauseStatus, convertedToTaskId: 'pending-refresh' } : item));
-      setCauses(next);
-      qc.invalidateQueries({ queryKey: ['action', actionId] });
-    } catch (error: any) {
-      toast.error(error?.message ?? 'Não foi possível transformar em ação');
-    }
+  function sendToFiveWhys(cause: IshikawaCause) {
+    if (!onSendToFiveWhys) return;
+    commit(causesRef.current.map((item) => (item.id === cause.id ? { ...item, status: 'LIKELY_CAUSE' as CauseStatus } : item)));
+    onSendToFiveWhys(cause.title, cause.id);
   }
 
   async function loadAiSuggestions() {
     if (!actionId) {
-      setSuggestions(defaultSuggestions(causes));
+      setSuggestions(defaultSuggestions());
       setSuggestionsOpen(true);
       return;
     }
@@ -341,163 +352,224 @@ export function IshikawaVisualAnalysis({
         method: 'POST',
         json: { problem, causes },
       });
-      setSuggestions(out.length ? out : defaultSuggestions(causes));
+      setSuggestions(out.length ? out : defaultSuggestions());
       setSuggestionsOpen(true);
     } catch (error: any) {
       toast.error(error?.message ?? 'Não foi possível gerar sugestões com IA');
-      setSuggestions(defaultSuggestions(causes));
+      setSuggestions(defaultSuggestions());
       setSuggestionsOpen(true);
     } finally {
       setLoadingAi(false);
     }
   }
 
-  function acceptSuggestion(item: Suggestion, editAfter = false) {
+  function acceptSuggestion(item: Suggestion) {
     const nextCause = makeCause({
       category: item.category,
       title: item.title,
       description: item.justification,
       priority: item.priority,
-      orderIndex: causes.length,
       isAiSuggested: true,
     });
-    const next = [...causes, nextCause];
-    setCauses(next);
+    commit([...causesRef.current, nextCause]);
     setSelectedId(nextCause.id);
     setSuggestions((current) => current.filter((candidate) => candidate !== item));
-    handleSave(next);
-    if (editAfter) setSuggestionsOpen(false);
   }
 
   async function exportImage() {
-    await exportNodeToPng(canvasRef.current, `ishikawa-${actionId ?? 'analise'}`);
+    await exportNodeToPng(diagramRef.current, `ishikawa-${actionId ?? 'analise'}`);
   }
 
-  function resetLayout() {
-    const next = autoLayout(causes);
-    setCauses(next);
-    handleSave(next);
+  // ---- Arraste -------------------------------------------------------------
+
+  const causeById = useMemo(() => new Map(causes.map((cause) => [cause.id, cause])), [causes]);
+  const containers = dragOrder ?? containersOf(causes);
+  const activeCause = activeId ? causeById.get(activeId) ?? null : null;
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    // Enter abre a edição; espaço pega e solta.
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+      keyboardCodes: { start: ['Space'], cancel: ['Escape'], end: ['Space'] },
+    }),
+  );
+
+  const titleOf = (id: UniqueIdentifier) => causeById.get(String(id))?.title ?? 'causa';
+  const placeOf = (id: UniqueIdentifier) => {
+    const current = dragOrderRef.current ?? containersOf(causesRef.current);
+    const key = findContainer(current, String(id));
+    const category = key ? CATEGORIES.find((item) => item.key === key) : undefined;
+    if (!category || !key) return 'fora das espinhas';
+    return `${category.label}, posição ${current[key].indexOf(String(id)) + 1} de ${current[key].length}`;
+  };
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Causa "${titleOf(active.id)}" pega em ${placeOf(active.id)}.`,
+    onDragOver: ({ active }) => `Causa "${titleOf(active.id)}" em ${placeOf(active.id)}.`,
+    onDragEnd: ({ active, over }) => (over ? `Causa "${titleOf(active.id)}" solta em ${placeOf(active.id)}.` : `Causa "${titleOf(active.id)}" voltou ao lugar.`),
+    onDragCancel: ({ active }) => `Movimento cancelado. A causa "${titleOf(active.id)}" voltou ao lugar.`,
+  };
+
+  function handleDragStart({ active }: DragStartEvent) {
+    const start = containersOf(causesRef.current);
+    dragStartRef.current = start;
+    setDragOrder(start);
+    setActiveId(String(active.id));
   }
 
-  function centerCanvas() {
-    setZoom(1);
-    scrollRef.current?.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
+  function handleDragOver({ active, over }: DragOverEvent) {
+    const current = dragOrderRef.current;
+    if (!over || !current) return;
+    const from = findContainer(current, String(active.id));
+    const to = findContainer(current, String(over.id));
+    if (!from || !to || from === to) return;
+    setDragOrder(moveItem(current, String(active.id), String(over.id)));
   }
+
+  function handleDragEnd({ active, over }: DragEndEvent) {
+    const id = String(active.id);
+    const start = dragStartRef.current;
+    const current = dragOrderRef.current;
+    dragStartRef.current = null;
+    setActiveId(null);
+    setDragOrder(null);
+    if (!start || !current) return;
+    const final = over ? moveItem(current, id, String(over.id)) : current;
+    const from = findContainer(start, id);
+    const to = findContainer(final, id);
+    if (!to || (from === to && start[from].indexOf(id) === final[to].indexOf(id))) return;
+    const next = applyContainers(causesRef.current, final);
+    if (from !== to) {
+      const category = CATEGORIES.find((item) => item.key === to);
+      toast.success(`"${titleOf(id)}" agora está em ${category?.label ?? 'outra categoria'}`);
+    }
+    commit(next);
+  }
+
+  function handleDragCancel() {
+    dragStartRef.current = null;
+    setActiveId(null);
+    setDragOrder(null);
+  }
+
+  // ---- Desenho da espinha --------------------------------------------------
+
+  // As linhas saem das posições reais dos cards (alturas variam com o texto).
+  useEffect(() => {
+    const root = diagramRef.current;
+    if (!root) return;
+    let frame = 0;
+    const measure = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => setGeometry(measureGeometry(root, spineRef.current, tailRef.current, headRef.current)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [causes, selectedId, problem]);
+
+  const renderColumn = (category: Category) => {
+    const ids = containers[category.key] ?? [];
+    return (
+      <CategoryColumn
+        key={category.key}
+        category={category}
+        causes={ids.flatMap((id) => {
+          const cause = causeById.get(id);
+          return cause ? [cause] : [];
+        })}
+        selectedId={selectedId}
+        canEdit={canEdit}
+        dragging={Boolean(activeCause)}
+        onSelect={(id) => setSelectedId((current) => (current === id ? null : id))}
+        onAdd={() => openAdd(category.key)}
+        renderEditor={(cause) => (
+          <CauseEditor
+            cause={cause}
+            canEdit={canEdit}
+            onTitle={(value) => updateCause(cause.id, { title: value, description: value })}
+            onBlur={saveIfDirty}
+            onCategory={(value) => changeCategory(cause, value)}
+            onPriority={(value) => commit(causesRef.current.map((item) => (item.id === cause.id ? { ...item, priority: value } : item)))}
+            onSendToFiveWhys={onSendToFiveWhys ? () => sendToFiveWhys(cause) : undefined}
+            onDelete={() => deleteCause(cause)}
+          />
+        )}
+      />
+    );
+  };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
+    <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => openAdd()} disabled={!canEdit}>
-            <Plus className="mr-2 h-4 w-4" />
-            Adicionar causa
-          </Button>
+          {canEdit && (
+            <Button size="sm" onClick={() => openAdd()}>
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar causa
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={loadAiSuggestions} disabled={loadingAi}>
             <Sparkles className="mr-2 h-4 w-4" />
             {loadingAi ? 'Carregando...' : 'Dicas de IA'}
           </Button>
-          <Button size="sm" variant="outline" onClick={resetLayout} disabled={!canEdit}>
-            <LayoutGrid className="mr-2 h-4 w-4" />
-            Layout automático
-          </Button>
-          <Button size="sm" variant="outline" onClick={centerCanvas}>
-            <Maximize className="mr-2 h-4 w-4" />
-            Centralizar
-          </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="icon" variant="outline" onClick={() => setZoom((value) => Math.max(0.5, value - 0.1))} title="Reduzir zoom">
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <div className="w-12 text-center text-xs font-medium text-slate-600">{Math.round(zoom * 100)}%</div>
-          <Button size="icon" variant="outline" onClick={() => setZoom((value) => Math.min(1.25, value + 0.1))} title="Aumentar zoom">
-            <ZoomIn className="h-4 w-4" />
-          </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          {canEdit && <IshikawaSaveStatus state={saving && saveState !== 'error' ? 'saving' : saveState} lastSavedAt={lastSavedAt} onRetry={queueSave} />}
           <Button size="sm" variant="outline" onClick={exportImage}>
             <Download className="mr-2 h-4 w-4" />
             Exportar
-          </Button>
-          <Button size="sm" onClick={() => handleSave()} disabled={!canEdit || saving}>
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? 'Salvando...' : 'Salvar análise'}
           </Button>
         </div>
       </div>
 
       {!canEdit && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800">
-          Você está em modo de visualização. Criação, edição e conversão de causas estão bloqueadas.
+          Você está em modo de visualização. Criação, edição e movimentação de causas estão bloqueadas.
         </div>
       )}
 
-      {/* Sem coluna lateral: o diagrama ocupa a largura toda. Edição e ações da
-          causa acontecem no próprio card ao selecioná-lo. */}
-      <div>
-        <div ref={scrollRef} className="max-h-[620px] overflow-auto bg-slate-50">
-          <div
-            ref={canvasRef}
-            className="relative m-0 origin-top-left"
-            style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, transform: `scale(${zoom})`, transformOrigin: 'top left' }}
-          >
-            <FishboneSvg causes={causes} />
-            <FishTail />
-            <FishHead problem={problem} />
-
-            {CATEGORIES.map((category) => (
-              <div key={category.key}>
-                <div
-                  className={cn('absolute z-10 inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-semibold shadow-sm', category.soft)}
-                  style={{ left: category.labelX, top: category.labelY }}
-                >
-                  <span aria-hidden>{category.icon}</span>
-                  {category.label}
-                </div>
-                {canEdit && (
-                  <button
-                    type="button"
-                    className="absolute z-10 rounded-md border border-dashed border-slate-300 bg-white/90 px-4 py-2 text-xs font-medium text-slate-500 shadow-sm transition hover:border-blue-300 hover:text-blue-700"
-                    style={{ left: category.cardX + 18, top: category.side === 'top' ? 248 : 522 }}
-                    onClick={() => openAdd(category.key)}
-                  >
-                    + Adicionar causa
-                  </button>
-                )}
-              </div>
-            ))}
-
-            {causes.map((cause) => (
-              <CauseCard
-                key={cause.id}
-                cause={cause}
-                selected={cause.id === selectedId}
-                canEdit={canEdit}
-                onSelect={() => setSelectedId(cause.id)}
-                onPointerDown={(event) => {
-                  if (!canEdit) return;
-                  dragRef.current = {
-                    id: cause.id,
-                    startX: event.clientX,
-                    startY: event.clientY,
-                    originX: cause.positionX,
-                    originY: cause.positionY,
-                    moved: false,
-                  };
-                }}
-                onUpdate={(patch) => updateCause(cause.id, patch)}
-                onSave={() => handleSave()}
-                onDelete={() => deleteCause(cause)}
-                onSendToFiveWhys={onSendToFiveWhys ? () => {
-                  updateCause(cause.id, { status: 'LIKELY_CAUSE' });
-                  handleSave();
-                  onSendToFiveWhys(cause.title, cause.id);
-                } : undefined}
-              />
-            ))}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        accessibility={{ announcements, screenReaderInstructions: SCREEN_READER_INSTRUCTIONS }}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div
+          ref={diagramRef}
+          className="relative bg-muted/20 px-4 py-5"
+          onClick={(event) => {
+            // Clique fora dos cards fecha a edição.
+            if (!(event.target as HTMLElement).closest('[data-cause-id]')) setSelectedId(null);
+          }}
+        >
+          {geometry && <FishboneLines geometry={geometry} showRibs={!activeCause} />}
+          <div className="relative z-10 grid gap-4 lg:grid-cols-3 lg:gap-x-6">{TOP_CATEGORIES.map(renderColumn)}</div>
+          <div ref={spineRef} className="relative z-10 my-4 flex min-h-[84px] items-center gap-3">
+            <div ref={tailRef} className="hidden h-14 w-10 shrink-0 bg-slate-500 lg:block" style={{ clipPath: 'polygon(0 0, 100% 50%, 0 100%)' }} aria-hidden />
+            <div className="hidden flex-1 lg:block" />
+            <FishHead ref={headRef} problem={problem} />
           </div>
+          <div className="relative z-10 grid gap-4 lg:grid-cols-3 lg:gap-x-6">{BOTTOM_CATEGORIES.map(renderColumn)}</div>
         </div>
-      </div>
+        <DragOverlay dropAnimation={{ duration: 160, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' }}>
+          {activeCause ? (
+            <div className="w-[240px] rotate-1 cursor-grabbing drop-shadow-xl">
+              <CauseCardView cause={activeCause} selected={false} draggable />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
-      <Legend lastSavedAt={lastSavedAt} saving={saving} />
+      <Legend canEdit={canEdit} />
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md">
@@ -515,7 +587,12 @@ export function IshikawaVisualAnalysis({
             </div>
             <div>
               <Label>Nome da causa</Label>
-              <Input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} autoFocus />
+              <Input
+                value={draft.title}
+                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                onKeyDown={(event) => event.key === 'Enter' && addCause()}
+                autoFocus
+              />
             </div>
           </div>
           <DialogFooter>
@@ -592,228 +669,322 @@ export function IshikawaVisualAnalysis({
   );
 }
 
-function FishboneSvg({ causes }: { causes: IshikawaCause[] }) {
-  return (
-    <svg className="absolute inset-0 z-0" width={CANVAS_WIDTH} height={CANVAS_HEIGHT} aria-hidden>
-      <defs>
-        <filter id="fishShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#94a3b8" floodOpacity="0.18" />
-        </filter>
-      </defs>
-      <line x1={SPINE_START} y1={SPINE_Y} x2={SPINE_END} y2={SPINE_Y} stroke="#64748b" strokeWidth="5" strokeLinecap="round" />
-      <circle cx={135} cy={SPINE_Y} r="8" fill="#64748b" />
-      <circle cx={370} cy={SPINE_Y} r="8" fill="#64748b" />
-      <circle cx={610} cy={SPINE_Y} r="8" fill="#64748b" />
-      <circle cx={820} cy={SPINE_Y} r="8" fill="#64748b" />
-      {CATEGORIES.map((category) => {
-        const endY = category.side === 'top' ? 70 : 566;
-        const endX = category.anchorX - 34;
-        return (
-          <g key={category.key}>
-            <line x1={category.anchorX} y1={category.anchorY} x2={endX} y2={endY} stroke={category.color} strokeWidth="3" strokeLinecap="round" />
-            {(causes.filter((cause) => normalizeCategory(cause.category) === category.key)).map((cause) => (
-              <line
-                key={cause.id}
-                x1={category.side === 'top' ? cause.positionX - 24 : cause.positionX - 16}
-                y1={cause.positionY + 22}
-                x2={cause.positionX}
-                y2={cause.positionY + 22}
-                stroke={category.color}
-                strokeWidth="2"
-                strokeLinecap="round"
-                opacity="0.65"
-              />
-            ))}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-function FishTail() {
-  return (
-    <div className="absolute z-10" style={{ left: 6, top: SPINE_Y - 34, width: 48, height: 68 }}>
-      <div className="h-full w-full bg-slate-600 shadow-md" style={{ clipPath: 'polygon(0 0, 100% 50%, 0 100%)' }} />
+/** Coluna da categoria: rótulo na ponta da espinha e causas empilhadas ao longo dela. */
+function CategoryColumn({
+  category,
+  causes,
+  selectedId,
+  canEdit,
+  dragging,
+  onSelect,
+  onAdd,
+  renderEditor,
+}: {
+  category: Category;
+  causes: IshikawaCause[];
+  selectedId: string | null;
+  canEdit: boolean;
+  dragging: boolean;
+  onSelect: (id: string) => void;
+  onAdd: () => void;
+  renderEditor: (cause: IshikawaCause) => React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: category.key, disabled: !canEdit });
+  const label = (
+    <div data-bone-label={category.key} className={cn('inline-flex h-9 w-fit items-center gap-2 rounded-lg border px-3 text-sm font-semibold shadow-sm', category.soft)}>
+      <span aria-hidden>{category.icon}</span>
+      {category.label}
+      <span className="rounded-full bg-white/70 px-1.5 text-[10px] font-bold">{causes.length}</span>
     </div>
   );
-}
-
-function FishHead({ problem }: { problem: string }) {
-  return (
-    <div
-      className="absolute z-10 flex items-center justify-center px-8 text-center text-white shadow-xl"
-      style={{
-        left: 825,
-        top: 220,
-        width: 210,
-        height: 195,
-        background: 'linear-gradient(135deg, #f87171 0%, #ef4444 55%, #fb7185 100%)',
-        clipPath: 'polygon(0 8%, 62% 16%, 100% 50%, 62% 84%, 0 92%, 8% 50%)',
-        filter: 'url(#fishShadow)',
-      }}
-    >
-      <div className="absolute left-55 top-36 h-7 w-7 rounded-full border-4 border-white bg-slate-800 shadow" style={{ left: 56, top: 38 }} />
-      <div className="mt-8 max-w-[132px] text-sm font-bold leading-5">
-        {problem?.trim() || 'Problema principal'}
-        <div className="mx-auto mt-3 w-fit rounded-full bg-red-900/45 px-3 py-1 text-[11px] font-semibold">Efeito</div>
+  const list = (
+    <SortableContext items={causes.map((cause) => cause.id)} strategy={verticalListSortingStrategy}>
+      <div
+        ref={setNodeRef}
+        data-bone-list={category.key}
+        className={cn(
+          // À esquerda, no desktop, fica o espaço da espinha inclinada (BONE_INSET + BONE_MAX_SLANT + folga).
+          'flex min-h-[96px] flex-col gap-2 rounded-xl p-1.5 transition-colors lg:pl-[72px]',
+          dragging && 'bg-background/60 ring-1 ring-dashed ring-border',
+          isOver && 'bg-primary/5 ring-2 ring-primary/40',
+        )}
+      >
+        {causes.map((cause) => (
+          <SortableCause key={cause.id} cause={cause} selected={cause.id === selectedId} canEdit={canEdit} onSelect={() => onSelect(cause.id)}>
+            {cause.id === selectedId ? renderEditor(cause) : null}
+          </SortableCause>
+        ))}
+        {!causes.length && (
+          <div className="grid min-h-[72px] place-items-center rounded-lg border border-dashed px-3 text-center text-xs text-muted-foreground">
+            {dragging ? `Solte aqui para mover para ${category.label}` : 'Nenhuma causa nesta categoria'}
+          </div>
+        )}
+        {canEdit && !dragging && (
+          <button
+            type="button"
+            className="rounded-md border border-dashed bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-primary/50 hover:text-primary"
+            onClick={onAdd}
+          >
+            + Adicionar causa
+          </button>
+        )}
       </div>
-    </div>
+    </SortableContext>
+  );
+  return (
+    <section className="flex min-w-0 flex-col gap-2" aria-label={`Causas de ${category.label}`}>
+      {category.side === 'top' ? (
+        <>
+          {label}
+          {list}
+        </>
+      ) : (
+        <>
+          {list}
+          {label}
+        </>
+      )}
+    </section>
   );
 }
 
-/**
- * Card da causa: edição e ações acontecem no próprio bloco, sem painel lateral.
- * O diagrama é o que importa nesta tela — tirar a coluna da direita devolveu
- * ~300px de largura e dispensou o zoom para enxergar a espinha inteira.
- */
-function CauseCard({
+function SortableCause({
   cause,
   selected,
   canEdit,
   onSelect,
-  onPointerDown,
-  onUpdate,
-  onSave,
-  onDelete,
-  onSendToFiveWhys,
+  children,
 }: {
   cause: IshikawaCause;
   selected: boolean;
   canEdit: boolean;
   onSelect: () => void;
-  onPointerDown: (event: React.PointerEvent<Element>) => void;
-  onUpdate: (patch: Partial<IshikawaCause>) => void;
-  onSave: () => void;
-  onDelete: () => void;
-  onSendToFiveWhys?: () => void;
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cause.id, disabled: !canEdit });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn('touch-manipulation rounded-lg', isDragging && 'opacity-40 outline-dashed outline-2 outline-offset-2 outline-primary/60')}
+    >
+      <CauseCardView
+        cause={cause}
+        selected={selected}
+        draggable={canEdit}
+        dragAttributes={canEdit ? attributes : undefined}
+        dragListeners={canEdit ? listeners : undefined}
+        onSelect={onSelect}
+      >
+        {children}
+      </CauseCardView>
+    </div>
+  );
+}
+
+function CauseCardView({
+  cause,
+  selected,
+  draggable,
+  dragAttributes,
+  dragListeners,
+  onSelect,
+  children,
+}: {
+  cause: IshikawaCause;
+  selected: boolean;
+  draggable: boolean;
+  dragAttributes?: DraggableAttributes;
+  dragListeners?: DraggableSyntheticListeners;
+  onSelect?: () => void;
+  children?: React.ReactNode;
 }) {
   const category = getCategory(cause.category);
   const hasRootCause = (cause.rootCause ?? '').trim().length > 0;
   return (
     <div
+      data-cause-id={cause.id}
       role="button"
       tabIndex={0}
-      className={cn(
-        'absolute z-20 min-h-[60px] w-[218px] resize-y overflow-auto rounded-lg border bg-white p-3 text-left shadow-sm transition',
-        selected ? 'z-30 border-blue-500 shadow-lg ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
-        cause.isRootCause && 'border-emerald-500 ring-2 ring-emerald-100',
-      )}
-      style={{ left: cause.positionX, top: cause.positionY }}
+      {...dragAttributes}
+      {...dragListeners}
+      aria-roledescription={dragListeners ? 'causa arrastável' : undefined}
+      aria-expanded={selected}
       onClick={onSelect}
       onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') onSelect();
+        if (event.key === 'Enter' && onSelect) {
+          event.preventDefault();
+          onSelect();
+          return;
+        }
+        dragListeners?.onKeyDown?.(event);
       }}
+      className={cn(
+        'group relative rounded-lg border bg-card p-2.5 text-left shadow-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary',
+        draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+        selected ? 'border-primary shadow-lg ring-2 ring-primary/20' : 'hover:shadow-md',
+        cause.isRootCause && 'border-emerald-500 ring-2 ring-emerald-100',
+      )}
+      style={{ borderLeftColor: category.color, borderLeftWidth: 4 }}
     >
       <div className="flex items-start gap-2">
-        <GripVertical
-          className={cn('mt-0.5 h-4 w-4 shrink-0 text-slate-300', canEdit && 'cursor-grab')}
-          onPointerDown={onPointerDown}
-        />
         <div className="min-w-0 flex-1">
-          {selected && canEdit ? (
-            // Selecionado: o texto vira campo no lugar, sem tirar os olhos do diagrama.
-            <Textarea
-              autoFocus
-              rows={3}
-              value={cause.title}
-              maxLength={500}
-              onChange={(event) => onUpdate({ title: event.target.value, description: event.target.value })}
-              onBlur={onSave}
-              onClick={(event) => event.stopPropagation()}
-              className="min-h-[56px] resize-none border-slate-200 p-1.5 text-xs leading-4"
-              placeholder="Descreva a causa"
-            />
-          ) : (
-            <div className="text-xs font-semibold leading-4 text-slate-900">{cause.title}</div>
-          )}
-          <div className="mt-2 flex flex-wrap gap-1">
-            {selected && canEdit ? (
-              <NativeSelect
-                value={cause.priority}
-                onChange={(event) => onUpdate({ priority: event.target.value as Priority })}
-                onBlur={onSave}
-                onClick={(event) => event.stopPropagation()}
-                className="h-7 w-full text-[11px]"
-              >
-                {Object.entries(PRIORITY_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-              </NativeSelect>
-            ) : (
-              <PriorityBadge priority={cause.priority} />
-            )}
+          <div className="line-clamp-4 break-words text-xs font-semibold leading-4 text-foreground">{cause.title}</div>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            <PriorityBadge priority={cause.priority} />
             {cause.isAiSuggested && <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">IA</Badge>}
             {cause.isRootCause && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Causa raiz</Badge>}
             {hasRootCause && <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700" title={cause.rootCause ?? undefined}>✔ Causa raiz encontrada</Badge>}
             {cause.convertedToTaskId && <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">Plano criado</Badge>}
           </div>
-
-          {selected && (
-            <div className="mt-2 space-y-1.5 border-t border-slate-100 pt-2">
-              {onSendToFiveWhys && (
-                <Button
-                  size="sm"
-                  className="h-7 w-full justify-center bg-emerald-600 px-2 text-[11px] hover:bg-emerald-700"
-                  disabled={!canEdit}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onSendToFiveWhys();
-                  }}
-                >
-                  <ArrowRight className="mr-1 h-3.5 w-3.5" />
-                  {hasRootCause ? 'Reabrir no 5 Porquês' : 'Investigar nos 5 Porquês'}
-                </Button>
-              )}
-              {canEdit && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 w-full justify-center px-2 text-[11px] text-red-600 hover:text-red-700"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDelete();
-                  }}
-                >
-                  <Trash2 className="mr-1 h-3.5 w-3.5" />
-                  Excluir causa
-                </Button>
-              )}
-            </div>
-          )}
         </div>
-        <span className="mt-1 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: category.color }} />
+        {draggable && <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/40 transition group-hover:text-muted-foreground" aria-hidden />}
       </div>
+      {children}
     </div>
   );
 }
 
-function ScaleControl({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+/**
+ * Edição no próprio card. Os eventos não sobem para o card: digitar espaço não
+ * começa um arraste e clicar no campo não fecha a edição.
+ */
+function CauseEditor({
+  cause,
+  canEdit,
+  onTitle,
+  onBlur,
+  onCategory,
+  onPriority,
+  onSendToFiveWhys,
+  onDelete,
+}: {
+  cause: IshikawaCause;
+  canEdit: boolean;
+  onTitle: (value: string) => void;
+  onBlur: () => void;
+  onCategory: (value: string) => void;
+  onPriority: (value: Priority) => void;
+  onSendToFiveWhys?: () => void;
+  onDelete: () => void;
+}) {
+  const hasRootCause = (cause.rootCause ?? '').trim().length > 0;
+  const stop = (event: React.SyntheticEvent) => event.stopPropagation();
   return (
-    <div>
-      <Label>{label}</Label>
-      <div className="mt-1 grid grid-cols-5 overflow-hidden rounded-md border border-slate-200">
-        {[1, 2, 3, 4, 5].map((item) => (
-          <button
-            key={item}
-            type="button"
-            className={cn('h-8 border-r border-slate-200 text-xs font-semibold last:border-r-0', value === item ? 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-400' : 'bg-white text-slate-600 hover:bg-slate-50')}
-            onClick={() => onChange(item)}
-          >
-            {item}
-          </button>
+    <div className="mt-2 cursor-default space-y-2 border-t pt-2" onClick={stop} onMouseDown={stop} onTouchStart={stop} onKeyDown={stop}>
+      {canEdit && (
+        <>
+          <Textarea
+            autoFocus
+            rows={3}
+            value={cause.title}
+            maxLength={500}
+            onChange={(event) => onTitle(event.target.value)}
+            onBlur={onBlur}
+            className="min-h-[56px] resize-none p-1.5 text-xs leading-4"
+            placeholder="Descreva a causa"
+            aria-label="Texto da causa"
+          />
+          <div className="grid grid-cols-2 gap-1.5">
+            <NativeSelect value={normalizeCategory(cause.category)} onChange={(event) => onCategory(event.target.value)} className="h-8 text-[11px]" aria-label="Categoria">
+              {CATEGORIES.map((category) => <option key={category.key} value={category.key}>{category.label}</option>)}
+            </NativeSelect>
+            <NativeSelect value={cause.priority} onChange={(event) => onPriority(event.target.value as Priority)} className="h-8 text-[11px]" aria-label="Prioridade">
+              {Object.entries(PRIORITY_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </NativeSelect>
+          </div>
+        </>
+      )}
+      {onSendToFiveWhys && (
+        <Button size="sm" className="h-7 w-full justify-center bg-emerald-600 px-2 text-[11px] hover:bg-emerald-700" disabled={!canEdit} onClick={onSendToFiveWhys}>
+          <ArrowRight className="mr-1 h-3.5 w-3.5" />
+          {hasRootCause ? 'Reabrir no 5 Porquês' : 'Investigar nos 5 Porquês'}
+        </Button>
+      )}
+      {canEdit && (
+        <Button size="sm" variant="ghost" className="h-6 w-full justify-center px-2 text-[11px] text-red-600 hover:text-red-700" onClick={onDelete}>
+          <Trash2 className="mr-1 h-3.5 w-3.5" />
+          Excluir causa
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function FishboneLines({ geometry, showRibs }: { geometry: Geometry; showRibs: boolean }) {
+  return (
+    <svg className="pointer-events-none absolute left-0 top-0 z-0" width={geometry.width} height={geometry.height} aria-hidden>
+      {geometry.spine && (
+        <line x1={geometry.spine.x1} y1={geometry.spine.y} x2={geometry.spine.x2} y2={geometry.spine.y} stroke="#64748b" strokeWidth={5} strokeLinecap="round" />
+      )}
+      {geometry.bones.map((bone) => (
+        <g key={bone.key}>
+          <line x1={bone.x1} y1={bone.y1} x2={bone.x2} y2={bone.y2} stroke={bone.color} strokeWidth={3} strokeLinecap="round" />
+          {geometry.spine && <circle cx={bone.x2} cy={bone.y2} r={6} fill="#64748b" />}
+        </g>
+      ))}
+      {showRibs &&
+        geometry.ribs.map((rib) => (
+          <g key={rib.id} opacity={0.7}>
+            <line x1={rib.x1} y1={rib.y} x2={rib.x2} y2={rib.y} stroke={rib.color} strokeWidth={2} strokeLinecap="round" />
+            <circle cx={rib.x1} cy={rib.y} r={3} fill={rib.color} />
+          </g>
         ))}
-      </div>
-    </div>
+    </svg>
   );
 }
 
-function Legend({ saving, lastSavedAt }: { saving: boolean; lastSavedAt: string | null }) {
+const FishHead = forwardRef<HTMLDivElement, { problem: string }>(({ problem }, ref) => (
+  <div
+    ref={ref}
+    className="relative ml-auto flex min-h-[84px] w-full items-center justify-center px-8 py-3 text-center text-white shadow-xl lg:w-[230px]"
+    style={{
+      background: 'linear-gradient(135deg, #f87171 0%, #ef4444 55%, #fb7185 100%)',
+      clipPath: 'polygon(0 8%, 70% 0, 100% 50%, 70% 100%, 0 92%, 6% 50%)',
+    }}
+  >
+    <div className="max-w-[160px] text-sm font-bold leading-5">
+      {problem?.trim() || 'Problema principal'}
+      <div className="mx-auto mt-2 w-fit rounded-full bg-red-900/45 px-3 py-0.5 text-[11px] font-semibold">Efeito</div>
+    </div>
+  </div>
+));
+FishHead.displayName = 'FishHead';
+
+function IshikawaSaveStatus({ state, lastSavedAt, onRetry }: { state: SaveState; lastSavedAt: string | null; onRetry: () => void }) {
+  if (state === 'saving') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Salvando…
+      </span>
+    );
+  }
+  if (state === 'error') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-destructive">
+        <AlertTriangle className="h-3.5 w-3.5" /> Falha ao salvar
+        <button type="button" className="underline underline-offset-2" onClick={onRetry}>Tentar de novo</button>
+      </span>
+    );
+  }
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-600">
-      <span className="font-semibold text-slate-800">Legenda:</span>
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <CircleCheck className="h-3.5 w-3.5 text-emerald-600" />
+      {state === 'saved' && lastSavedAt ? `Salvo às ${lastSavedAt}` : 'Salvamento automático'}
+    </span>
+  );
+}
+
+function Legend({ canEdit }: { canEdit: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t px-4 py-2.5 text-xs text-muted-foreground">
+      <span className="font-semibold text-foreground">Legenda:</span>
       <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-red-500" />Alta prioridade</span>
       <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-400" />Média prioridade</span>
       <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-500" />Baixa prioridade</span>
-      <span className="ml-auto text-slate-400">{saving ? 'Salvando automaticamente...' : lastSavedAt ? `Salvo às ${lastSavedAt}` : 'Arraste para reposicionar'}</span>
+      {canEdit && (
+        <span className="ml-auto">Arraste as causas para reordenar ou levar a outra categoria (no celular, toque e segure). Clique para editar.</span>
+      )}
     </div>
   );
 }
@@ -828,49 +999,105 @@ function PriorityBadge({ priority }: { priority: Priority }) {
   return <Badge variant="outline" className={styles[priority]}>{PRIORITY_LABEL[priority]}</Badge>;
 }
 
-function normalizeCauses(rows: any[] | undefined): IshikawaCause[] {
-  const source = rows?.length ? rows : [];
-  return autoLayout(
-    source.map((row: any, index: number) =>
-      makeCause({
-        id: row.id,
-        category: row.category,
-        title: row.title ?? row.description,
-        description: row.description,
-        priority: row.priority,
-        severity: row.severity ?? row.impact,
-        probability: row.probability,
-        status: row.status,
-        evidence: row.evidence,
-        responsibleUserId: row.responsibleUserId,
-        dueDate: row.dueDate,
-        positionX: row.positionX,
-        positionY: row.positionY,
-        orderIndex: row.orderIndex ?? index,
-        tags: row.tags,
-        isAiSuggested: row.isAiSuggested,
-        isRootCause: row.isRootCause ?? row.likelyRootCause,
-        convertedToTaskId: row.convertedToTaskId,
-        rootCause: row.rootCause,
-        fiveWhysData: row.fiveWhysData,
-      }),
-    ),
+/** Linhas do desenho a partir dos retângulos reais; sem as colunas lado a lado (celular), só os cards. */
+function measureGeometry(root: HTMLElement, spineRow: HTMLElement | null, tail: HTMLElement | null, head: HTMLElement | null): Geometry | null {
+  const base = root.getBoundingClientRect();
+  const relative = (rect: DOMRect) => ({ left: rect.left - base.left, right: rect.right - base.left, top: rect.top - base.top, bottom: rect.bottom - base.top });
+  const lists = CATEGORIES.map((category) => root.querySelector<HTMLElement>(`[data-bone-list="${category.key}"]`));
+  const labels = CATEGORIES.map((category) => root.querySelector<HTMLElement>(`[data-bone-label="${category.key}"]`));
+  if (!spineRow || lists.some((list) => !list) || labels.some((label) => !label)) return null;
+  const listRects = lists.map((list) => relative(list!.getBoundingClientRect()));
+  const sideBySide = Math.abs(listRects[0].top - listRects[1].top) < 2 && listRects[1].left > listRects[0].right;
+  if (!sideBySide) return null;
+
+  const spineRect = relative(spineRow.getBoundingClientRect());
+  const spineY = (spineRect.top + spineRect.bottom) / 2;
+  const tailRect = tail ? relative(tail.getBoundingClientRect()) : null;
+  const headRect = head ? relative(head.getBoundingClientRect()) : null;
+  const geometry: Geometry = {
+    width: base.width,
+    height: base.height,
+    spine: { x1: tailRect ? tailRect.right - 4 : spineRect.left, x2: headRect ? headRect.left + 8 : spineRect.right, y: spineY },
+    bones: [],
+    ribs: [],
+  };
+
+  CATEGORIES.forEach((category, index) => {
+    const list = listRects[index];
+    const label = relative(labels[index]!.getBoundingClientRect());
+    const top = category.side === 'top';
+    const far = top ? label.bottom + 4 : label.top - 4;
+    const length = Math.abs(spineY - far);
+    const slant = Math.min(BONE_MAX_SLANT, Math.max(18, length * 0.3));
+    const farX = list.left + BONE_INSET;
+    const nearX = farX + slant;
+    geometry.bones.push({ key: category.key, color: category.color, x1: farX, y1: far, x2: nearX, y2: spineY });
+    // x da espinha da categoria numa altura y (reta entre a ponta e a espinha central).
+    const boneX = (y: number) => {
+      const t = length ? Math.min(1, Math.max(0, Math.abs(y - far) / length)) : 0;
+      return farX + slant * t;
+    };
+    lists[index]!.querySelectorAll<HTMLElement>('[data-cause-id]').forEach((card) => {
+      const rect = relative(card.getBoundingClientRect());
+      const y = Math.min(rect.top + 22, (rect.top + rect.bottom) / 2);
+      geometry.ribs.push({ id: card.dataset.causeId ?? `${category.key}-${y}`, color: category.color, x1: boneX(y), x2: rect.left - 2, y });
+    });
+  });
+  return geometry;
+}
+
+function containersOf(causes: IshikawaCause[]): Containers {
+  const containers: Containers = Object.fromEntries(CATEGORIES.map((category) => [category.key, [] as string[]]));
+  for (const cause of causes) containers[normalizeCategory(cause.category)].push(cause.id);
+  return containers;
+}
+
+/** Categoria e ordem saem do lugar da causa na espinha; x/y seguem o desenho antigo. */
+function applyContainers(causes: IshikawaCause[], containers: Containers): IshikawaCause[] {
+  const byId = new Map(causes.map((cause) => [cause.id, cause]));
+  return CATEGORIES.flatMap((category) =>
+    (containers[category.key] ?? []).flatMap((id, index) => {
+      const cause = byId.get(id);
+      if (!cause) return [];
+      return [{ ...cause, category: category.key, orderIndex: index, positionX: category.legacyX + (index % 2 ? 18 : 0), positionY: category.legacyY + index * 58 }];
+    }),
   );
 }
 
-function autoLayout(rows: IshikawaCause[]) {
-  const counters = new Map<string, number>();
-  return rows.map((cause) => {
-    if (Number.isFinite(cause.positionX) && Number.isFinite(cause.positionY) && cause.positionX > 0 && cause.positionY > 0) return cause;
-    const category = getCategory(cause.category);
-    const index = counters.get(category.key) ?? 0;
-    counters.set(category.key, index + 1);
-    return {
-      ...cause,
-      positionX: category.cardX + (index % 2 === 0 ? 0 : 16),
-      positionY: category.cardY + index * 58,
-    };
-  });
+function normalizeCauses(rows: any[] | undefined): IshikawaCause[] {
+  const source = rows?.length ? rows : [];
+  const causes = source.map((row: any, index: number) =>
+    makeCause({
+      id: row.id,
+      category: row.category,
+      title: row.title ?? row.description,
+      description: row.description,
+      priority: row.priority,
+      severity: row.severity ?? row.impact,
+      probability: row.probability,
+      status: row.status,
+      evidence: row.evidence,
+      responsibleUserId: row.responsibleUserId,
+      dueDate: row.dueDate,
+      positionX: row.positionX,
+      positionY: row.positionY,
+      orderIndex: row.orderIndex ?? index,
+      tags: row.tags,
+      isAiSuggested: row.isAiSuggested,
+      isRootCause: row.isRootCause ?? row.likelyRootCause,
+      convertedToTaskId: row.convertedToTaskId,
+      rootCause: row.rootCause,
+      fiveWhysData: row.fiveWhysData,
+    }),
+  );
+  // Ordem na espinha: a altura em que a causa aparecia no desenho antigo (posição
+  // livre), depois a ordem gravada. Nos dados novos as duas andam juntas.
+  const height = (cause: IshikawaCause) => (cause.positionY > 0 ? cause.positionY : Number.MAX_SAFE_INTEGER);
+  const ordered = causes
+    .map((cause, index) => ({ cause, index }))
+    .sort((a, b) => height(a.cause) - height(b.cause) || a.cause.orderIndex - b.cause.orderIndex || a.index - b.index)
+    .map((item) => item.cause);
+  return applyContainers(ordered, containersOf(ordered));
 }
 
 function makeCause(input: Partial<IshikawaCause>): IshikawaCause {
@@ -878,7 +1105,7 @@ function makeCause(input: Partial<IshikawaCause>): IshikawaCause {
   const priority = normalizePriority(input.priority);
   const title = String(input.title ?? '').trim() || 'Nova causa';
   return {
-    id: input.id && !String(input.id).startsWith('temp-') ? String(input.id) : newTempId(),
+    id: input.id && !String(input.id).startsWith('temp-') ? String(input.id) : newCauseId(),
     category,
     title,
     description: input.description ?? '',
@@ -956,7 +1183,7 @@ function normalizeStatus(value: any, isRootCause?: boolean): CauseStatus {
 function normalizeKey(value: any) {
   return String(value ?? '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '_')
@@ -969,11 +1196,16 @@ function clampScale(value: any) {
   return Math.max(1, Math.min(5, Math.round(numeric)));
 }
 
-function newTempId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return `temp-${crypto.randomUUID()}`;
+/**
+ * Id definitivo já no navegador: o servidor mantém o id recebido, então a causa
+ * nova não troca de id ao salvar (a seleção não se perde). Sem `randomUUID`
+ * (navegador antigo), o prefixo temp- deixa o servidor gerar.
+ */
+function newCauseId() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
   return `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function defaultSuggestions(_causes: IshikawaCause[]): Suggestion[] {
+function defaultSuggestions(): Suggestion[] {
   return [];
 }

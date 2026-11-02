@@ -25,7 +25,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
-import { AnalysisWorkspace, type AnalysisPayload } from '@/components/platform/analysis-workspace';
+import { AnalysisWorkspace, type AnalysisPayload, type AnalysisSaveOptions } from '@/components/platform/analysis-workspace';
 import { api } from '@/lib/api';
 import { formatDate, formatNumber } from '@/lib/utils';
 
@@ -217,12 +217,17 @@ export default function MeetingDetailPage() {
       return api(`/actions/${actionId}/analysis`, { method: 'POST', json: payload });
     },
     onSuccess: () => {
-      toast.success('Análise de causa sincronizada com o plano');
       qc.invalidateQueries({ queryKey: ['meeting', id] });
       if (linkedAction?.id) qc.invalidateQueries({ queryKey: ['action', linkedAction.id] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Não foi possível salvar a análise'),
   });
+  // Salvamentos automáticos (arraste, edição no lugar) não mostram aviso de sucesso.
+  const persistAnalysis = (payload: AnalysisPayload, options?: AnalysisSaveOptions) =>
+    saveAnalysis.mutateAsync(payload).then((result) => {
+      if (!options?.silent) toast.success('Análise de causa sincronizada com o plano');
+      return result;
+    });
 
   const attendance = useMutation({
     mutationFn: ({ userId, attended }: { userId: string; attended: boolean }) =>
@@ -451,7 +456,7 @@ export default function MeetingDetailPage() {
               <AnalysisWorkspace
                 action={actionQuery.data}
                 users={analysisUsers}
-                onSave={(payload) => saveAnalysis.mutate(payload)}
+                onSave={persistAnalysis}
                 onEnsureActionPlan={ensureActionPlan}
                 saving={saveAnalysis.isPending}
                 title="Análise de causa (ferramentas)"
@@ -472,7 +477,7 @@ export default function MeetingDetailPage() {
                 deviationId: m?.deviation?.id,
               }}
               users={analysisUsers}
-              onSave={(payload) => saveAnalysis.mutate(payload)}
+              onSave={persistAnalysis}
               onEnsureActionPlan={ensureActionPlan}
               saving={saveAnalysis.isPending}
               title="Análise de causa (ferramentas)"
