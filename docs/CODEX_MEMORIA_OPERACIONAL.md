@@ -960,7 +960,7 @@ Pedido do usuário depois de testar em produção:
   demonstração/`/actions` 200, PDCA novo nos chunks da web. Sem teste em
   navegador (o usuário testa).
 
-## Logo e cores com acesso direto (2026-11-02, local)
+## Logo e cores com acesso direto (2026-11-02, publicado)
 
 Pedido do usuario: voltar a encontrar as opcoes de logo da empresa e cores do
 portal em Configuracoes. A tela e a API de identidade visual continuam no codigo.
@@ -975,6 +975,14 @@ portal em Configuracoes. A tela e a API de identidade visual continuam no codigo
 - Sem mudanca de API, banco ou migration. A identidade visual existente e
   preservada; somente o acesso a tela foi reorganizado.
 - Validado: web 15 arquivos / 112 testes, `tsc --noEmit` da web e lint dos arquivos
-  alterados. Sem build completo ou teste em navegador nesta tarefa.
-- Publicacao autorizada pelo usuario em 2026-11-02 na Vultr, seguindo o fluxo
-  de commit, push, backup, build antecipado e deploy. Resultado registrado abaixo.
+  alterados. Build completo da web aprovado na Vultr; sem teste em navegador.
+- Publicado na Vultr em 2026-11-02 com OK do usuario: commit `60c16c9`, versao
+  `0.1.0+60c16c94`. Build antecipado com o site no ar (API em cache, web 134 s);
+  `make deploy` em 30 s (20:30:21Z a 20:30:51Z). Banco em dia, 153 migrations.
+- Backup antes: `db-backups/g360-20261102-202742.dump` (2,1 MB, validado com
+  `pg_restore --list`, 4086 linhas). Rollback preservado nas tags
+  `g360-api:rollback-006e213-branding-20261102` e Web equivalente.
+- Validado depois: API/Web/Postgres saudaveis; health, home, login, demonstracao,
+  `/settings`, `/settings/identidade-visual` e Portal Admin com HTTP 200; leitura
+  e gravacao da identidade visual sem token com 401; versao publica no login e
+  nova rota, titulo e atalho confirmados nos arquivos compilados da imagem.
