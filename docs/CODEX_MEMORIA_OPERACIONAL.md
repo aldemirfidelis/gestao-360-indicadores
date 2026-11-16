@@ -1059,3 +1059,56 @@ português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`
   Builds Docker fizeram a checagem de compilação. Em revisões de português,
   preservar também identificadores dentro de SQL/tagged templates e validar as
   consultas afetadas no Postgres; mocks não detectam nomes de coluna inválidos.
+
+## Projetos e curva S (2026-11-16, publicado)
+
+- Pedido do usuário: localizar o módulo antigo e voltar a disponibilizá-lo.
+  Diagnóstico e alterações: `docs/RESTAURACAO_PROJETOS.md`.
+- O módulo não havia sido excluído: `6003cf1` preservou o portfólio em
+  `/projects/cronograma`, fora do menu, enquanto `/projects` virou a Ata.
+  Histórico confirmado pelo Git local e pelo conector GitHub.
+- Menu principal **Projetos** restaurado, separado da Ata. Gantt, portfólio,
+  orçamento, tarefas, marcos e indicador reutilizados. Curva S do projeto no
+  detalhe, com planejado/realizado, diferença em p.p. e CSV. PMO e curva usam
+  a mesma regra de planejamento; realizado mantém os pesos anteriores.
+- Migração aditiva `20261116120000_project_progress_snapshots`: histórico
+  diário em São Paulo, primeira medição na ativação para projetos existentes.
+  Sem histórico anterior inventado. Mudanças de tarefas/marcos e conclusões
+  pelo quadro de Tarefas gravam medição na mesma transação, com bloqueio do
+  projeto para concorrência. Não executar seeds; backup antes da publicação.
+- Corrigido atalho de projeto no Meu Dia. Controles respeitam leitura/demo;
+  dependências ficam no mesmo projeto e não podem criar ciclos. Atualizações
+  aceitam apenas campos editáveis, protegendo empresa e medições.
+- Validação: shared 31 testes, serviços de API afetados 31, web 113; lint dos
+  arquivos web alterados sem avisos/erros; Prisma gerado e validado. Builds
+  Docker de API/Web aprovados em cópia isolada na Vultr. Sem navegador nem
+  typecheck local da API, conforme preferência anterior e memória disponível.
+- As 155 migrações aplicaram do zero num Postgres 17 descartável em tmpfs;
+  `scripts/check-projects.cjs` validou medição inicial, avanço, marcos,
+  isolamento, concorrência, dependências, quadro de Tarefas e rollback.
+  Container descartável removido; nenhum volume de produção utilizado.
+- Evidências em `/tmp/g360-projects-review.EbDKb5` na Vultr; imagens de revisão
+  `g360-api:projects-review-20261116` e Web equivalente. Não são imagens
+  publicadas. Durante o ensaio, produção permaneceu saudável, sem reinício ou
+  mudança no banco.
+- Publicado com autorização explícita do usuário: commit `b120801`, push em
+  `main`, versão `0.1.0+b120801a`. Builds antecipados com o portal no ar;
+  `make deploy` entre 12:37:54Z e 12:38:30Z (36 s), com as imagens em cache.
+- Migração `20261116120000_project_progress_snapshots` aplicada e confirmada;
+  155 migrations em dia. Projetos, tarefas e marcos preservados por contagem
+  e hash. A base atual contém zero projetos ativos; zero medições iniciais
+  era o resultado esperado. Não houve seed nem criação de projetos fictícios.
+- Backup protegido antes da migração:
+  `db-backups/pre-projects-20261116/g360-20261116-123752.dump` (5.437.636 bytes,
+  modo 600), `pg_restore --list` validado (4.086 linhas). SHA-256:
+  `78946eca25b0c6d6a7dd378ae573932f7d0f76a6cf525c13ad729b968b708deb`.
+  Rollback: `g360-api:rollback-6b796a8-projects-20261116` e Web equivalente.
+- Pós-deploy: API/Web/Postgres saudáveis; zero erros nos logs de inicialização.
+  Health, home, login, demonstração, Ata e Projetos com HTTP 200; versão pública
+  conferida. Pela sessão pública da demo, lista e portfólio de projetos e
+  seleção dos 84 indicadores responderam 200. Sem projeto cadastrado para testar
+  curva pela API de produção; curva validada com fixture isolada e confirmada
+  no JavaScript servido pela imagem nova. Sem teste em navegador.
+- Logs e scripts da publicação em `/tmp/g360-projects-release-20261116`.
+  Alterações locais anteriores de demonstração corporativa preservadas e
+  mantidas fora dos commits desta publicação.

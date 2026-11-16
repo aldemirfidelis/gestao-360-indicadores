@@ -42,10 +42,11 @@ A migração aditiva `20261116120000_project_progress_snapshots` cria apenas
 projetos, tarefas ou marcos existentes. É necessário backup antes de publicá-la.
 Não executar seeds para ativar o módulo.
 
-Commit, push, deploy e aplicação da migração foram autorizados pelo usuário
-em 16/11/2026. O resultado da publicação fica registrado na memória
-operacional após a validação em produção. Alterações locais anteriores foram
-preservadas.
+Publicado com autorização do usuário em 16/11/2026: commit `b120801`, versão
+`0.1.0+b120801a`, com a migração aplicada e 155 migrations em dia. API, web e
+Postgres saudáveis. Backup validado e detalhes registrados na memória
+operacional. A base atual não tem projetos cadastrados; a lista vazia é
+esperada. Alterações locais anteriores foram preservadas.
 
 ## Validação
 
