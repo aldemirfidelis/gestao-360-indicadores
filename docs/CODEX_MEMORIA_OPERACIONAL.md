@@ -1112,3 +1112,54 @@ português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`
 - Logs e scripts da publicação em `/tmp/g360-projects-release-20261116`.
   Alterações locais anteriores de demonstração corporativa preservadas e
   mantidas fora dos commits desta publicação.
+
+## SIPOC, BPMN e RACI (2026-11-16, implementação local)
+
+- Pedido do usuário: implementar o prompt anexo de gestão integrada de processos
+  e documentar toda a plataforma. Relatório e evidências:
+  `docs/RELATORIO_IMPLEMENTACAO_SIPOC_BPMN_RACI.md`; documento principal:
+  `docs/GESTAO360_DOCUMENTACAO_COMPLETA.md`. Índice atualizado em `docs/README.md`.
+- Reutilizados Process/ProcessStep, organização, usuários, tarefas, indicadores,
+  projetos, permissões e auditoria. Menu Processos reativado no código; ferramentas
+  no detalhe `/processes/:id`, sem três cadastros/módulos independentes.
+- SIPOC detalhado; bpmn-js 18.31.1 na web e bpmn-moddle 9.0.4 CommonJS na API;
+  XML/SVG, atividades estáveis, propriedades, AS-IS/TO-BE e comparação. BPMN é
+  documentação/modelagem: não executa workflows nem inventa métricas operacionais.
+- RACI com pessoas/áreas/cargos existentes, R+A e múltiplos R; único A e ao menos
+  um R por linha antes de decisões protegidas. Mudanças organizacionais sinalizam
+  revisão, sem transferir responsabilidade nem conceder acesso automaticamente.
+- Governança, revisão concorrente, snapshots e auditoria transacionais. Novas
+  permissões de aprovar/publicar no catálogo aditivo existente. Respeitar overrides
+  e licenças empresariais. Módulos corporativos suspensos continuam suspensos.
+- Migration **ainda não aplicada em produção**:
+  `20261116140000_process_governance`, seis tabelas, quatro enums e CHECKs/FKs
+  aditivos. Sem seed, conversão destrutiva ou alteração de dados reais.
+- Vínculos tipados e navegação reversa em registros centrais, painel de governança,
+  revisões no Meu Dia com permissão/disponibilidade do módulo e notificação ao
+  proprietário. FK em uso retorna 409 com mensagem; referências mantidas por
+  artefatos só são alteradas pela edição de origem.
+- Validação: shared 38 testes, web 113, API afetada/selecionada 89; lint das telas
+  alteradas, Prisma e builds Docker de API/Web aprovados. Toda a cadeia de 156
+  migrations aplicou do zero: 545 tabelas incluindo `_prisma_migrations`.
+- Serviços compilados testados em Postgres 17 descartável: persistência,
+  referências, isolamento de empresa/área, estados/permissões, histórico, RACI,
+  comparação, concorrência, rollback, checks, painel e Meu Dia. Scripts:
+  `scripts/check-process-governance.cjs` e fixture em `tests/fixtures`.
+- O novo prompt pediu testes de interface: Playwright 1.60.0/Chromium executado
+  em rede Docker isolada, com login e dados sintéticos. Nove grupos passaram,
+  incluindo criação/edição/recarga, importação inválida preservando desenho,
+  XML/SVG, TO-BE/comparação, aprovação/publicação, histórico, navegação reversa,
+  proteção de exclusão/409, leitura/403 e três ferramentas em 390 pixels.
+- Evidências em `/tmp/g360-process-review.2kOIcl` na Vultr; imagens somente de
+  revisão `g360-api:process-review-20261116` e Web equivalente. Postgres em tmpfs,
+  sem volume do produto. Containers/rede de ensaio removidos após validação;
+  artefatos preservados. Produção permaneceu saudável na versão já publicada.
+- Documentação técnica, funcional, comercial e inventário de todos os módulos:
+  61 diretórios, 1.747 operações HTTP decoradas, 201 páginas, 544 modelos Prisma.
+  Inventário descreve fonte; não afirma teste integral de módulos suspensos.
+- Alterações anteriores de interface preservadas: sequência sem números,
+  minimapas React Flow removidos e linhas selecionadas do mapa estratégico com
+  traçado animado. Alterações/scripts anteriores da demonstração preservados.
+- **Sem commit, push ou deploy desta nova entrega.** Publicação requer revisão
+  do resultado e OK do usuário, conforme fluxo operacional deste arquivo. Não
+  incluir scripts/dados anteriores da demonstração no commit da implementação.

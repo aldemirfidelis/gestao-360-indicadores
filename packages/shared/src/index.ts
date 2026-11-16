@@ -7,3 +7,4 @@ export * from './product-scope';
 export * from './site-analytics';
 export * from './portuguese';
 export * from './project-progress';
+export * from './process-governance';

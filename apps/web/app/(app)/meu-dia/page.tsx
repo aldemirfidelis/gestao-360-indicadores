@@ -63,6 +63,7 @@ const TYPE_META: Record<string, { label: string; icon: typeof Inbox }> = {
   WORKFLOW_TASK: { label: 'Tarefa de fluxo', icon: Workflow },
   APPROVAL: { label: 'Aprovação', icon: Stamp },
   DOCUMENT_REVIEW: { label: 'Documento', icon: FileText },
+  PROCESS_REVIEW: { label: 'Revisão de processo', icon: Workflow },
   DOCUMENT_EDIT_APPROVAL: { label: 'Liberar documento', icon: FileText },
   DOCUMENT_EDIT: { label: 'Editar documento', icon: FileText },
   RISK_CRITICAL: { label: 'Risco', icon: ShieldAlert },

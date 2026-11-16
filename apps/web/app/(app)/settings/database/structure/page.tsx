@@ -6,7 +6,6 @@ import { useQuery } from '@tanstack/react-query';
 import ReactFlow, {
   Background,
   Controls,
-  MiniMap,
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
@@ -146,7 +145,6 @@ function StructureFlow() {
           >
             <Background gap={16} />
             <Controls />
-            <MiniMap pannable zoomable nodeStrokeWidth={3} />
           </ReactFlow>
         </div>
       )}

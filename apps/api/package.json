@@ -37,6 +37,7 @@
     "@nestjs/websockets": "^10",
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3",
+    "bpmn-moddle": "9.0.4",
     "bullmq": "^5.13.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",

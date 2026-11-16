@@ -1,5 +1,7 @@
 'use client';
 
+import { ProcessReferences } from '@/components/processes/process-references';
+
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -577,6 +579,7 @@ export default function OrgPage() {
         </div>
       </SectionCard>
 
+      {selectedNodeId && <ProcessReferences type="AREA" targetId={selectedNodeId} />}
       {selectedNodeId && (
         <OrgDetailPanel
           detail={detail.data}

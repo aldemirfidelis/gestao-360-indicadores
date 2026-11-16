@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/components/auth/auth-provider';
+import { ProcessReferences } from '@/components/processes/process-references';
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -126,7 +127,7 @@ export function TaskDetailsDrawer({ taskId, context, onClose }: Props) {
               </TabsList>
             </div>
             <fieldset disabled={user?.isDemo} className="min-h-0 flex-1 overflow-y-auto">
-              <TabsContent value="details" className="m-0"><DetailsTab task={task} context={context} onChanged={refresh} /></TabsContent>
+              <TabsContent value="details" className="m-0"><ProcessReferences type="TASK" targetId={task.id} /><DetailsTab task={task} context={context} onChanged={refresh} /></TabsContent>
               <TabsContent value="checklist" className="m-0"><ChecklistTab task={task} onChanged={refresh} /></TabsContent>
               <TabsContent value="comments" className="m-0"><CommentsTab task={task} onChanged={refresh} /></TabsContent>
               <TabsContent value="attachments" className="m-0"><AttachmentsTab task={task} onChanged={refresh} /></TabsContent>

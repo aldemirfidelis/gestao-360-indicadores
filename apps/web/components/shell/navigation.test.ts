@@ -21,6 +21,7 @@ describe('granular navigation', () => {
       'Indicadores',
       'Desvios',
       'Plano de Ação',
+      'Processos',
       'Projetos',
       'Ata da Reunião',
       'Reuniões',

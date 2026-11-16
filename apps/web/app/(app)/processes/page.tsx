@@ -4,6 +4,7 @@ import { formatQuantity } from '@g360/shared';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Edit, Filter, ListChecks, Network, Plus, Trash2, X } from 'lucide-react';
@@ -22,6 +23,7 @@ import { api } from '@/lib/api';
 import { cn, formatNumber } from '@/lib/utils';
 import { useVision360 } from '@/components/ui/vision360-context';
 import { ImpactConfirmationModal } from '@/components/ui/impact-confirmation-modal';
+import { ProcessDashboard } from '@/components/processes/process-dashboard';
 
 type ProcessType = 'CORE' | 'SUPPORT' | 'MANAGEMENT';
 type ProcessStatus = 'DRAFT' | 'ACTIVE' | 'UNDER_REVIEW' | 'ARCHIVED';
@@ -145,11 +147,11 @@ const EMPTY_STEP: StepForm = { id: '', order: '', name: '', description: '', res
 export default function ProcessesPage() {
   const qc = useQueryClient();
   const searchParams = useSearchParams();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { open: openVision360 } = useVision360();
-  const canCreate = hasPermission(['processes:create']);
-  const canUpdate = hasPermission(['processes:update']);
-  const canDelete = hasPermission(['processes:delete']);
+  const canCreate = !user?.isDemo && hasPermission(['processes:create']);
+  const canUpdate = !user?.isDemo && hasPermission(['processes:update']);
+  const canDelete = !user?.isDemo && hasPermission(['processes:delete']);
   const [filters, setFilters] = useState({ search: '', status: '', type: '' });
   const [processOpen, setProcessOpen] = useState(false);
   const [stepOpen, setStepOpen] = useState(false);
@@ -362,10 +364,11 @@ export default function ProcessesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Processos"
-        description="Mapeie processos, entradas, saídas, clientes, fornecedores e etapas operacionais."
+        description="Mapeie processos com SIPOC, BPMN e RACI, conectando responsáveis, indicadores e projetos."
         actions={canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Novo processo</Button> : null}
       />
 
+      <ProcessDashboard />
       <div className="grid gap-3 md:grid-cols-4">
         <MetricCard title="Processos" value={formatNumber(summary?.total)} description="Mapeamentos registrados" icon={<Network className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Ativos" value={formatNumber(summary?.active)} description="Processos vigentes" icon={<ListChecks className="h-4 w-4" />} tone="green" />
@@ -419,6 +422,7 @@ export default function ProcessesPage() {
                     </p>
                   </button>
                   <div className="flex flex-wrap gap-2">
+                    <Button size="sm" asChild><Link href={`/processes/${item.id}`}>SIPOC · BPMN · RACI</Link></Button>
                     <Button size="sm" variant="outline" onClick={() => openVision360('PROCESS', item.id)} className="gap-1.5">
                       <Network className="h-4 w-4 text-primary" /> 360°
                     </Button>

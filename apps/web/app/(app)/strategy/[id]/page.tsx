@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ProcessReferences } from '@/components/processes/process-references';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,7 +14,6 @@ import ReactFlow, {
   EdgeLabelRenderer,
   Handle,
   MarkerType,
-  MiniMap,
   NodeResizer,
   NodeToolbar,
   Position,
@@ -632,10 +632,10 @@ function StrategyEdge({
         style={{
           stroke: meta.color,
           strokeWidth: selected ? 4 : 2.5,
-          strokeDasharray: data?.kind === 'depende' ? '8 5' : undefined,
+          strokeDasharray: selected ? '8 4' : data?.kind === 'depende' ? '8 5' : undefined,
           filter: 'drop-shadow(0 1px 1px rgba(15, 23, 42, 0.18))',
         }}
-        className="react-flow__edge-path"
+        className={cn('react-flow__edge-path', selected && 'strategy-edge-tracing')}
       />
       {editing && (
         <g>
@@ -1596,19 +1596,6 @@ function StrategyMapPageInner() {
             >
               <Background gap={20} size={1} color="#cbd5e1" className="opacity-45" />
               <Controls showInteractive={false} position="bottom-left" />
-              <MiniMap
-                pannable
-                zoomable
-                position="bottom-right"
-                className="hidden md:block"
-                maskColor="rgba(15, 23, 42, 0.08)"
-                nodeBorderRadius={6}
-                nodeColor={(node) =>
-                  node.type === 'objective'
-                    ? LIGHT_STROKE[(node.data as ObjectiveNodeData).objective.aggregateLight] ?? LIGHT_STROKE.GRAY
-                    : `${(node.data as LaneData).perspective.color ?? '#94a3b8'}33`
-                }
-              />
             </ReactFlow>
 
             <div className="absolute right-3 top-3 z-10 flex flex-wrap gap-1.5">
@@ -1700,6 +1687,7 @@ function StrategyMapPageInner() {
 
             {selectedObjective && (
               <div className="space-y-4">
+                <ProcessReferences type="OBJECTIVE" targetId={selectedObjective.id} />
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <Badge variant="secondary">{selectedObjective.perspective.name}</Badge>

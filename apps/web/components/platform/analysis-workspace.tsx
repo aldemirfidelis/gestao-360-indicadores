@@ -312,7 +312,7 @@ function AnalysisSequenceHint({ method, onSelect }: { method: string; onSelect: 
               method === key ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:text-foreground',
             )}
           >
-            {index + 1}. {TOOL_LABEL[key] ?? key}
+            {TOOL_LABEL[key] ?? key}
           </button>
           {index < VISIBLE_ANALYSIS_METHODS.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />}
         </span>

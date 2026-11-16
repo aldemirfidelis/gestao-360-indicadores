@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { KeyMessageCard, areaKeyMessageQueryKey, useAreaKeyMessage } from '@/components/platform/key-message-card';
+import { ProcessDashboard } from '@/components/processes/process-dashboard';
 import { api } from '@/lib/api';
 import { cn, formatNumber } from '@/lib/utils';
 
@@ -160,6 +161,7 @@ export default function VisualizationPage() {
 
   return (
     <div className="space-y-5">
+      <ProcessDashboard />
       {/* Painel enxuto: sem título/descrição de escopo — só filtros, cards e mensagem-chave. */}
       <div className="flex justify-end">
         <Button type="button" variant="outline" className="gap-2" onClick={exportPanel} disabled={exporting || indicators.isLoading || !selectedNodeId}>

@@ -825,6 +825,7 @@ export class TasksService {
     if (['IN_PROGRESS', 'UNDER_ANALYSIS', 'ACTION', 'MITIGATING', 'IN_TREATMENT'].includes(normalized)) return 'IN_PROGRESS';
     if (
       normalized === 'WAITING'
+      || normalized === 'IN_REVIEW'
       || normalized === 'BLOCKED'
       || normalized === 'VERIFICATION'
       || normalized === 'LEAD_REVIEW'

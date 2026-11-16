@@ -109,7 +109,7 @@ export class ProcessesService {
       OR: [
         { orgNodeId: null, indicatorId: null },
         { orgNodeId: { in: permitted } },
-        { indicator: { ownerNodeId: { in: permitted } } },
+        { orgNodeId: null, indicator: { ownerNodeId: { in: permitted } } },
       ],
     };
   }

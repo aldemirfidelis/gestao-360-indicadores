@@ -43,6 +43,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { NativeSelect } from '@/components/ui/select';
 import { PageHeader } from '@/components/shell/page-header';
+import { ProcessReferences } from '@/components/processes/process-references';
 import { StatusLight } from '@/components/ui/status-light';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { api } from '@/lib/api';
@@ -570,6 +571,7 @@ export function IndicatorDetailView({
       {/* Mesmas ações da tela de Indicadores: quem chegou pelo detalhe lança,
           edita, ajusta metas ou inativa daqui mesmo, sem voltar para a lista. */}
       {!embedded && <IndicatorActionsBar indicatorId={ind.id} />}
+      <ProcessReferences type="INDICATOR" targetId={ind.id} />
 
       {/* Fluxo Lógico e Rastreabilidade Superior — fora da apresentação: no telão
           a hierarquia completa é informação demais para o tempo do fórum. */}

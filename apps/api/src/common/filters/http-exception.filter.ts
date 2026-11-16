@@ -2,6 +2,7 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from
 import { Request, Response } from 'express';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { AuthPayload } from '../../modules/auth/auth.types';
+import { Prisma } from '@prisma/client';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -19,6 +20,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
       status = exception.getStatus();
       const res = exception.getResponse();
       message = typeof res === 'string' ? res : (res as object);
+    } else if (exception instanceof Prisma.PrismaClientKnownRequestError && exception.code === 'P2003') {
+      status = HttpStatus.CONFLICT;
+      message = 'Este registro possui vínculos em uso. Revise os relacionamentos antes de removê-lo.';
     }
 
     // Contexto estruturado — correlaciona o erro a quem/onde aconteceu.

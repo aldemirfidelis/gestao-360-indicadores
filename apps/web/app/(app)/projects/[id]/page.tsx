@@ -10,6 +10,7 @@ import { AlertTriangle, ArrowLeft, Clock3, Plus, Target, TrendingUp, TrendingDow
 import { PageHeader } from '@/components/shell/page-header';
 import { useAuth } from '@/components/auth/auth-provider';
 import { ProjectCurve } from '@/components/platform/project-curve';
+import { ProcessReferences } from '@/components/processes/process-references';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -179,6 +180,7 @@ export default function ProjectDetailPage() {
       </Link>
 
       <PageHeader title={p.name} description={p.description ?? undefined} />
+      <ProcessReferences type="PROJECT" targetId={p.id} />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>

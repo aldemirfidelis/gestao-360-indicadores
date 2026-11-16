@@ -5,7 +5,6 @@ import ReactFlow, {
   Background,
   Controls,
   Handle,
-  MiniMap,
   Position,
   MarkerType,
   getRectOfNodes,
@@ -432,17 +431,6 @@ export function OkrFlowchart({
         >
           <Background gap={20} size={1} color="#cbd5e1" className="opacity-45" />
           <Controls showInteractive={false} position="bottom-left" />
-          {!selected && (
-            <MiniMap
-              pannable
-              zoomable
-              position="bottom-right"
-              className="hidden md:block"
-              maskColor="rgba(15, 23, 42, 0.08)"
-              nodeBorderRadius={6}
-              nodeColor={(node) => STATUS_COLOR[(node.data as OkrNodeData).status] ?? '#94a3b8'}
-            />
-          )}
         </ReactFlow>
         {selected && <OkrDetailPanel obj={selected} periodRef={period || null} onClose={() => setSelectedId(null)} />}
       </div>

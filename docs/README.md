@@ -1,5 +1,7 @@
 # Documentacao - fonte de verdade viva
 
+Atualização de 16/11/2026: consulte a [documentação completa atual](GESTAO360_DOCUMENTACAO_COMPLETA.md), o [mapa de funcionalidades](MAPA_FUNCIONALIDADES.md) e a [memória operacional](CODEX_MEMORIA_OPERACIONAL.md). As seções históricas abaixo ainda contêm referências à infraestrutura anterior. A produção atual é na Vultr; a stack usa React 19. SIPOC/BPMN/RACI estão implementados na árvore local e sua publicação é registrada no [relatório](RELATORIO_IMPLEMENTACAO_SIPOC_BPMN_RACI.md).
+
 Ultima atualizacao: 2026-06-20.
 
 Leia esta pagina primeiro quando entrar no projeto. Ela consolida o estado operacional atual e aponta para os documentos que ainda valem para build, testes, deploy e decisoes de produto.

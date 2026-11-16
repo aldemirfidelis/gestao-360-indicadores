@@ -176,6 +176,7 @@ export const navSections: NavSection[] = [
     { href: '/indicators', label: 'Indicadores', description: 'Farol, ranking e histórico', icon: Target, permissions: ['indicators:view'], exact: true },
     { href: '/deviations', label: 'Desvios', description: 'Indicadores fora da meta, causas e tratativas', icon: AlertTriangle, permissions: ['deviations:view'] },
     { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },
+    { href: '/processes', label: 'Processos', description: 'SIPOC, BPMN, responsabilidades RACI e integrações', icon: Workflow, permissions: ['processes:view'] },
     { href: '/projects/cronograma', label: 'Projetos', description: 'Portfólio, Gantt, curva S, tarefas e marcos', icon: FolderKanban, permissions: ['projects:view'] },
     { href: '/projects', label: 'Ata da Reunião', description: 'Ações da reunião mensal por área, setor e responsável', icon: GanttChartSquare, permissions: ['projects:view', 'actions:view'], exact: true },
     { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: CalendarDays, permissions: ['meetings:view'] },
@@ -190,7 +191,6 @@ export const navSections: NavSection[] = [
     items: [
       // Ordenado pelo ciclo do SGQ: documentar -> mapear -> verificar -> tratar -> gerir risco.
       { href: '/documents', label: 'Documentos', description: 'Políticas, procedimentos, validade e aprovação', icon: FileText, permissions: ['doc:view'] },
-      { href: '/processes', label: 'Processos e SIPOC', description: 'Mapeamento SIPOC, fluxo, responsáveis e análise de processos', icon: Network, permissions: ['processes:view'], exact: true },
       { href: '/forms', label: 'Formulários e Checklists', description: 'Modelos, listas de verificação, inspeções e preenchimentos', icon: FileSpreadsheet, permissions: ['forms:view'] },
       { href: '/audits', label: 'Auditorias', description: 'Auditorias, constatações e geração de NCs', icon: ClipboardCheck, permissions: ['audits:view'] },
       { href: '/nonconformities', label: 'Não Conformidades', description: 'NCs, causa raiz, ação corretiva e eficácia', icon: FileWarning, permissions: ['nc:view'] },

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ProcessReferences } from '@/components/processes/process-references';
 import { useParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
@@ -299,6 +300,7 @@ export default function MeetingDetailPage() {
         }
       />
 
+      <ProcessReferences type="MEETING" targetId={m.id} />
       <div className="grid grid-cols-1 gap-6">
         <div className="space-y-6">
           <SectionCard

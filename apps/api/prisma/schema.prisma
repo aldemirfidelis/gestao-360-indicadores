@@ -763,6 +763,10 @@ model OrgNode {
   monthlyMeetingAreas     MonthlyMeetingArea[]         @relation("MonthlyAreaOrgNode")
   sharedIndicators        IndicatorSharedArea[]        @relation("SharedIndicatorArea")
 
+  processActivities ProcessActivity[] @relation("ProcessActivityArea")
+  processRaciAssignments ProcessRaciAssignment[] @relation("ProcessRaciArea")
+  processIntegrations ProcessIntegration[]
+
   @@unique([companyId, externalSource, externalId])
   @@index([companyId])
   @@index([parentId])
@@ -950,6 +954,10 @@ model User {
   ticketMessages              SupportTicketMessage[]
   ticketAttachments           SupportTicketAttachment[]
 
+  processVersions ProcessArtifactVersion[] @relation("ProcessVersionAuthor")
+  processActivityOwnerships ProcessActivity[] @relation("ProcessActivityOwner")
+  processRaciAssignments ProcessRaciAssignment[] @relation("ProcessRaciUser")
+
   @@index([companyId])
   @@index([branchId])
   @@index([accessProfileId])
@@ -1122,6 +1130,8 @@ model StrategicObjective {
   okrs           OKRObjective[]
   outRelations   ObjectiveRelation[]           @relation("ObjFrom")
   inRelations    ObjectiveRelation[]           @relation("ObjTo")
+
+  processIntegrations ProcessIntegration[]
 
   @@index([mapId])
   @@index([perspectiveId])
@@ -1356,6 +1366,8 @@ model Indicator {
   monthlyMeetingIndicators MonthlyMeetingIndicator[]     @relation("MonthlySnapshotIndicator")
   sharedAreas              IndicatorSharedArea[]         @relation("IndicatorSharedArea")
 
+  processIntegrations ProcessIntegration[]
+
   @@unique([companyId, code])
   @@unique([companyId, externalSource, externalId])
   @@index([companyId])
@@ -1500,6 +1512,8 @@ model Deviation {
   treatmentCases  TreatmentCase[]
   nonConformities NonConformity[]     @relation("NcDeviation")
 
+  processIntegrations ProcessIntegration[]
+
   @@unique([companyId, number])
   @@index([companyId])
   @@index([indicatorId])
@@ -1603,6 +1617,9 @@ model ActionPlan {
   aiSuggestions    ActionAiSuggestion[]
   risks            RiskRegister[]          @relation("RiskMitigationAction")
   nonConformities  NonConformity[]         @relation("NcCorrectiveAction")
+
+  processIntegrations ProcessIntegration[]
+  processRaciRows ProcessRaciRow[]
 
   @@index([companyId])
   @@index([branchId])
@@ -1913,6 +1930,8 @@ model Project {
   progressSnapshots ProjectProgressSnapshot[]
   risks      RiskRegister[]     @relation("RiskProject")
 
+  processIntegrations ProcessIntegration[]
+
   @@index([companyId])
   @@index([indicatorId])
 }
@@ -1949,6 +1968,9 @@ model ProjectTask {
   dependency   ProjectTask?  @relation("TaskDep", fields: [dependencyId], references: [id])
   dependents   ProjectTask[] @relation("TaskDep")
   position     Int           @default(0)
+  processIntegrations ProcessIntegration[]
+  processRaciRows ProcessRaciRow[]
+
 }
 
 model RiskRegister {
@@ -1986,6 +2008,8 @@ model RiskRegister {
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
   deletedAt           DateTime?
+
+  processIntegrations ProcessIntegration[]
 
   @@index([companyId])
   @@index([companyId, status])
@@ -2205,6 +2229,8 @@ model Document {
   editorSessions      DocumentEditorSession[]
   autosaveCheckpoints DocumentAutosaveCheckpoint[]
   tagRelations        DocumentTagRelation[]
+
+  processIntegrations ProcessIntegration[]
 
   @@unique([companyId, number])
   @@index([companyId])
@@ -3073,6 +3099,8 @@ model Audit {
   externalAccesses    AuditExternalAccess[]
   aiSuggestions       AuditAiSuggestion[]
 
+  processIntegrations ProcessIntegration[]
+
   @@unique([companyId, number])
   @@unique([companyId, code])
   @@index([companyId])
@@ -3931,6 +3959,10 @@ model Process {
   deletedAt   DateTime?
 
   steps           ProcessStep[]
+  artifacts       ProcessArtifact[]
+  activities      ProcessActivity[]
+  integrations    ProcessIntegration[] @relation("ProcessIntegrations")
+  relatedProcesses ProcessIntegration[] @relation("RelatedProcessIntegration")
   formTemplates   FormTemplate[]   @relation("FormTemplateProcess")
   formSubmissions FormSubmission[] @relation("FormSubmissionProcess")
 
@@ -3943,6 +3975,188 @@ model Process {
   @@index([ownerUserId])
 }
 
+enum ProcessArtifactKind {
+  SIPOC
+  BPMN
+  RACI
+}
+
+enum ProcessArtifactState {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ProcessScenario {
+  AS_IS
+  TO_BE
+}
+
+enum ProcessRaciRole {
+  R
+  A
+  C
+  I
+}
+
+model ProcessArtifact {
+  id          String @id @default(uuid())
+  processId   String
+  process     Process @relation(fields: [processId], references: [id], onDelete: Restrict)
+  kind        ProcessArtifactKind
+  name        String
+  scenario    ProcessScenario @default(AS_IS)
+  state       ProcessArtifactState @default(DRAFT)
+  revision    Int @default(1)
+  version     Int @default(0)
+  content     Json @default("{}")
+  bpmnXml     String?
+  reviewDueAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  versions    ProcessArtifactVersion[]
+  activities  ProcessActivity[]
+  raciRows    ProcessRaciRow[]
+  integrations ProcessIntegration[]
+
+  @@index([processId, kind, state])
+}
+
+model ProcessArtifactVersion {
+  id          String @id @default(uuid())
+  artifactId  String
+  artifact    ProcessArtifact @relation(fields: [artifactId], references: [id], onDelete: Restrict)
+  version     Int
+  state       ProcessArtifactState
+  snapshot    Json
+  changeNote  String
+  authorId    String?
+  author      User? @relation("ProcessVersionAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  authorName  String
+  createdAt   DateTime @default(now())
+
+  @@unique([artifactId, version])
+}
+
+model ProcessActivity {
+  id           String @id @default(uuid())
+  processId    String
+  process      Process @relation(fields: [processId], references: [id], onDelete: Restrict)
+  artifactId   String
+  artifact     ProcessArtifact @relation(fields: [artifactId], references: [id], onDelete: Restrict)
+  elementId    String
+  elementType  String
+  name         String
+  description  String?
+  orgNodeId    String?
+  orgNode      OrgNode? @relation("ProcessActivityArea", fields: [orgNodeId], references: [id], onDelete: SetNull)
+  ownerUserId  String?
+  owner        User? @relation("ProcessActivityOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  orgJobId     String?
+  orgJob       OrgJob? @relation(fields: [orgJobId], references: [id], onDelete: SetNull)
+  expectedMinutes Int?
+  slaMinutes   Int?
+  systems      String?
+  active       Boolean @default(true)
+  updatedAt    DateTime @updatedAt
+  integrations ProcessIntegration[]
+  raciRows     ProcessRaciRow[]
+
+  @@unique([artifactId, elementId])
+  @@index([processId, active])
+}
+
+model ProcessRaciRow {
+  id              String @id @default(uuid())
+  artifactId      String
+  artifact        ProcessArtifact @relation(fields: [artifactId], references: [id], onDelete: Restrict)
+  name            String
+  position        Int @default(0)
+  activityId      String?
+  activity        ProcessActivity? @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  processStepId   String?
+  processStep     ProcessStep? @relation(fields: [processStepId], references: [id], onDelete: Restrict)
+  projectTaskId   String?
+  projectTask     ProjectTask? @relation(fields: [projectTaskId], references: [id], onDelete: Restrict)
+  workspaceTaskId String?
+  workspaceTask   WorkspaceTask? @relation(fields: [workspaceTaskId], references: [id], onDelete: Restrict)
+  actionPlanId    String?
+  actionPlan      ActionPlan? @relation(fields: [actionPlanId], references: [id], onDelete: Restrict)
+  assignments     ProcessRaciAssignment[]
+
+  @@index([artifactId, position])
+}
+
+model ProcessRaciAssignment {
+  id       String @id @default(uuid())
+  rowId    String
+  row      ProcessRaciRow @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  role     ProcessRaciRole
+  subjectKey String
+  userId   String?
+  user     User? @relation("ProcessRaciUser", fields: [userId], references: [id], onDelete: Restrict)
+  orgNodeId String?
+  orgNode  OrgNode? @relation("ProcessRaciArea", fields: [orgNodeId], references: [id], onDelete: Restrict)
+  orgJobId String?
+  orgJob   OrgJob? @relation(fields: [orgJobId], references: [id], onDelete: Restrict)
+  subjectSnapshot Json
+
+  @@unique([rowId, subjectKey, role])
+}
+
+model ProcessIntegration {
+  id          String @id @default(uuid())
+  processId   String
+  process     Process @relation("ProcessIntegrations", fields: [processId], references: [id], onDelete: Restrict)
+  activityId  String?
+  activity    ProcessActivity? @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  artifactId  String?
+  artifact    ProcessArtifact? @relation(fields: [artifactId], references: [id], onDelete: Restrict)
+  scopeKey    String @default("PROCESS")
+  targetKey   String
+  label       String?
+  createdAt   DateTime @default(now())
+  indicatorId String?
+  indicator   Indicator? @relation(fields: [indicatorId], references: [id], onDelete: Restrict)
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  projectTaskId String?
+  projectTask ProjectTask? @relation(fields: [projectTaskId], references: [id], onDelete: Restrict)
+  workspaceTaskId String?
+  workspaceTask WorkspaceTask? @relation(fields: [workspaceTaskId], references: [id], onDelete: Restrict)
+  actionPlanId String?
+  actionPlan  ActionPlan? @relation(fields: [actionPlanId], references: [id], onDelete: Restrict)
+  deviationId String?
+  deviation   Deviation? @relation(fields: [deviationId], references: [id], onDelete: Restrict)
+  documentId  String?
+  document    Document? @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  formTemplateId String?
+  formTemplate FormTemplate? @relation(fields: [formTemplateId], references: [id], onDelete: Restrict)
+  riskId      String?
+  risk        RiskRegister? @relation(fields: [riskId], references: [id], onDelete: Restrict)
+  auditId     String?
+  audit       Audit? @relation(fields: [auditId], references: [id], onDelete: Restrict)
+  trainingId  String?
+  training    Training? @relation(fields: [trainingId], references: [id], onDelete: Restrict)
+  meetingId   String?
+  meeting     Meeting? @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+  objectiveId String?
+  objective   StrategicObjective? @relation(fields: [objectiveId], references: [id], onDelete: Restrict)
+  relatedProcessId String?
+  relatedProcess Process? @relation("RelatedProcessIntegration", fields: [relatedProcessId], references: [id], onDelete: Restrict)
+  orgNodeId   String?
+  orgNode     OrgNode? @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
+
+  @@unique([processId, scopeKey, targetKey])
+  @@index([indicatorId])
+  @@index([projectId])
+  @@index([projectTaskId])
+  @@index([actionPlanId])
+  @@index([deviationId])
+}
+
 model ProcessStep {
   id          String   @id @default(uuid())
   processId   String
@@ -3953,6 +4167,8 @@ model ProcessStep {
   responsible String? // papel/area responsavel pela etapa (texto livre)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  processRaciRows ProcessRaciRow[]
 
   @@index([processId])
 }
@@ -4238,6 +4454,8 @@ model FormTemplate {
   qrCodes            FormQrCode[]
   kiosks             FormKiosk[]
   aiSuggestions      FormAiSuggestion[]
+
+  processIntegrations ProcessIntegration[]
 
   @@unique([companyId, number])
   @@index([companyId])
@@ -5338,6 +5556,8 @@ model Meeting {
   emailLogs            EmailLog[]
   calendarInvites      CalendarInvite[]
   primaryForTreatments TreatmentCase[]      @relation("TreatmentPrimaryMeeting")
+
+  processIntegrations ProcessIntegration[]
 
   @@index([companyId])
   @@index([startsAt])
@@ -6469,6 +6689,9 @@ model OrgJob {
   toPaths                   OrgJobCareerPath[]      @relation("JobTo")
   approvalRequestsAsCurrent OrgJobApprovalRequest[] @relation("CareerApprovalCurrentJob")
   approvalRequestsAsTarget  OrgJobApprovalRequest[] @relation("CareerApprovalTargetJob")
+
+  processActivities ProcessActivity[]
+  processRaciAssignments ProcessRaciAssignment[]
 
   @@index([companyId])
 }
@@ -9757,6 +9980,9 @@ model WorkspaceTask {
   checklistItems TaskChecklistItem[]
   activities     TaskActivity[]
   links          TaskLink[]
+
+  processIntegrations ProcessIntegration[]
+  processRaciRows ProcessRaciRow[]
 
   @@index([companyId, boardId, isArchived])
   @@index([companyId, assigneeId, status])
@@ -15414,6 +15640,8 @@ model Training {
   certificates TrainingCertificate[]
   developmentActions DevelopmentAction[]
   assessment         TrainingAssessment?
+
+  processIntegrations ProcessIntegration[]
 
   @@unique([companyId, code])
   @@index([companyId, status])

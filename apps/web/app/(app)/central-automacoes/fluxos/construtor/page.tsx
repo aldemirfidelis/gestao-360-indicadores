@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import ReactFlow, {
-  MiniMap,
   Controls,
   Background,
   useNodesState,
@@ -400,7 +399,6 @@ export default function WorkflowBuilder() {
             onEdgeClick={onEdgeClick}
             fitView
           >
-            <MiniMap style={{ height: 80, width: 120 }} zoomable pannable />
             <Controls />
             <Background gap={12} size={1} />
           </ReactFlow>

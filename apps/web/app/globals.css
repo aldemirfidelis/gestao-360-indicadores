@@ -169,6 +169,22 @@
   }
 }
 
+/* Segue a conexão selecionada do mapa estratégico, da origem ao destino. */
+.strategy-edge-tracing {
+  animation: strategy-edge-flow 0.6s linear infinite;
+}
+
+@keyframes strategy-edge-flow {
+  from { stroke-dashoffset: 12; }
+  to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strategy-edge-tracing {
+    animation: none;
+  }
+}
+
 /* Gestão 360 Logo animations */
 @keyframes spin360 {
   from { transform: rotate(0deg); }

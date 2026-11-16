@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { ArrowLeft, Bot, CheckCircle2, Download, GitBranch, Paperclip, Pencil, Plus, Save, Send, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { ProcessReferences } from '@/components/processes/process-references';
 import { SectionCard } from '@/components/platform/section-card';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { EmptyState } from '@/components/platform/empty-state';
@@ -324,6 +325,7 @@ export function ActionDetailView({
         ))}
       </div>
 
+      <ProcessReferences type="ACTION" targetId={a.id} />
       {tab === 'Visão geral' && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">

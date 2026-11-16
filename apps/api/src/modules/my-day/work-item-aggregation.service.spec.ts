@@ -220,4 +220,15 @@ describe('WorkItemAggregationService', () => {
     expect(prisma.recruitOffer.findMany).not.toHaveBeenCalled();
     expect(prisma.compensationMovementRequest.findMany).not.toHaveBeenCalled();
   });
+
+  it('revisões de processo respeitam a disponibilidade do módulo da empresa', async () => {
+    const prisma = { processArtifact: { findMany: vi.fn().mockResolvedValue([]) } };
+    const portal = { getEffectiveConfig: vi.fn().mockResolvedValue({ modules: [{ code: 'processes', unavailable: true, allowedRoles: [] }] }) };
+    const svc = new WorkItemAggregationService(prisma as any, new WorkItemPriorityService(), { listAreaFilter: async () => null } as any, { me: async () => ({ permissions: ['processes:view'] }) } as any, portal as any);
+    expect(await (svc as any).collectProcessReviews(me)).toEqual([]);
+    expect(prisma.processArtifact.findMany).not.toHaveBeenCalled();
+    portal.getEffectiveConfig.mockResolvedValue({ modules: [{ code: 'processes', unavailable: false, allowedRoles: [] }] });
+    await (svc as any).collectProcessReviews(me);
+    expect(prisma.processArtifact.findMany).toHaveBeenCalledOnce();
+  });
 });

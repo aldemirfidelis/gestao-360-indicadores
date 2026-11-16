@@ -1,10 +1,13 @@
 import { formatQuantity } from '@g360/shared';
 import { isProductRouteActive, isProductModuleActive } from '@g360/shared';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { WorkItemPriorityService } from './work-item-priority.service';
+import { AccessService } from '../access/access.service';
+import { AuthService } from '../auth/auth.service';
+import { PortalConfigService } from '../portal-admin/services/portal-config.service';
 import type { WorkItemAction } from '@g360/shared';
 const EMPLOYEE_FEED_PATH = '/servico-pessoal/comunicacao-interna';
 
@@ -62,6 +65,9 @@ export class WorkItemAggregationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly priority: WorkItemPriorityService,
+    @Optional() private readonly processAccess?: AccessService,
+    @Optional() private readonly processAuth?: AuthService,
+    @Optional() private readonly processPortal?: PortalConfigService,
   ) {}
 
   /** Reconstrói a fatia do índice pertencente ao usuário, a partir das fontes. */
@@ -175,6 +181,7 @@ export class WorkItemAggregationService {
       this.collectMeetingsToday(me).catch((e) => this.warn('collectMeetingsToday', e)),
       this.collectIndicatorsOffTarget(me).catch((e) => this.warn('collectIndicatorsOffTarget', e)),
       this.collectNotifications(me).catch((e) => this.warn('collectNotifications', e)),
+      ...(isProductModuleActive('processes') ? [this.collectProcessReviews(me).catch((e) => this.warn('collectProcessReviews', e))] : []),
       ...(isProductModuleActive('automations') ? [this.collectWorkflowTasks(me).catch((e) => this.warn('collectWorkflowTasks', e))] : []),
       ...(isProductModuleActive('automations') ? [this.collectApprovals(me).catch((e) => this.warn('collectApprovals', e))] : []),
       ...(isProductModuleActive('documents') ? [this.collectDocuments(me).catch((e) => this.warn('collectDocuments', e))] : []),
@@ -310,6 +317,25 @@ export class WorkItemAggregationService {
       sourceCreatedAt: task.createdAt,
       sourceUpdatedAt: task.updatedAt,
     }));
+  }
+
+  private async collectProcessReviews(me: AuthPayload): Promise<WorkItemDraft[]> {
+    // Os leitores standalone antigos continuam compatíveis; sem contexto de
+    // autorização não se materializa uma responsabilidade nova no Meu Dia.
+    if (!this.processAuth || !this.processAccess || !this.processPortal) return [];
+    const profile = await this.processAuth.me(me);
+    if (me.role !== 'SUPER_ADMIN' && !profile.permissions.some((key) => ['processes:view', 'processes:manage'].includes(key))) return [];
+    if (me.role !== 'SUPER_ADMIN') {
+      const config = await this.processPortal.getEffectiveConfig(me);
+      const module = config.modules.find((item) => item.code === 'processes');
+      if (!module || module.unavailable || module.hidden || module.maintenance || (module.allowedRoles.length && !module.allowedRoles.includes(me.role))) return [];
+    }
+    const areas = await this.processAccess.listAreaFilter(me.sub, 'processes', 'view');
+    const rows = await this.prisma.processArtifact.findMany({
+      where: { process: { companyId: me.companyId, deletedAt: null, ownerUserId: me.sub, ...(areas ? { OR: [{ orgNodeId: { in: areas } }, { orgNodeId: null, indicator: { ownerNodeId: { in: areas } } }, { orgNodeId: null, indicatorId: null }] } : {}) }, OR: [{ state: 'IN_REVIEW' }, { state: 'PUBLISHED', reviewDueAt: { lt: new Date() } }] },
+      select: { id: true, name: true, kind: true, state: true, processId: true, reviewDueAt: true, updatedAt: true, process: { select: { name: true, orgNodeId: true } } }, take: 200,
+    });
+    return rows.map((artifact) => ({ sourceModule: 'processes', sourceEntityType: 'PROCESS_ARTIFACT', sourceEntityId: artifact.id, itemType: 'PROCESS_REVIEW', title: artifact.name, summary: `${artifact.process.name} · ${artifact.kind}`, status: 'REVIEW', criticality: artifact.reviewDueAt && artifact.reviewDueAt < new Date() ? 'HIGH' : 'MEDIUM', dueAt: artifact.reviewDueAt, assignedUserId: me.sub, orgNodeId: artifact.process.orgNodeId, processId: artifact.processId, requiresDecision: true, availableActions: [{ key: 'open', label: 'Revisar processo', href: `/processes/${artifact.processId}?artifact=${artifact.id}` }], sourceUpdatedAt: artifact.updatedAt }));
   }
 
   /** Projetos legados guardam o responsável por nome; a comparação é exata e case-insensitive. */

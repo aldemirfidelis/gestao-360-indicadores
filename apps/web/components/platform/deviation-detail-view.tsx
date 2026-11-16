@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle2, CalendarPlus, Lock } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { ProcessReferences } from '@/components/processes/process-references';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -138,6 +139,8 @@ export function DeviationDetailView({
           )
         }
       />
+
+      <ProcessReferences type="DEVIATION" targetId={d.id} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <Card>

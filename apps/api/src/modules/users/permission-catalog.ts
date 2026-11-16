@@ -118,6 +118,9 @@ const ALL_PERMISSION_CATALOG = [
   ['processes:create', 'Mapear processos', 'Processos', 'create'],
   ['processes:update', 'Editar processos e etapas', 'Processos', 'update'],
   ['processes:delete', 'Arquivar/excluir processos', 'Processos', 'delete'],
+  ['processes:approve', 'Aprovar artefatos de processos', 'Processos', 'approve'],
+  ['processes:publish', 'Publicar SIPOC, BPMN e RACI', 'Processos', 'approve'],
+  ['processes:export', 'Exportar modelos e matrizes de processos', 'Processos', 'export'],
   ['processes:manage', 'Gerenciar processos', 'Processos', 'manage'],
 
   // Seguranca dos Alimentos (FSMS)

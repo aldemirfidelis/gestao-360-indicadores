@@ -4,7 +4,6 @@ import { useEffect, useMemo } from 'react';
 import ReactFlow, {
   Background,
   Controls,
-  MiniMap,
   ReactFlowProvider,
   useNodesState,
   type Node,
@@ -119,14 +118,13 @@ function FlowCanvas({ processes, canManage, onOpenId, onChanged, statusLabel }: 
           >
             <Background gap={20} size={1} color="#cbd5e1" className="opacity-45" />
             <Controls showInteractive={false} />
-            <MiniMap pannable zoomable className="!bg-muted" />
           </ReactFlow>
         </div>
         <div className="border-t p-2 text-center text-xs text-muted-foreground">
           {processes.length === 0
             ? 'Cadastre processos na aba Processos para vê-los no fluxograma.'
             : canManage
-              ? 'Arraste os processos para reorganizar · clique para abrir · zoom e minimapa no canto.'
+              ? 'Arraste os processos para reorganizar · clique para abrir · use os controles no canto para ajustar o zoom.'
               : 'Clique em um processo para ver os detalhes.'}
         </div>
       </CardContent>
