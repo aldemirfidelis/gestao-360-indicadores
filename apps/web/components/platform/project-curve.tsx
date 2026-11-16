@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type { ProjectCurve as ProjectCurveData } from '@g360/shared';
 import { CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Download, TrendingUp } from 'lucide-react';
@@ -12,18 +13,31 @@ const dateLabel = (value: number | string) => new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'UTC',
 }).format(new Date(value));
 
-export function ProjectCurve({ curve, progress, expectedProgress }: {
+export function ProjectCurve({
+  curve,
+  progress,
+  expectedProgress,
+  title = 'Curva S do projeto',
+  fileName = 'curva-s-projeto.csv',
+  id = 'curva-s',
+  note,
+}: {
   curve: ProjectCurveData;
   progress: number;
   expectedProgress: number | null;
+  title?: string;
+  fileName?: string;
+  id?: string;
+  /** Substitui a explicação padrão (regra de um projeto) exibida abaixo do gráfico. */
+  note?: ReactNode;
 }) {
   const delta = expectedProgress === null ? null : progress - expectedProgress;
   const data = curve.points.map((point) => ({ ...point, time: Date.parse(point.date) }));
   return (
-    <Card className="mb-6" id="curva-s">
+    <Card className="mb-6" id={id}>
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-        <CardTitle className="flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Curva S do projeto</CardTitle>
-        <Button size="sm" variant="outline" onClick={() => downloadCsv('curva-s-projeto.csv', [
+        <CardTitle className="flex items-center gap-2"><TrendingUp className="h-4 w-4" /> {title}</CardTitle>
+        <Button size="sm" variant="outline" onClick={() => downloadCsv(fileName, [
           ['Data', 'Planejado (%)', 'Realizado (%)'],
           ...curve.points.map((point) => [point.date.slice(0, 10), point.planned ?? '', point.actual ?? '']),
         ])}><Download className="mr-2 h-4 w-4" /> Exportar curva</Button>
@@ -48,13 +62,13 @@ export function ProjectCurve({ curve, progress, expectedProgress }: {
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-        <p className="text-xs text-muted-foreground">
+        {note ?? <p className="text-xs text-muted-foreground">
           Planejado pelos prazos das tarefas e dos marcos; quando ambos existem, cada grupo representa metade do avanço.
           Sem tarefas nem marcos, o planejado segue as datas do projeto.
           {' '}O realizado guarda a última medição de cada dia e mantém esse valor até a próxima atualização.
           {curve.historyStartsOn ? ` Histórico disponível desde ${dateLabel(curve.historyStartsOn)}.` : ' O histórico começa com a primeira atualização.'}
           {' '}Alterar o cronograma recalcula o planejado; medições passadas do realizado são preservadas.
-        </p>
+        </p>}
         {!curve.hasSchedule && <p className="text-sm text-muted-foreground">Preencha as datas do projeto ou de todas as tarefas para comparar o avanço com o planejado.</p>}
       </CardContent>
     </Card>

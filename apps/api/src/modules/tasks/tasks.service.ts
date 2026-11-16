@@ -814,7 +814,7 @@ export class TasksService {
       });
       if (!source) return;
       await withProjectProgressSnapshot(this.prisma, source.projectId, (tx) =>
-        tx.projectTask.update({ where: { id: sourceId }, data: { progress: 100 } }));
+        tx.projectTask.update({ where: { id: sourceId }, data: { progress: 100, completedAt: new Date() } }));
     }
   }
 

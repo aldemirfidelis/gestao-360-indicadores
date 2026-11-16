@@ -1,444 +1,468 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import type { ProjectCurve as ProjectCurveData } from '@g360/shared';
+import { useParams, useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, Clock3, Plus, Target, TrendingUp, TrendingDown } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clock3, Copy, Pencil, Target, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { useAuth } from '@/components/auth/auth-provider';
+import { ConfirmDialog } from '@/components/platform/confirm-dialog';
 import { ProjectCurve } from '@/components/platform/project-curve';
 import { ProcessReferences } from '@/components/processes/process-references';
+import { ProjectCosts } from '@/components/projects/project-costs';
+import { ProjectFormDialog } from '@/components/projects/project-form-dialog';
+import { ProjectRisks } from '@/components/projects/project-risks';
+import { ProjectSchedule } from '@/components/projects/project-schedule';
+import { ProjectTeam } from '@/components/projects/project-team';
+import { ProjectUpdates } from '@/components/projects/project-updates';
+import {
+  HEALTH_LABEL,
+  HEALTH_PILL,
+  PMO_CLASS,
+  PMO_LABEL,
+  PRIORITY_LABEL,
+  PRIORITY_PILL,
+  STATUS_LABEL,
+  STATUS_ORDER,
+  STATUS_PILL,
+  formatDay,
+  formatMoney,
+  toDateInput,
+  type LinkedIndicator,
+  type ProjectDetail,
+  type ProjectStatus,
+} from '@/components/projects/types';
+import { useProjectAction, useProjectOptions } from '@/components/projects/use-project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
-import { Gantt } from '@/components/gantt';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api';
-import { formatDate, formatNumber, cn } from '@/lib/utils';
+import { formatNumber, cn } from '@/lib/utils';
 import { getIndicatorUnitLabel } from '@/lib/labels';
 
-interface Milestone {
-  id: string;
-  name: string;
-  dueDate: string;
-  done: boolean;
-}
+const TABS = ['overview', 'schedule', 'costs', 'risks', 'team', 'updates'] as const;
+type TabKey = (typeof TABS)[number];
 
-interface Task {
-  id: string;
-  name: string;
-  startDate: string | null;
-  endDate: string | null;
-  progress: number;
-  responsible: string | null;
-  dependencyId: string | null;
-  dependency: { id: string; name: string } | null;
-}
-
-type PmoStatus = 'ON_TRACK' | 'AT_RISK' | 'CRITICAL' | 'FINALIZED';
-
-interface LinkedIndicator {
-  id: string;
-  name: string;
-  code: string | null;
-  unit: string;
-  unitLabel: string | null;
-  direction: 'HIGHER_BETTER' | 'LOWER_BETTER';
-  ownerNode: { id: string; name: string } | null;
-  results: { id: string; periodRef: string; value: number; light: string; attainment: number | null }[];
-}
-
-interface IndicatorOption {
-  id: string;
-  name: string;
-  code: string | null;
-  unit: string;
-  unitLabel: string | null;
-  direction: 'HIGHER_BETTER' | 'LOWER_BETTER';
-}
-
-interface ProjectDetail {
-  id: string;
-  name: string;
-  description: string | null;
-  status: string;
-  startsAt: string | null;
-  endsAt: string | null;
-  responsible: string | null;
-  budget: number | null;
-  progressOverall: number;
-  expectedProgress: number | null;
-  scheduleVariance: number | null;
-  pmoStatus: PmoStatus;
-  milestonesDone: number;
-  milestonesOverdue: number;
-  tasksOverdue: number;
-  indicatorId: string | null;
-  indicator: LinkedIndicator | null;
-  milestones: Milestone[];
-  tasks: Task[];
-  curve: ProjectCurveData;
-}
-
-const PMO_LABEL: Record<PmoStatus, string> = {
-  ON_TRACK: 'No prazo',
-  AT_RISK: 'Em risco',
-  CRITICAL: 'Crítico',
-  FINALIZED: 'Finalizado',
-};
-
-const PMO_CLASS: Record<PmoStatus, string> = {
-  ON_TRACK: 'pill-green',
-  AT_RISK: 'pill-yellow',
-  CRITICAL: 'pill-red',
-  FINALIZED: 'pill-gray',
+/** Âncoras antigas e atalhos do portfólio abrem a aba correspondente. */
+const HASH_TAB: Record<string, TabKey> = {
+  '#milestones': 'schedule',
+  '#cronograma': 'schedule',
+  '#custos': 'costs',
+  '#riscos': 'risks',
+  '#equipe': 'team',
+  '#status': 'updates',
 };
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const qc = useQueryClient();
   const { user, hasPermission } = useAuth();
   const canEdit = !user?.isDemo && hasPermission(['projects:update']);
-  const refreshProject = () => {
-    qc.invalidateQueries({ queryKey: ['project', id] });
-    qc.invalidateQueries({ queryKey: ['projects'] });
-  };
+  const canCreate = !user?.isDemo && hasPermission(['projects:create']);
+  const canDelete = !user?.isDemo && hasPermission(['projects:delete']);
+
+  const [tab, setTab] = useState<TabKey>('overview');
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+
+  useEffect(() => {
+    const target = HASH_TAB[window.location.hash];
+    if (target) setTab(target);
+  }, []);
 
   const query = useQuery<ProjectDetail>({
     queryKey: ['project', id],
     queryFn: () => api<ProjectDetail>(`/projects/${id}`),
   });
-
-  const indicatorsQuery = useQuery<IndicatorOption[]>({
-    queryKey: ['projects', 'indicators'],
-    queryFn: () => api<IndicatorOption[]>('/projects/indicators'),
-    staleTime: 60_000,
-  });
-
-  const [milestone, setMilestone] = useState({ name: '', dueDate: '' });
-  const [task, setTask] = useState({ name: '', startDate: '', endDate: '', responsible: '', dependencyId: '' });
-
-  const linkIndicator = useMutation({
-    mutationFn: (indicatorId: string) => api(`/projects/${id}`, { method: 'PATCH', json: { indicatorId } }),
-    onSuccess: () => {
-      toast.success('Indicador atualizado');
-      qc.invalidateQueries({ queryKey: ['project', id] });
-      qc.invalidateQueries({ queryKey: ['projects'] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? 'Falha ao vincular indicador'),
-  });
-
-  const addMilestone = useMutation({
-    mutationFn: () => api(`/projects/${id}/milestones`, { method: 'POST', json: milestone }),
-    onSuccess: () => {
-      setMilestone({ name: '', dueDate: '' });
-      refreshProject();
-    },
-    onError: (e: Error) => toast.error(e.message || 'Não foi possível adicionar o marco'),
-  });
-
-  const toggleMilestone = useMutation({
-    mutationFn: ({ msId, done }: { msId: string; done: boolean }) =>
-      api(`/projects/milestones/${msId}`, { method: 'PATCH', json: { done } }),
-    onSuccess: refreshProject,
-    onError: (e: Error) => toast.error(e.message || 'Não foi possível atualizar o marco'),
-  });
-
-  const addTask = useMutation({
-    mutationFn: () => api(`/projects/${id}/tasks`, { method: 'POST', json: { ...task, dependencyId: task.dependencyId || undefined } }),
-    onSuccess: () => {
-      setTask({ name: '', startDate: '', endDate: '', responsible: '', dependencyId: '' });
-      refreshProject();
-    },
-    onError: (e: Error) => toast.error(e.message || 'Não foi possível adicionar a tarefa'),
-  });
-
-  const updateTask = useMutation({
-    mutationFn: ({ taskId, patch }: { taskId: string; patch: any }) =>
-      api(`/projects/tasks/${taskId}`, { method: 'PATCH', json: patch }),
-    onSuccess: refreshProject,
-    onError: (e: Error) => toast.error(e.message || 'Não foi possível atualizar a tarefa'),
-  });
+  const options = useProjectOptions();
+  const action = useProjectAction(id);
 
   if (query.isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
-  if (query.isError) return <div className="space-y-3"><p role="alert">Não foi possível carregar o projeto: {query.error.message}</p><Button variant="outline" onClick={() => query.refetch()}>Tentar novamente</Button></div>;
+  if (query.isError) {
+    return (
+      <div className="space-y-3">
+        <p role="alert">Não foi possível carregar o projeto: {query.error.message}</p>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => query.refetch()}>Tentar novamente</Button>
+          <Button variant="ghost" asChild><Link href="/projects/cronograma">Voltar aos projetos</Link></Button>
+        </div>
+      </div>
+    );
+  }
   if (!query.data) return null;
   const p = query.data;
-  const varianceLabel = p.scheduleVariance === null
-    ? '-'
-    : `${p.scheduleVariance > 0 ? '+' : ''}${p.scheduleVariance}%`;
+  const people = options.data?.people ?? [];
+  const indicators = options.data?.indicators ?? [];
+  const varianceLabel = p.scheduleVariance === null ? '—' : `${p.scheduleVariance > 0 ? '+' : ''}${p.scheduleVariance} p.p.`;
+  const latestUpdate = p.updates[0] ?? null;
+  const charter: Array<[string, string | null]> = [
+    ['Objetivo', p.objective],
+    ['Justificativa', p.justification],
+    ['Escopo', p.scope],
+    ['Fora do escopo', p.outOfScope],
+    ['Premissas e restrições', p.assumptions],
+    ['Benefícios esperados', p.benefits],
+  ];
+  const hasCharter = charter.some(([, value]) => Boolean(value));
+
+  async function removeProject() {
+    try {
+      await api(`/projects/${id}`, { method: 'DELETE' });
+      toast.success('Projeto excluído');
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      router.push('/projects/cronograma');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível excluir o projeto');
+    }
+  }
 
   return (
     <div>
-      <Link href="/projects/cronograma" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
-        <ArrowLeft className="h-4 w-4 mr-1" /> Projetos
+      <Link href="/projects/cronograma" className="mb-4 inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="mr-1 h-4 w-4" /> Projetos
       </Link>
 
-      <PageHeader title={p.name} description={p.description ?? undefined} />
-      <ProcessReferences type="PROJECT" targetId={p.id} />
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-[11px] uppercase text-muted-foreground">Início</div>
-            <div className="font-semibold">{formatDate(p.startsAt)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-[11px] uppercase text-muted-foreground">Fim previsto</div>
-            <div className="font-semibold">{formatDate(p.endsAt)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-[11px] uppercase text-muted-foreground">Responsável</div>
-            <div className="font-semibold">{p.responsible ?? '—'}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-[11px] uppercase text-muted-foreground">Progresso</div>
-            <div className="font-semibold">{p.progressOverall}%</div>
-            <Progress value={p.progressOverall} className="mt-1" />
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock3 className="h-4 w-4" /> Status PMO
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <span className={cn('pill', PMO_CLASS[p.pmoStatus])}>{PMO_LABEL[p.pmoStatus]}</span>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Status calculado por prazo, progresso planejado, marcos e tarefas vencidas.
-              </p>
-            </div>
-            {(p.milestonesOverdue > 0 || p.tasksOverdue > 0) && (
-              <div className="inline-flex items-center gap-2 rounded-md border border-status-red/30 bg-status-red/10 px-3 py-2 text-sm text-status-red">
-                <AlertTriangle className="h-4 w-4" />
-                Pendências vencidas
-              </div>
-            )}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-4">
-            <div className="rounded-md border p-3">
-              <div className="text-[10px] uppercase text-muted-foreground">Planejado</div>
-              <div className="font-semibold">{p.expectedProgress === null ? '-' : `${p.expectedProgress}%`}</div>
-            </div>
-            <div className="rounded-md border p-3">
-              <div className="text-[10px] uppercase text-muted-foreground">Variação</div>
-              <div className={cn('font-semibold', (p.scheduleVariance ?? 0) < -15 && 'text-status-red')}>
-                {varianceLabel}
-              </div>
-            </div>
-            <div className="rounded-md border p-3">
-              <div className="text-[10px] uppercase text-muted-foreground">Marcos vencidos</div>
-              <div className={cn('font-semibold', p.milestonesOverdue > 0 && 'text-status-red')}>
-                {p.milestonesOverdue}
-              </div>
-            </div>
-            <div className="rounded-md border p-3">
-              <div className="text-[10px] uppercase text-muted-foreground">Tarefas vencidas</div>
-              <div className={cn('font-semibold', p.tasksOverdue > 0 && 'text-status-red')}>
-                {p.tasksOverdue}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-4 w-4" /> Indicador vinculado
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-[280px,1fr]">
-            <div className="space-y-2">
-              <Label>Selecionar indicador</Label>
+      <PageHeader
+        eyebrow={[p.code, p.category].filter(Boolean).join(' · ') || undefined}
+        title={p.name}
+        description={p.description ?? undefined}
+        actions={(
+          <div className="flex flex-wrap items-center gap-2">
+            {canEdit ? (
               <NativeSelect
-                value={p.indicatorId ?? ''}
-                onChange={(e) => linkIndicator.mutate(e.target.value)}
-                disabled={!canEdit || linkIndicator.isPending}
+                aria-label="Status do projeto"
+                value={p.status}
+                disabled={action.isPending}
+                onChange={(e) => action.mutate({ path: `/projects/${id}`, method: 'PATCH', json: { status: e.target.value }, success: 'Status atualizado' })}
+                className="h-9 w-auto text-xs"
               >
-                <option value="">Sem indicador</option>
-                {(indicatorsQuery.data ?? []).map((ind) => (
-                  <option key={ind.id} value={ind.id}>
-                    {ind.code ? `[${ind.code}] ` : ''}{ind.name}
-                  </option>
-                ))}
+                {STATUS_ORDER.map((status) => <option key={status} value={status}>{STATUS_LABEL[status]}</option>)}
               </NativeSelect>
-              <p className="text-xs text-muted-foreground">
-                Vincule um KPI para acompanhar o impacto do projeto.
-              </p>
-            </div>
-            {p.indicator ? (
-              <IndicatorImpactPanel indicator={p.indicator} />
             ) : (
-              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                Nenhum indicador vinculado. Escolha um KPI ao lado para ver tendência e atingimento.
-              </div>
+              <span className={cn('pill', STATUS_PILL[p.status])}>{STATUS_LABEL[p.status]}</span>
+            )}
+            {canEdit && (
+              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+                <Pencil className="mr-2 h-4 w-4" /> Editar
+              </Button>
+            )}
+            {canCreate && (
+              <Button size="sm" variant="outline" onClick={() => setDuplicateOpen(true)}>
+                <Copy className="mr-2 h-4 w-4" /> Duplicar
+              </Button>
+            )}
+            {canDelete && (
+              <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="mr-2 h-4 w-4" /> Excluir
+              </Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      />
 
-      <ProjectCurve curve={p.curve} progress={p.progressOverall} expectedProgress={p.expectedProgress} />
-
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Cronograma (Gantt)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Gantt tasks={p.tasks} />
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card id="milestones" className="scroll-mt-20">
-          <CardHeader>
-            <CardTitle>Marcos ({p.milestones.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <fieldset disabled={!canEdit || addMilestone.isPending} className="grid grid-cols-1 sm:grid-cols-[1fr,140px,auto] gap-2">
-              <Input
-                placeholder="Nome do marco"
-                value={milestone.name}
-                onChange={(e) => setMilestone({ ...milestone, name: e.target.value })}
-              />
-              <Input
-                type="date"
-                value={milestone.dueDate}
-                onChange={(e) => setMilestone({ ...milestone, dueDate: e.target.value })}
-              />
-              <Button onClick={() => addMilestone.mutate()} disabled={!milestone.name || !milestone.dueDate}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </fieldset>
-            {p.milestones.map((m) => {
-              const late = !m.done && new Date(m.dueDate) < new Date();
-              return (
-                <label
-                  key={m.id}
-                  className={cn(
-                    'flex items-center gap-3 rounded-md border p-2 text-sm cursor-pointer',
-                    m.done && 'opacity-60',
-                    late && 'border-status-red/40',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={m.done}
-                    disabled={!canEdit || toggleMilestone.isPending}
-                    onChange={(e) => toggleMilestone.mutate({ msId: m.id, done: e.target.checked })}
-                  />
-                  <span className={cn('flex-1', m.done && 'line-through')}>{m.name}</span>
-                  <span className={cn('text-xs text-muted-foreground', late && 'text-status-red')}>
-                    {formatDate(m.dueDate)}
-                  </span>
-                </label>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Tarefas ({p.tasks.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <fieldset disabled={!canEdit || addTask.isPending} className="grid grid-cols-2 gap-2">
-              <Input
-                placeholder="Nome da tarefa"
-                className="col-span-2"
-                value={task.name}
-                onChange={(e) => setTask({ ...task, name: e.target.value })}
-              />
-              <Input
-                type="date"
-                value={task.startDate}
-                onChange={(e) => setTask({ ...task, startDate: e.target.value })}
-              />
-              <Input
-                type="date"
-                value={task.endDate}
-                onChange={(e) => setTask({ ...task, endDate: e.target.value })}
-              />
-              <Input
-                placeholder="Responsável"
-                value={task.responsible}
-                onChange={(e) => setTask({ ...task, responsible: e.target.value })}
-              />
-              <select
-                value={task.dependencyId}
-                onChange={(e) => setTask({ ...task, dependencyId: e.target.value })}
-                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="">Sem dependência</option>
-                {p.tasks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-              <Button
-                className="col-span-2"
-                onClick={() => addTask.mutate()}
-                disabled={!task.name || !task.startDate || !task.endDate}
-              >
-                <Plus className="h-4 w-4 mr-2" /> Adicionar tarefa
-              </Button>
-            </fieldset>
-            <div className="space-y-1.5">
-              {p.tasks.map((t) => (
-                <div key={t.id} className="grid grid-cols-[1fr,80px,auto] gap-2 items-center rounded-md border p-2 text-sm">
-                  <div>
-                    <div className="font-medium">{t.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {formatDate(t.startDate)} - {formatDate(t.endDate)}
-                      {t.dependency && ` - depois de ${t.dependency.name}`}
-                    </div>
-                  </div>
-                  <Input
-                    key={`${t.id}:${t.progress}`}
-                    type="number"
-                    aria-label={`Progresso de ${t.name} (%)`}
-                    disabled={!canEdit || updateTask.isPending}
-                    min={0}
-                    max={100}
-                    defaultValue={t.progress}
-                    className="h-8 text-right"
-                    onBlur={(e) => {
-                      const v = Number(e.target.value);
-                      if (!Number.isFinite(v) || v < 0 || v > 100 || e.target.value === '') {
-                        e.target.value = String(t.progress);
-                        toast.error('Informe um progresso entre 0 e 100.');
-                        return;
-                      }
-                      if (v === t.progress) return;
-                      updateTask.mutate({ taskId: t.id, patch: { progress: v } });
-                    }}
-                  />
-                  <span className="text-xs text-muted-foreground w-8">%</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className={cn('pill', PMO_CLASS[p.pmoStatus])}>{PMO_LABEL[p.pmoStatus]}</span>
+        <span className={cn('pill', PRIORITY_PILL[p.priority])}>Prioridade {PRIORITY_LABEL[p.priority].toLowerCase()}</span>
+        {p.latestHealth && <span className={cn('pill', HEALTH_PILL[p.latestHealth])}>Último relato: {HEALTH_LABEL[p.latestHealth].toLowerCase()}</span>}
+        {p.finance.overBudget && <span className="pill pill-red">Orçamento estourado</span>}
       </div>
+
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <Summary label="Progresso">
+          <div className="font-semibold">{p.progressOverall}%</div>
+          <Progress value={p.progressOverall} className="mt-1" />
+        </Summary>
+        <Summary label="Prazo previsto">
+          <div className="font-semibold">{formatDay(p.startsAt)} a {formatDay(p.endsAt)}</div>
+          {(p.actualStartAt || p.actualEndAt) && (
+            <div className="text-xs text-muted-foreground">Real: {formatDay(p.actualStartAt)} a {formatDay(p.actualEndAt)}</div>
+          )}
+        </Summary>
+        <Summary label="Gerente do projeto">
+          <div className="truncate font-semibold">{p.manager?.name ?? p.responsible ?? '—'}</div>
+          {p.sponsor && <div className="truncate text-xs text-muted-foreground">Patrocinador: {p.sponsor}</div>}
+        </Summary>
+        <Summary label="Orçamento">
+          <div className="font-semibold">{formatMoney(p.finance.budget)}</div>
+          <div className={cn('text-xs text-muted-foreground', p.finance.overBudget && 'font-semibold text-status-red')}>
+            Realizado: {formatMoney(p.finance.actualCost)}
+          </div>
+        </Summary>
+        <Summary label="Riscos e impedimentos">
+          <div className={cn('font-semibold', p.openIssues > 0 && 'text-status-red')}>{p.openRisks + p.openIssues} em aberto</div>
+          <div className="text-xs text-muted-foreground">{p.openRisks} risco(s) · {p.openIssues} impedimento(s)</div>
+        </Summary>
+      </div>
+
+      <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)}>
+        <TabsList>
+          <TabsTrigger value="overview">Visão geral</TabsTrigger>
+          <TabsTrigger value="schedule">Cronograma ({p.tasks.length + p.milestones.length})</TabsTrigger>
+          <TabsTrigger value="costs">Custos</TabsTrigger>
+          <TabsTrigger value="risks">Riscos ({p.openRisks + p.openIssues})</TabsTrigger>
+          <TabsTrigger value="team">Equipe ({p.members.length})</TabsTrigger>
+          <TabsTrigger value="updates">Status report ({p.updates.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <ProcessReferences type="PROJECT" targetId={p.id} />
+
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock3 className="h-4 w-4" /> Status PMO
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <span className={cn('pill', PMO_CLASS[p.pmoStatus])}>{PMO_LABEL[p.pmoStatus]}</span>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Status calculado por prazo, progresso planejado, marcos e tarefas vencidas.
+                  </p>
+                </div>
+                {(p.milestonesOverdue > 0 || p.tasksOverdue > 0) && (
+                  <button
+                    type="button"
+                    onClick={() => setTab('schedule')}
+                    className="inline-flex items-center gap-2 rounded-md border border-status-red/30 bg-status-red/10 px-3 py-2 text-sm text-status-red"
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                    Pendências vencidas: ver cronograma
+                  </button>
+                )}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-4">
+                <Fact label="Planejado até hoje" value={p.expectedProgress === null ? 'Sem cronograma' : `${p.expectedProgress}%`} />
+                <Fact label="Variação" value={varianceLabel} tone={(p.scheduleVariance ?? 0) < -15 ? 'text-status-red' : undefined} />
+                <Fact label="Marcos vencidos" value={String(p.milestonesOverdue)} tone={p.milestonesOverdue > 0 ? 'text-status-red' : undefined} />
+                <Fact label="Tarefas vencidas" value={String(p.tasksOverdue)} tone={p.tasksOverdue > 0 ? 'text-status-red' : undefined} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <ProjectCurve curve={p.curve} progress={p.progressOverall} expectedProgress={p.expectedProgress} />
+
+          {latestUpdate && (
+            <Card className="mb-6">
+              <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+                <CardTitle>Último status report</CardTitle>
+                <Button size="sm" variant="ghost" onClick={() => setTab('updates')}>Ver histórico</Button>
+              </CardHeader>
+              <CardContent className="text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={cn('pill text-[10px]', HEALTH_PILL[latestUpdate.health])}>{HEALTH_LABEL[latestUpdate.health]}</span>
+                  <span className="font-semibold">{formatDay(latestUpdate.reportDate)}</span>
+                  <span className="text-xs text-muted-foreground">por {latestUpdate.authorName}</span>
+                </div>
+                <p className="mt-2 whitespace-pre-line">{latestUpdate.summary}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="mb-6">
+            <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+              <CardTitle>Termo de abertura</CardTitle>
+              {canEdit && <Button size="sm" variant="ghost" onClick={() => setEditOpen(true)}><Pencil className="mr-2 h-4 w-4" /> Editar</Button>}
+            </CardHeader>
+            <CardContent>
+              {hasCharter ? (
+                <dl className="grid gap-4 md:grid-cols-2">
+                  {charter.filter(([, value]) => Boolean(value)).map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</dt>
+                      <dd className="mt-0.5 whitespace-pre-line text-sm">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Objetivo, justificativa, escopo, premissas e benefícios ainda não foram preenchidos.
+                  {canEdit ? ' Use Editar para registrar o termo de abertura.' : ''}
+                </p>
+              )}
+              {p.lessonsLearned && (
+                <div className="mt-4 border-t pt-4">
+                  <div className="text-[11px] font-semibold uppercase text-muted-foreground">Lições aprendidas</div>
+                  <p className="mt-0.5 whitespace-pre-line text-sm">{p.lessonsLearned}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-4 w-4" /> Indicador vinculado
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-[280px,1fr]">
+                <div className="space-y-2">
+                  <Label htmlFor="project-linked-indicator">Selecionar indicador</Label>
+                  <NativeSelect
+                    id="project-linked-indicator"
+                    value={p.indicatorId ?? ''}
+                    onChange={(e) => action.mutate({ path: `/projects/${id}`, method: 'PATCH', json: { indicatorId: e.target.value }, success: 'Indicador atualizado' })}
+                    disabled={!canEdit || action.isPending}
+                  >
+                    <option value="">Sem indicador</option>
+                    {indicators.map((ind) => (
+                      <option key={ind.id} value={ind.id}>
+                        {ind.code ? `[${ind.code}] ` : ''}{ind.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                  <p className="text-xs text-muted-foreground">
+                    Vincule um KPI para acompanhar o impacto do projeto.
+                  </p>
+                </div>
+                {p.indicator ? (
+                  <IndicatorImpactPanel indicator={p.indicator} />
+                ) : (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                    Nenhum indicador vinculado. Escolha um KPI ao lado para ver tendência e atingimento.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="schedule">
+          <ProjectSchedule project={p} canEdit={canEdit} action={action} people={people} />
+        </TabsContent>
+        <TabsContent value="costs">
+          <ProjectCosts project={p} canEdit={canEdit} action={action} />
+        </TabsContent>
+        <TabsContent value="risks">
+          <ProjectRisks project={p} canEdit={canEdit} action={action} people={people} />
+        </TabsContent>
+        <TabsContent value="team">
+          <ProjectTeam project={p} canEdit={canEdit} action={action} people={people} />
+        </TabsContent>
+        <TabsContent value="updates">
+          <ProjectUpdates project={p} canEdit={canEdit} action={action} />
+        </TabsContent>
+      </Tabs>
+
+      <ProjectFormDialog open={editOpen} onOpenChange={setEditOpen} project={p} />
+      <DuplicateDialog
+        open={duplicateOpen}
+        onOpenChange={setDuplicateOpen}
+        project={p}
+        onCreated={(created) => router.push(`/projects/${created.id}`)}
+      />
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Excluir projeto"
+        description={`“${p.name}” sairá do portfólio com seu cronograma, custos, riscos, equipe e status reports.`}
+        confirmLabel="Excluir projeto"
+        destructive
+        onConfirm={removeProject}
+      />
     </div>
+  );
+}
+
+function Summary({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="text-[11px] uppercase text-muted-foreground">{label}</div>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Fact({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="rounded-md border p-3">
+      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
+      <div className={cn('font-semibold', tone)}>{value}</div>
+    </div>
+  );
+}
+
+function DuplicateDialog({
+  open,
+  onOpenChange,
+  project,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  project: ProjectDetail;
+  onCreated: (project: { id: string }) => void;
+}) {
+  const qc = useQueryClient();
+  const [name, setName] = useState('');
+  const [startsAt, setStartsAt] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setName(`${project.name} (cópia)`.slice(0, 180));
+    setStartsAt(toDateInput(project.startsAt));
+  }, [open, project.name, project.startsAt]);
+
+  const duplicate = useMutation({
+    mutationFn: () => api<{ id: string }>(`/projects/${project.id}/duplicate`, {
+      method: 'POST',
+      json: { name: name.trim(), startsAt: startsAt || undefined },
+    }),
+    onSuccess: (created) => {
+      toast.success('Projeto duplicado');
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      onOpenChange(false);
+      onCreated(created);
+    },
+    onError: (error: Error) => toast.error(error.message || 'Não foi possível duplicar o projeto'),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !duplicate.isPending && onOpenChange(next)}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Duplicar projeto</DialogTitle>
+          <DialogDescription>
+            O novo projeto recebe o cadastro, as tarefas, os marcos e a equipe deste, com avanço zerado.
+            Custos, riscos e status reports não são copiados.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="duplicate-name">Nome do novo projeto *</Label>
+            <Input id="duplicate-name" value={name} maxLength={180} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="duplicate-start">Nova data de início</Label>
+            <Input id="duplicate-start" type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+            <p className="text-xs text-muted-foreground">
+              {project.startsAt
+                ? 'As datas das tarefas e dos marcos são deslocadas pelo mesmo intervalo.'
+                : 'O projeto original não tem data de início; as datas das tarefas e dos marcos são mantidas.'}
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" disabled={duplicate.isPending} onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={() => duplicate.mutate()} disabled={!name.trim() || duplicate.isPending}>
+            {duplicate.isPending ? 'Duplicando...' : 'Duplicar'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -458,13 +482,13 @@ function IndicatorImpactPanel({ indicator }: { indicator: LinkedIndicator }) {
 
   return (
     <div className="rounded-lg border bg-card p-4">
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[11px] uppercase text-muted-foreground">
             {indicator.code && <span className="mr-2 font-mono">[{indicator.code}]</span>}
             {indicator.ownerNode?.name ?? 'KPI'}
           </div>
-          <div className="font-semibold truncate">{indicator.name}</div>
+          <div className="truncate font-semibold">{indicator.name}</div>
         </div>
         <Link
           href={`/indicators/${indicator.id}`}
@@ -493,7 +517,7 @@ function IndicatorImpactPanel({ indicator }: { indicator: LinkedIndicator }) {
         </div>
         <div>
           <div className="text-[10px] uppercase text-muted-foreground">Tendência</div>
-          <div className="text-xl font-bold flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 text-xl font-bold">
             {trendUp === null ? (
               '—'
             ) : trendUp ? (

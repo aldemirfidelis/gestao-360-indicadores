@@ -5,9 +5,32 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AlertTriangle, BarChart3, Clock3, Filter, FolderKanban, Plus, Wallet, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Clock3, Columns3, Filter, Flag, FolderKanban, LayoutGrid, List, Plus, ShieldAlert, Wallet, X } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { EmptyState } from '@/components/platform/empty-state';
 import { MetricCard } from '@/components/platform/metric-card';
+import { ProjectFormDialog } from '@/components/projects/project-form-dialog';
+import {
+  HEALTH_LABEL,
+  HEALTH_PILL,
+  PMO_CLASS,
+  PMO_LABEL,
+  PRIORITY_LABEL,
+  PRIORITY_ORDER,
+  PRIORITY_PILL,
+  STATUS_LABEL,
+  STATUS_ORDER,
+  STATUS_PILL,
+  formatDay,
+  formatMoney,
+  isOverdue,
+  toDateInput,
+  type PortfolioSummary,
+  type ProjectSummary,
+} from '@/components/projects/types';
+import { useProjectOptions } from '@/components/projects/use-project';
+import { PortfolioGantt } from '@/components/projects/portfolio-gantt';
+import { PortfolioAgenda, PortfolioCurveCard, usePortfolioExecution } from '@/components/projects/portfolio-execution';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,108 +44,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { NativeSelect } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/auth/auth-provider';
 import { downloadCsv } from '@/lib/compensation/format';
-import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
 
-interface Project {
-  id: string;
-  name: string;
-  description: string | null;
-  status: 'PLANNED' | 'IN_PROGRESS' | 'ON_HOLD' | 'DONE' | 'CANCELLED';
-  startsAt: string | null;
-  endsAt: string | null;
-  responsible: string | null;
-  budget: number | null;
-  progressOverall: number;
-  expectedProgress: number | null;
-  scheduleVariance: number | null;
-  pmoStatus: 'ON_TRACK' | 'AT_RISK' | 'CRITICAL' | 'FINALIZED';
-  milestonesDone: number;
-  milestonesOverdue: number;
-  tasksOverdue: number;
-  indicatorId: string | null;
-  indicator: {
-    id: string;
-    name: string;
-    code: string | null;
-    unit: string;
-    unitLabel: string | null;
-    direction: 'HIGHER_BETTER' | 'LOWER_BETTER';
-    results: { value: number; light: string; attainment: number | null; periodRef: string }[];
-  } | null;
-  _count: { tasks: number; milestones: number };
-}
+type Filters = { search: string; status: string; priority: string; managerId: string; indicatorId: string };
+type ViewMode = 'cards' | 'list' | 'board';
 
-interface IndicatorOption {
-  id: string;
-  name: string;
-  code: string | null;
-  unit: string;
-  unitLabel: string | null;
-  direction: 'HIGHER_BETTER' | 'LOWER_BETTER';
-  ownerNodeId?: string;
-}
-
-interface PortfolioSummary {
-  totalProjects: number;
-  activeProjects: number;
-  budgetTotal: number;
-  activeBudget: number;
-  avgProgress: number;
-  milestonesTotal: number;
-  milestonesDone: number;
-  milestonesOverdue: number;
-  tasksTotal: number;
-  tasksOverdue: number;
-  behindSchedule: number;
-  criticalProjects: Array<{
-    id: string;
-    name: string;
-    status: Project['status'];
-    pmoStatus: Project['pmoStatus'];
-    responsible: string | null;
-    endsAt: string | null;
-    progressOverall: number;
-    expectedProgress: number | null;
-    scheduleVariance: number | null;
-    milestonesOverdue: number;
-    tasksOverdue: number;
-    indicator: { id: string; name: string; code: string | null } | null;
-  }>;
-}
-
-const STATUS_PILL: Record<string, string> = {
-  PLANNED: 'pill-gray',
-  IN_PROGRESS: 'pill-blue',
-  ON_HOLD: 'pill-yellow',
-  DONE: 'pill-green',
-  CANCELLED: 'pill-gray',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  PLANNED: 'Planejado',
-  IN_PROGRESS: 'Em andamento',
-  ON_HOLD: 'Pausado',
-  DONE: 'Concluído',
-  CANCELLED: 'Cancelado',
-};
-
-const PMO_LABEL: Record<Project['pmoStatus'], string> = {
-  ON_TRACK: 'No prazo',
-  AT_RISK: 'Em risco',
-  CRITICAL: 'Crítico',
-  FINALIZED: 'Finalizado',
-};
-
-const PMO_CLASS: Record<Project['pmoStatus'], string> = {
-  ON_TRACK: 'pill-green',
-  AT_RISK: 'pill-yellow',
-  CRITICAL: 'pill-red',
-  FINALIZED: 'pill-gray',
-};
+const EMPTY_FILTERS: Filters = { search: '', status: '', priority: '', managerId: '', indicatorId: '' };
+const VIEWS: Array<{ key: ViewMode; label: string; icon: typeof LayoutGrid }> = [
+  { key: 'cards', label: 'Cartões', icon: LayoutGrid },
+  { key: 'list', label: 'Lista', icon: List },
+  { key: 'board', label: 'Quadro', icon: Columns3 },
+];
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -130,30 +65,25 @@ export default function ProjectsPage() {
   const qc = useQueryClient();
   const { user, hasPermission } = useAuth();
   const canCreate = !user?.isDemo && hasPermission(['projects:create']);
+  const canEdit = !user?.isDemo && hasPermission(['projects:update']);
   const [open, setOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [milestoneOpen, setMilestoneOpen] = useState(false);
   const [milestoneProjectId, setMilestoneProjectId] = useState('');
+  const [view, setView] = useState<ViewMode>('cards');
   const ganttRef = useRef<HTMLDivElement>(null);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<Filters>({
     search: searchParams.get('search') ?? '',
     status: searchParams.get('status') ?? '',
+    priority: searchParams.get('priority') ?? '',
+    managerId: searchParams.get('managerId') ?? '',
     indicatorId: searchParams.get('indicatorId') ?? '',
   });
-  const [form, setForm] = useState({
-    name: '',
-    description: '',
-    responsible: '',
-    startsAt: '',
-    endsAt: '',
-    budget: '',
-    status: 'PLANNED' as Project['status'],
-    indicatorId: '',
-  });
+  const hasFilters = Object.values(filters).some(Boolean);
 
-  const query = useQuery<Project[]>({
+  const query = useQuery<ProjectSummary[]>({
     queryKey: ['projects', filters],
-    queryFn: () => api<Project[]>(`/projects${toQueryString(filters)}`),
+    queryFn: () => api<ProjectSummary[]>(`/projects${toQueryString(filters)}`),
   });
 
   const portfolio = useQuery<PortfolioSummary>({
@@ -161,53 +91,25 @@ export default function ProjectsPage() {
     queryFn: () => api<PortfolioSummary>(`/projects/portfolio${toQueryString(filters)}`),
   });
 
-  const indicatorsQuery = useQuery<IndicatorOption[]>({
-    queryKey: ['projects', 'indicators'],
-    queryFn: () => api<IndicatorOption[]>('/projects/indicators'),
-    staleTime: 60_000,
-  });
+  const options = useProjectOptions();
+
+  const execution = usePortfolioExecution(filters);
 
   const projects = useMemo(() => query.data ?? [], [query.data]);
   const pmo = portfolio.data;
-  const timeline = useMemo(() => buildTimeline(projects), [projects]);
 
   // Filtros na URL desta tela: "/projects" agora é a Ata da reunião e levaria o usuário embora.
   useEffect(() => {
     router.replace(`/projects/cronograma${toQueryString(filters)}`, { scroll: false });
   }, [filters, router]);
 
-  const createProject = useMutation({
-    mutationFn: () =>
-      api<Project>('/projects', {
-        method: 'POST',
-        json: {
-          name: form.name,
-          description: form.description || undefined,
-          responsible: form.responsible || undefined,
-          startsAt: form.startsAt || undefined,
-          endsAt: form.endsAt || undefined,
-          budget: form.budget ? Number(form.budget) : undefined,
-          status: form.status,
-          indicatorId: form.indicatorId || undefined,
-        },
-      }),
-    onSuccess: (project) => {
-      toast.success('Projeto criado');
-      setOpen(false);
-      setForm({
-        name: '',
-        description: '',
-        responsible: '',
-        startsAt: '',
-        endsAt: '',
-        budget: '',
-        status: 'PLANNED',
-        indicatorId: '',
-      });
+  const changeStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => api(`/projects/${id}`, { method: 'PATCH', json: { status } }),
+    onSuccess: () => {
+      toast.success('Status atualizado');
       qc.invalidateQueries({ queryKey: ['projects'] });
-      router.push(`/projects/${project.id}`);
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Não foi possível criar o projeto'),
+    onError: (e: Error) => toast.error(e.message || 'Não foi possível atualizar o status'),
   });
 
   function openMilestone() {
@@ -226,16 +128,23 @@ export default function ProjectsPage() {
   function exportPortfolio() {
     if (projects.length === 0) return;
     downloadCsv(`portfolio-projetos-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ['Projeto', 'Status', 'Situação PMO', 'Responsável', 'Início', 'Fim', 'Progresso (%)', 'Orçamento', 'Tarefas vencidas', 'Marcos vencidos'],
+      ['Código', 'Projeto', 'Categoria', 'Status', 'Prioridade', 'Situação PMO', 'Gerente', 'Início', 'Fim', 'Progresso (%)', 'Planejado (%)', 'Orçamento', 'Custo realizado', 'Riscos abertos', 'Impedimentos abertos', 'Tarefas vencidas', 'Marcos vencidos'],
       ...projects.map((project) => [
+        project.code ?? '',
         project.name,
+        project.category ?? '',
         STATUS_LABEL[project.status] ?? project.status,
+        PRIORITY_LABEL[project.priority] ?? '',
         PMO_LABEL[project.pmoStatus],
         project.responsible ?? '',
-        project.startsAt ?? '',
-        project.endsAt ?? '',
+        toDateInput(project.startsAt),
+        toDateInput(project.endsAt),
         project.progressOverall,
+        project.expectedProgress ?? '',
         project.budget ?? '',
+        project.finance?.actualCost ?? '',
+        project.openRisks ?? 0,
+        project.openIssues ?? 0,
         project.tasksOverdue,
         project.milestonesOverdue,
       ]),
@@ -250,22 +159,24 @@ export default function ProjectsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Projetos e Cronogramas"
-        description="Portfólio de projetos, cronogramas Gantt, curva S de avanço, tarefas, marcos e painel PMO integrado."
+        description="Portfólio de projetos com cronograma, curva S, custos, riscos, equipe e status report."
         actions={canCreate ? <Button onClick={() => setOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"><Plus className="mr-1.5 h-4 w-4" />Novo projeto</Button> : null}
       />
 
       {/* PMO KPIs superiores */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard title="Projetos Ativos" value={formatNumber(pmo?.activeProjects)} change={`${formatNumber(pmo?.totalProjects)} no portfólio`} color="sky" icon={FolderKanban} />
-        <KpiCard title="Marcos Concluídos" value={`${formatNumber(pmo?.milestonesDone)}/${formatNumber(pmo?.milestonesTotal)}`} change={`${formatNumber(pmo?.milestonesOverdue)} vencidos`} color="rose" icon={AlertTriangle} />
-        <KpiCard title="Orçamento Alocado" value={formatNumber(pmo?.activeBudget, { style: 'currency', currency: 'BRL' })} change={`Total ${formatNumber(pmo?.budgetTotal, { style: 'currency', currency: 'BRL' })}`} color="purple" icon={Wallet} />
         <KpiCard title="Progresso Médio" value={`${formatNumber(pmo?.avgProgress, { maximumFractionDigits: 0 })}%`} change={`${formatNumber(pmo?.behindSchedule)} abaixo do plano`} color="amber" icon={Clock3} />
+        <KpiCard title="Marcos Concluídos" value={`${formatNumber(pmo?.milestonesDone)}/${formatNumber(pmo?.milestonesTotal)}`} change={`${formatNumber(pmo?.milestonesOverdue)} vencidos`} color="emerald" icon={Flag} />
+        <KpiCard title="Tarefas Vencidas" value={formatNumber(pmo?.tasksOverdue)} change={`${formatNumber(pmo?.tasksTotal)} tarefas no total`} color="rose" icon={AlertTriangle} />
+        <KpiCard title="Orçamento Ativo" value={formatMoney(pmo?.activeBudget ?? 0)} change={`Realizado ${formatMoney(pmo?.actualCost ?? 0)}`} color="purple" icon={Wallet} />
+        <KpiCard title="Riscos Abertos" value={formatNumber((pmo?.openRisks ?? 0) + (pmo?.openIssues ?? 0))} change={`${formatNumber(pmo?.openIssues)} impedimento(s)`} color="rose" icon={ShieldAlert} />
       </div>
 
       {/* Ações Rápidas */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
-        <QuickActionBtn icon={Plus} title="Criar projeto" onClick={() => setOpen(true)} />
-        <QuickActionBtn icon={AlertTriangle} title="Novo marco" onClick={openMilestone} />
+        {canCreate && <QuickActionBtn icon={Plus} title="Criar projeto" onClick={() => setOpen(true)} />}
+        {canEdit && <QuickActionBtn icon={Flag} title="Novo marco" onClick={openMilestone} />}
         <QuickActionBtn icon={Wallet} title="Previsão financeira" onClick={() => setFinanceOpen(true)} />
         <QuickActionBtn icon={FolderKanban} title="Exportar portfólio" onClick={exportPortfolio} disabled={projects.length === 0} />
         <QuickActionBtn icon={BarChart3} title="Visão Gantt" onClick={scrollToGantt} />
@@ -273,7 +184,7 @@ export default function ProjectsPage() {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,360px]">
 
-        {/* Painel PMO / Gantt Chart SVG */}
+        {/* Painel PMO / Gantt do portfólio */}
         <Card ref={ganttRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
           <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
             <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-855 dark:text-white">
@@ -283,30 +194,7 @@ export default function ProjectsPage() {
           </div>
           <CardContent className="p-4 space-y-4">
 
-            <div className="overflow-x-auto rounded-xl border border-slate-100 bg-slate-50/40 p-3 dark:border-slate-800/85 dark:bg-slate-900/40">
-              {timeline.rows.length === 0 ? (
-                <div className="p-6 text-center text-xs text-muted-foreground">Informe as datas de início e fim dos projetos para gerar o Gantt.</div>
-              ) : (
-                <div className="min-w-[620px] space-y-2">
-                  <div className="grid grid-cols-[170px,1fr] items-center gap-3 text-[10px] font-semibold text-muted-foreground">
-                    <span>Projeto</span>
-                    <div className="flex justify-between"><span>{formatDate(timeline.start.toISOString())}</span><span>{formatDate(timeline.end.toISOString())}</span></div>
-                  </div>
-                  {timeline.rows.map((row) => (
-                    <Link key={row.project.id} href={`/projects/${row.project.id}`} className="grid grid-cols-[170px,1fr] items-center gap-3 rounded-md px-1 py-1.5 hover:bg-muted/50">
-                      <span className="truncate text-xs font-medium" title={row.project.name}>{row.project.name}</span>
-                      <div className="relative h-6 rounded bg-slate-200/60 dark:bg-slate-800">
-                        <div
-                          className={cn('absolute top-1 h-4 min-w-2 rounded', row.project.pmoStatus === 'CRITICAL' ? 'bg-rose-500' : row.project.pmoStatus === 'AT_RISK' ? 'bg-amber-500' : 'bg-sky-500')}
-                          style={{ left: `${row.left}%`, width: `${row.width}%` }}
-                          title={`${formatDate(row.project.startsAt)} a ${formatDate(row.project.endsAt)}`}
-                        />
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
+            <PortfolioGantt projects={projects} />
 
             <div className="space-y-2">
               {(pmo?.criticalProjects ?? []).length === 0 && (
@@ -319,7 +207,9 @@ export default function ProjectsPage() {
                   <div className="min-w-0">
                     <div className="font-bold text-slate-800 dark:text-slate-200 truncate">{project.name}</div>
                     <div className="text-[10px] text-slate-400 mt-0.5">
-                      {project.responsible ?? 'Sem responsável'} - fim {formatDate(project.endsAt)}
+                      {project.responsible ?? 'Sem responsável'} - fim {formatDay(project.endsAt)}
+                      {project.tasksOverdue > 0 && ` - ${project.tasksOverdue} tarefa(s) vencida(s)`}
+                      {project.milestonesOverdue > 0 && ` - ${project.milestonesOverdue} marco(s) vencido(s)`}
                     </div>
                     {project.indicator && (
                       <div className="mt-1 text-[10px] text-sky-500 font-semibold truncate">
@@ -346,31 +236,38 @@ export default function ProjectsPage() {
             </div>
             <div className="space-y-3">
               <Input
+                aria-label="Buscar projeto"
                 value={filters.search}
                 onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-                placeholder="Buscar projeto, responsável ou KPI"
+                placeholder="Buscar projeto, código, responsável ou KPI"
                 className="text-xs"
               />
-              <NativeSelect value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))} className="text-xs">
+              <NativeSelect aria-label="Filtrar por status" value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))} className="text-xs">
                 <option value="">Todos os status</option>
-                {Object.entries(STATUS_LABEL).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
+                {STATUS_ORDER.map((key) => <option key={key} value={key}>{STATUS_LABEL[key]}</option>)}
               </NativeSelect>
-              <NativeSelect value={filters.indicatorId} onChange={(e) => setFilters((prev) => ({ ...prev, indicatorId: e.target.value }))} className="text-xs">
+              <NativeSelect aria-label="Filtrar por prioridade" value={filters.priority} onChange={(e) => setFilters((prev) => ({ ...prev, priority: e.target.value }))} className="text-xs">
+                <option value="">Todas as prioridades</option>
+                {PRIORITY_ORDER.map((key) => <option key={key} value={key}>Prioridade {PRIORITY_LABEL[key].toLowerCase()}</option>)}
+              </NativeSelect>
+              <NativeSelect aria-label="Filtrar por gerente" value={filters.managerId} onChange={(e) => setFilters((prev) => ({ ...prev, managerId: e.target.value }))} className="text-xs">
+                <option value="">Todos os gerentes</option>
+                {(options.data?.people ?? []).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+              </NativeSelect>
+              <NativeSelect aria-label="Filtrar por indicador" value={filters.indicatorId} onChange={(e) => setFilters((prev) => ({ ...prev, indicatorId: e.target.value }))} className="text-xs">
                 <option value="">Todos os indicadores</option>
-                {(indicatorsQuery.data ?? []).map((ind) => (
+                {(options.data?.indicators ?? []).map((ind) => (
                   <option key={ind.id} value={ind.id}>
                     {ind.code ? `[${ind.code}] ` : ''}{ind.name}
                   </option>
                 ))}
               </NativeSelect>
-              {(filters.search || filters.status || filters.indicatorId) && (
+              {hasFilters && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
-                  onClick={() => setFilters({ search: '', status: '', indicatorId: '' })}
+                  onClick={() => setFilters(EMPTY_FILTERS)}
                 >
                   <X className="mr-2 h-4 w-4" />
                   Limpar filtros
@@ -381,200 +278,164 @@ export default function ProjectsPage() {
         </Card>
       </div>
 
-      {/* Grid de Projetos */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {query.isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
-        {projects.map((p) => {
-          const late = p.endsAt && new Date(p.endsAt) < new Date() && p.status !== 'DONE';
-          return (
-            <Link key={p.id} href={`/projects/${p.id}`}>
-              <Card className="cursor-pointer border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm transition-all hover:border-sky-500/40 hover:shadow-md hover:scale-[1.005]">
-                <CardContent className="p-5">
-                  <div className="mb-3 flex items-start justify-between gap-2">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-50 dark:bg-sky-950/20 text-sky-500">
-                      <FolderKanban className="h-5 w-5" />
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className={cn('pill text-[9px]', STATUS_PILL[p.status])}>{STATUS_LABEL[p.status]}</span>
-                      <span className={cn('pill text-[9px]', PMO_CLASS[p.pmoStatus])}>{PMO_LABEL[p.pmoStatus]}</span>
-                    </div>
-                  </div>
-                  <h3 className="font-bold text-sm text-slate-850 dark:text-white">{p.name}</h3>
-                  {p.description && (
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{p.description}</p>
-                  )}
-                  {p.indicator && (
-                    <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-500">
-                      <span>KPI</span>
-                      <span className="max-w-[180px] truncate">{p.indicator.name}</span>
-                    </div>
-                  )}
-                  <div className="mt-4 grid grid-cols-3 gap-3 text-xs text-slate-400">
-                    <div>
-                      <div className="text-[9px] uppercase font-bold">Início</div>
-                      <div className="text-slate-700 dark:text-slate-350">{formatDate(p.startsAt)}</div>
-                    </div>
-                    <div>
-                      <div className="text-[9px] uppercase font-bold">Fim previsto</div>
-                      <div className={cn('text-slate-700 dark:text-slate-350 font-semibold', late && 'text-status-red')}>
-                        {formatDate(p.endsAt)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[9px] uppercase font-bold">Marcos</div>
-                      <div className="text-slate-700 dark:text-slate-350">{p.milestonesDone}/{p._count.milestones}</div>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-400">
-                    <div>
-                      <div className="text-[9px] uppercase font-bold">Responsável</div>
-                      <div className="truncate text-slate-700 dark:text-slate-350 font-medium">{p.responsible ?? 'Não definido'}</div>
-                    </div>
-                    <div>
-                      <div className="text-[9px] uppercase font-bold">Orçamento</div>
-                      <div className="text-slate-700 dark:text-slate-350 font-medium">
-                        {p.budget ? formatNumber(p.budget, { style: 'currency', currency: 'BRL' }) : '-'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 border-t pt-3 border-slate-100 dark:border-slate-800/60">
-                    <div className="mb-1.5 flex justify-between text-[11px] font-semibold">
-                      <span className="text-slate-400">
-                        {p._count.tasks} tarefa(s)
-                        {p.tasksOverdue > 0 && <span className="ml-1 text-rose-500 font-bold">- {p.tasksOverdue} vencida(s)</span>}
-                      </span>
-                      <span className="text-slate-750 dark:text-slate-300">{p.progressOverall}%</span>
-                    </div>
-                    <Progress value={p.progressOverall} />
-                    {p.expectedProgress !== null && (
-                      <div className="mt-1.5 text-[10px] text-slate-400">
-                        Planejado: {p.expectedProgress}% - variação {p.scheduleVariance != null && p.scheduleVariance > 0 ? '+' : ''}{p.scheduleVariance ?? 0}%
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-        {!query.isLoading && projects.length === 0 && (
-          <Card className="lg:col-span-2">
-            <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Nenhum projeto encontrado para os filtros atuais.
-            </CardContent>
-          </Card>
-        )}
+      {/* Execução do portfólio: curva S consolidada e agenda de marcos e tarefas */}
+      {projects.length > 0 && execution.data && (
+        <section aria-label="Execução do portfólio">
+          <PortfolioCurveCard curve={execution.data.curve} />
+          <PortfolioAgenda data={execution.data} canEdit={canEdit} />
+        </section>
+      )}
+
+      {/* Projetos: cartões, lista ou quadro por status */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Projetos ({projects.length})</h2>
+        <div className="inline-flex rounded-md border bg-muted/35 p-1" role="group" aria-label="Modo de exibição">
+          {VIEWS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={view === key}
+              onClick={() => setView(key)}
+              className={cn('inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors', view === key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+            >
+              <Icon className="h-3.5 w-3.5" /> {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl bg-card text-card-foreground">
-          <DialogHeader>
-            <DialogTitle>Novo projeto</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4">
-            <div className="space-y-2">
-              <Label>Nome do projeto *</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Ex.: Implantação do plano de melhoria operacional"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Textarea
-                rows={4}
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="Escopo, objetivo, entregas esperadas e observações..."
-              />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Responsável</Label>
-                <Input
-                  value={form.responsible}
-                  onChange={(e) => setForm({ ...form, responsible: e.target.value })}
-                  placeholder="Nome do responsável"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <NativeSelect
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value as Project['status'] })}
-                >
-                  {Object.entries(STATUS_LABEL).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </NativeSelect>
-              </div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Início</Label>
-                <Input
-                  type="date"
-                  value={form.startsAt}
-                  onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Fim previsto</Label>
-                <Input
-                  type="date"
-                  value={form.endsAt}
-                  onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Orçamento</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.budget}
-                  onChange={(e) => setForm({ ...form, budget: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Indicador vinculado</Label>
-              <NativeSelect
-                value={form.indicatorId}
-                onChange={(e) => setForm({ ...form, indicatorId: e.target.value })}
-              >
-                <option value="">Sem indicador</option>
-                {(indicatorsQuery.data ?? []).map((ind) => (
-                  <option key={ind.id} value={ind.id}>
-                    {ind.code ? `[${ind.code}] ` : ''}{ind.name}
-                  </option>
+      {query.isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
+      {query.isError && (
+        <div className="space-y-2" role="alert">
+          <p className="text-sm">Não foi possível carregar os projetos: {query.error.message}</p>
+          <Button variant="outline" size="sm" onClick={() => query.refetch()}>Tentar novamente</Button>
+        </div>
+      )}
+
+      {!query.isLoading && !query.isError && projects.length === 0 && (
+        <EmptyState
+          icon={<FolderKanban className="h-5 w-5" strokeWidth={1.5} />}
+          title={hasFilters ? 'Nenhum projeto encontrado para os filtros atuais' : 'Nenhum projeto cadastrado'}
+          description={hasFilters
+            ? 'Ajuste ou limpe os filtros para ver outros projetos.'
+            : 'Cadastre o primeiro projeto para montar o cronograma, acompanhar a curva S, os custos, os riscos e a equipe.'}
+          action={hasFilters
+            ? <Button variant="outline" size="sm" onClick={() => setFilters(EMPTY_FILTERS)}>Limpar filtros</Button>
+            : canCreate ? <Button size="sm" onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" /> Novo projeto</Button> : undefined}
+        />
+      )}
+
+      {view === 'cards' && projects.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {projects.map((p) => <ProjectCard key={p.id} project={p} />)}
+        </div>
+      )}
+
+      {view === 'list' && projects.length > 0 && (
+        <Card>
+          <CardContent className="overflow-x-auto p-0">
+            <table className="w-full min-w-[980px] text-sm">
+              <thead>
+                <tr className="border-b text-left text-[11px] uppercase text-muted-foreground">
+                  <th className="px-3 py-2 font-medium">Projeto</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Prioridade</th>
+                  <th className="px-3 py-2 font-medium">Gerente</th>
+                  <th className="px-3 py-2 font-medium">Prazo</th>
+                  <th className="w-40 px-3 py-2 font-medium">Progresso</th>
+                  <th className="px-3 py-2 text-right font-medium">Orçamento</th>
+                  <th className="px-3 py-2 text-right font-medium">Realizado</th>
+                  <th className="px-3 py-2 text-right font-medium">Riscos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projects.map((p) => (
+                  <tr key={p.id} className="border-b last:border-0 hover:bg-muted/40">
+                    <td className="px-3 py-2">
+                      <Link href={`/projects/${p.id}`} className="font-medium hover:underline">{p.name}</Link>
+                      <div className="text-xs text-muted-foreground">{[p.code, p.category].filter(Boolean).join(' · ') || '—'}</div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-col items-start gap-1">
+                        <span className={cn('pill text-[10px]', STATUS_PILL[p.status])}>{STATUS_LABEL[p.status]}</span>
+                        <span className={cn('pill text-[10px]', PMO_CLASS[p.pmoStatus])}>{PMO_LABEL[p.pmoStatus]}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2"><span className={cn('pill text-[10px]', PRIORITY_PILL[p.priority])}>{PRIORITY_LABEL[p.priority]}</span></td>
+                    <td className="px-3 py-2 text-xs">{p.responsible ?? '—'}</td>
+                    <td className={cn('whitespace-nowrap px-3 py-2 text-xs', isLate(p) && 'font-semibold text-status-red')}>
+                      {formatDay(p.startsAt)} a {formatDay(p.endsAt)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Progress value={p.progressOverall} className="h-1.5" />
+                        <span className="w-9 text-right text-xs tabular-nums">{p.progressOverall}%</span>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums">{formatMoney(p.budget)}</td>
+                    <td className={cn('whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums', p.finance?.overBudget && 'font-semibold text-status-red')}>{formatMoney(p.finance?.actualCost ?? 0)}</td>
+                    <td className={cn('px-3 py-2 text-right text-xs tabular-nums', (p.openIssues ?? 0) > 0 && 'font-semibold text-status-red')}>{(p.openRisks ?? 0) + (p.openIssues ?? 0)}</td>
+                  </tr>
                 ))}
-              </NativeSelect>
-              <p className="text-xs text-muted-foreground">
-                O progresso do projeto será comparado com este KPI no detalhe do projeto.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button
-              onClick={() => createProject.mutate()}
-              disabled={!form.name.trim() || createProject.isPending}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-            >
-              {createProject.isPending ? 'Criando...' : 'Criar projeto'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
+      {view === 'board' && projects.length > 0 && (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {STATUS_ORDER.map((status) => {
+            const column = projects.filter((p) => p.status === status);
+            return (
+              <section key={status} aria-label={STATUS_LABEL[status]} className="rounded-lg border bg-muted/20 p-2">
+                <header className="mb-2 flex items-center justify-between px-1">
+                  <span className={cn('pill text-[10px]', STATUS_PILL[status])}>{STATUS_LABEL[status]}</span>
+                  <span className="text-xs text-muted-foreground">{column.length}</span>
+                </header>
+                <div className="space-y-2">
+                  {column.length === 0 && <p className="px-1 py-4 text-center text-xs text-muted-foreground">Nenhum projeto</p>}
+                  {column.map((p) => (
+                    <div key={p.id} className="rounded-md border bg-card p-3 text-xs shadow-sm">
+                      <Link href={`/projects/${p.id}`} className="font-semibold hover:underline">{p.name}</Link>
+                      <div className="mt-0.5 text-[10px] text-muted-foreground">{p.code ?? ''}{p.responsible ? ` · ${p.responsible}` : ''}</div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <span className={cn('pill text-[9px]', PMO_CLASS[p.pmoStatus])}>{PMO_LABEL[p.pmoStatus]}</span>
+                        <span className={cn('pill text-[9px]', PRIORITY_PILL[p.priority])}>{PRIORITY_LABEL[p.priority]}</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Progress value={p.progressOverall} className="h-1.5" />
+                        <span className="tabular-nums">{p.progressOverall}%</span>
+                      </div>
+                      <div className={cn('mt-1 text-[10px] text-muted-foreground', isLate(p) && 'font-semibold text-status-red')}>Fim: {formatDay(p.endsAt)}</div>
+                      {canEdit && (
+                        <NativeSelect
+                          aria-label={`Mover ${p.name} para outro status`}
+                          value={p.status}
+                          disabled={changeStatus.isPending}
+                          onChange={(e) => changeStatus.mutate({ id: p.id, status: e.target.value })}
+                          className="mt-2 h-8 text-[11px]"
+                        >
+                          {STATUS_ORDER.map((key) => <option key={key} value={key}>{STATUS_LABEL[key]}</option>)}
+                        </NativeSelect>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      <ProjectFormDialog open={open} onOpenChange={setOpen} onSaved={(project) => router.push(`/projects/${project.id}`)} />
 
       <Dialog open={milestoneOpen} onOpenChange={setMilestoneOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Selecionar projeto para o novo marco</DialogTitle></DialogHeader>
           <div className="space-y-2 py-2">
-            <Label>Projeto</Label>
-            <NativeSelect value={milestoneProjectId} onChange={(event) => setMilestoneProjectId(event.target.value)}>
+            <Label htmlFor="milestone-project">Projeto</Label>
+            <NativeSelect id="milestone-project" value={milestoneProjectId} onChange={(event) => setMilestoneProjectId(event.target.value)}>
               {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
             </NativeSelect>
           </div>
@@ -587,30 +448,36 @@ export default function ProjectsPage() {
                 router.push(`/projects/${milestoneProjectId}#milestones`);
               }}
             >
-              Abrir cadastro de marco
+              Abrir cronograma do projeto
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={financeOpen} onOpenChange={setFinanceOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Previsão financeira do portfólio</DialogTitle></DialogHeader>
-          <div className="grid gap-3 py-2 sm:grid-cols-3">
-            <MetricCard title="Orçamento total" value={formatNumber(pmo?.budgetTotal, { style: 'currency', currency: 'BRL' })} />
-            <MetricCard title="Projetos ativos" value={formatNumber(pmo?.activeBudget, { style: 'currency', currency: 'BRL' })} />
-            <MetricCard title="Sem orçamento" value={formatNumber(projects.filter((project) => project.budget == null).length)} />
+          <div className="grid gap-3 py-2 sm:grid-cols-4">
+            <MetricCard title="Orçamento total" value={formatMoney(pmo?.budgetTotal ?? 0)} />
+            <MetricCard title="Custo previsto" value={formatMoney(pmo?.plannedCost ?? 0)} />
+            <MetricCard title="Custo realizado" value={formatMoney(pmo?.actualCost ?? 0)} />
+            <MetricCard title="Acima do orçamento" value={formatNumber(pmo?.overBudget)} />
           </div>
           <div className="max-h-64 divide-y overflow-y-auto rounded-md border">
             {projects.length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">Nenhum projeto no filtro atual.</div>
             ) : projects.map((project) => (
-              <Link key={project.id} href={`/projects/${project.id}`} onClick={() => setFinanceOpen(false)} className="flex items-center justify-between gap-4 p-3 text-sm hover:bg-muted/50">
+              <Link key={project.id} href={`/projects/${project.id}#custos`} onClick={() => setFinanceOpen(false)} className="flex items-center justify-between gap-4 p-3 text-sm hover:bg-muted/50">
                 <div className="min-w-0">
                   <div className="truncate font-medium">{project.name}</div>
                   <div className="text-xs text-muted-foreground">{STATUS_LABEL[project.status]} · {project.progressOverall}% concluído</div>
                 </div>
-                <strong className="shrink-0">{project.budget == null ? 'Não informado' : formatNumber(project.budget, { style: 'currency', currency: 'BRL' })}</strong>
+                <div className="shrink-0 text-right">
+                  <strong>{project.budget == null ? 'Sem orçamento' : formatMoney(project.budget)}</strong>
+                  <div className={cn('text-xs text-muted-foreground', project.finance?.overBudget && 'font-semibold text-status-red')}>
+                    Realizado {formatMoney(project.finance?.actualCost ?? 0)}
+                  </div>
+                </div>
               </Link>
             ))}
           </div>
@@ -621,32 +488,102 @@ export default function ProjectsPage() {
   );
 }
 
-function toQueryString(filters: { search?: string; status?: string; indicatorId?: string }) {
+function isLate(project: ProjectSummary) {
+  return project.status !== 'DONE' && project.status !== 'CANCELLED' && isOverdue(project.endsAt);
+}
+
+function ProjectCard({ project: p }: { project: ProjectSummary }) {
+  const late = isLate(p);
+  return (
+    <Link href={`/projects/${p.id}`}>
+      <Card className="h-full cursor-pointer border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm transition-all hover:border-sky-500/40 hover:shadow-md hover:scale-[1.005]">
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-start justify-between gap-2">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-50 dark:bg-sky-950/20 text-sky-500">
+              <FolderKanban className="h-5 w-5" />
+            </div>
+            <div className="flex flex-wrap justify-end gap-1">
+              <span className={cn('pill text-[9px]', STATUS_PILL[p.status])}>{STATUS_LABEL[p.status]}</span>
+              <span className={cn('pill text-[9px]', PMO_CLASS[p.pmoStatus])}>{PMO_LABEL[p.pmoStatus]}</span>
+              <span className={cn('pill text-[9px]', PRIORITY_PILL[p.priority])}>{PRIORITY_LABEL[p.priority]}</span>
+              {p.latestHealth && <span className={cn('pill text-[9px]', HEALTH_PILL[p.latestHealth])}>{HEALTH_LABEL[p.latestHealth]}</span>}
+            </div>
+          </div>
+          {(p.code || p.category) && (
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{[p.code, p.category].filter(Boolean).join(' · ')}</div>
+          )}
+          <h3 className="font-bold text-sm text-slate-850 dark:text-white">{p.name}</h3>
+          {p.description && (
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{p.description}</p>
+          )}
+          {p.indicator && (
+            <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-500">
+              <span>KPI</span>
+              <span className="max-w-[180px] truncate">{p.indicator.name}</span>
+            </div>
+          )}
+          <div className="mt-4 grid grid-cols-3 gap-3 text-xs text-slate-400">
+            <div>
+              <div className="text-[9px] uppercase font-bold">Início</div>
+              <div className="text-slate-700 dark:text-slate-350">{formatDay(p.startsAt)}</div>
+            </div>
+            <div>
+              <div className="text-[9px] uppercase font-bold">Fim previsto</div>
+              <div className={cn('text-slate-700 dark:text-slate-350 font-semibold', late && 'text-status-red')}>
+                {formatDay(p.endsAt)}
+              </div>
+            </div>
+            <div>
+              <div className="text-[9px] uppercase font-bold">Marcos</div>
+              <div className="text-slate-700 dark:text-slate-350">{p.milestonesDone}/{p._count.milestones}</div>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-3 text-xs text-slate-400">
+            <div>
+              <div className="text-[9px] uppercase font-bold">Gerente</div>
+              <div className="truncate text-slate-700 dark:text-slate-350 font-medium">{p.responsible ?? 'Não definido'}</div>
+            </div>
+            <div>
+              <div className="text-[9px] uppercase font-bold">Orçamento</div>
+              <div className={cn('text-slate-700 dark:text-slate-350 font-medium', p.finance?.overBudget && 'text-status-red')}>
+                {p.budget ? formatMoney(p.budget) : '-'}
+              </div>
+            </div>
+            <div>
+              <div className="text-[9px] uppercase font-bold">Riscos abertos</div>
+              <div className={cn('text-slate-700 dark:text-slate-350 font-medium', (p.openIssues ?? 0) > 0 && 'text-status-red')}>
+                {(p.openRisks ?? 0) + (p.openIssues ?? 0)}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 border-t pt-3 border-slate-100 dark:border-slate-800/60">
+            <div className="mb-1.5 flex justify-between text-[11px] font-semibold">
+              <span className="text-slate-400">
+                {p._count.tasks} tarefa(s)
+                {p.tasksOverdue > 0 && <span className="ml-1 text-rose-500 font-bold">- {p.tasksOverdue} vencida(s)</span>}
+              </span>
+              <span className="text-slate-750 dark:text-slate-300">{p.progressOverall}%</span>
+            </div>
+            <Progress value={p.progressOverall} />
+            {p.expectedProgress !== null && (
+              <div className="mt-1.5 text-[10px] text-slate-400">
+                Planejado: {p.expectedProgress}% - variação {p.scheduleVariance != null && p.scheduleVariance > 0 ? '+' : ''}{p.scheduleVariance ?? 0} p.p.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+function toQueryString(filters: Partial<Filters>) {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
     if (value) params.set(key, value);
   });
   const qs = params.toString();
   return qs ? `?${qs}` : '';
-}
-
-function buildTimeline(projects: Project[]) {
-  const dated = projects.filter((project): project is Project & { startsAt: string; endsAt: string } => Boolean(project.startsAt && project.endsAt));
-  if (dated.length === 0) {
-    const now = new Date();
-    return { start: now, end: now, rows: [] as Array<{ project: Project; left: number; width: number }> };
-  }
-  const start = new Date(Math.min(...dated.map((project) => new Date(project.startsAt).getTime())));
-  const end = new Date(Math.max(...dated.map((project) => new Date(project.endsAt).getTime())));
-  const total = Math.max(1, end.getTime() - start.getTime());
-  const rows = dated.map((project) => {
-    const itemStart = new Date(project.startsAt).getTime();
-    const itemEnd = new Date(project.endsAt).getTime();
-    const left = Math.max(0, ((itemStart - start.getTime()) / total) * 100);
-    const width = Math.max(1, ((Math.max(itemStart, itemEnd) - itemStart) / total) * 100);
-    return { project, left, width: Math.min(100 - left, width) };
-  });
-  return { start, end, rows };
 }
 
 function KpiCard({ title, value, change, color, icon: Icon }: { title: string; value: any; change: string; color: 'emerald' | 'sky' | 'purple' | 'rose' | 'amber'; icon: any }) {
@@ -659,13 +596,13 @@ function KpiCard({ title, value, change, color, icon: Icon }: { title: string; v
   };
 
   return (
-    <Card className={cn("border bg-card shadow-sm p-4 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.01] flex items-center justify-between", colors[color])}>
-      <div className="space-y-1">
+    <Card className={cn("border bg-card shadow-sm p-4 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.01] flex items-center justify-between gap-2", colors[color])}>
+      <div className="min-w-0 space-y-1">
         <span className="text-[10px] uppercase font-bold tracking-wider opacity-85 text-slate-550 dark:text-slate-400">{title}</span>
-        <div className="text-2xl font-extrabold text-slate-900 dark:text-white leading-none">{value ?? '0'}</div>
-        <span className="text-[10px] text-slate-400 font-medium">{change}</span>
+        <div className="truncate text-xl font-extrabold text-slate-900 dark:text-white leading-none">{value ?? '0'}</div>
+        <span className="block truncate text-[10px] text-slate-400 font-medium">{change}</span>
       </div>
-      <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 shadow-sm border border-slate-50 dark:border-slate-800">
+      <div className="shrink-0 p-2.5 rounded-xl bg-white dark:bg-slate-900 shadow-sm border border-slate-50 dark:border-slate-800">
         <Icon className="h-5 w-5" />
       </div>
     </Card>

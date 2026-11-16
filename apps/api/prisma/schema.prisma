@@ -305,6 +305,36 @@ enum ProjectStatus {
   CANCELLED
 }
 
+enum ProjectPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ProjectCostKind {
+  PLANNED
+  ACTUAL
+}
+
+enum ProjectRiskKind {
+  RISK
+  ISSUE
+}
+
+enum ProjectRiskStatus {
+  OPEN
+  MITIGATING
+  RESOLVED
+  ACCEPTED
+}
+
+enum ProjectHealth {
+  GREEN
+  YELLOW
+  RED
+}
+
 enum RiskCategory {
   STRATEGIC
   OPERATIONAL
@@ -849,6 +879,10 @@ model User {
   branch          Branch?        @relation(fields: [branchId], references: [id])
   accessProfileId String?
   accessProfile   AccessProfile? @relation(fields: [accessProfileId], references: [id])
+  managedProjects      Project[]       @relation("ProjectManager")
+  assignedProjectTasks ProjectTask[]   @relation("ProjectTaskAssignee")
+  projectMemberships   ProjectMember[] @relation("ProjectMemberUser")
+  ownedProjectRisks    ProjectRisk[]   @relation("ProjectRiskOwner")
   defaultNodeId   String?
   defaultNode     OrgNode?       @relation("UserDefaultNode", fields: [defaultNodeId], references: [id])
 
@@ -1925,15 +1959,38 @@ model Project {
   updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?
 
+  // Gestão completa do projeto (código, prioridade, gerente e termo de abertura).
+  code           String?
+  priority       ProjectPriority @default(MEDIUM)
+  category       String?
+  sponsor        String?
+  managerId      String?
+  manager        User?           @relation("ProjectManager", fields: [managerId], references: [id], onDelete: SetNull)
+  objective      String?
+  justification  String?
+  scope          String?
+  outOfScope     String?
+  assumptions    String?
+  benefits       String?
+  lessonsLearned String?
+  actualStartAt  DateTime?
+  actualEndAt    DateTime?
+
   milestones ProjectMilestone[]
   tasks      ProjectTask[]
   progressSnapshots ProjectProgressSnapshot[]
   risks      RiskRegister[]     @relation("RiskProject")
+  members      ProjectMember[]
+  costs        ProjectCost[]
+  projectRisks ProjectRisk[]
+  updates      ProjectUpdate[]
 
   processIntegrations ProcessIntegration[]
 
+  @@unique([companyId, code])
   @@index([companyId])
   @@index([indicatorId])
+  @@index([managerId])
 }
 
 model ProjectProgressSnapshot {
@@ -1953,6 +2010,8 @@ model ProjectMilestone {
   name      String
   dueDate   DateTime
   done      Boolean  @default(false)
+  description String?
+  completedAt DateTime?
 }
 
 model ProjectTask {
@@ -1968,9 +2027,87 @@ model ProjectTask {
   dependency   ProjectTask?  @relation("TaskDep", fields: [dependencyId], references: [id])
   dependents   ProjectTask[] @relation("TaskDep")
   position     Int           @default(0)
+  description  String?
+  phase        String?
+  assigneeId   String?
+  assignee     User?         @relation("ProjectTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  completedAt  DateTime?
   processIntegrations ProcessIntegration[]
   processRaciRows ProcessRaciRow[]
 
+  @@index([assigneeId])
+}
+
+model ProjectMember {
+  id         String   @id @default(uuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation("ProjectMemberUser", fields: [userId], references: [id], onDelete: SetNull)
+  name       String
+  role       String?
+  allocation Int?
+  createdAt  DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model ProjectCost {
+  id          String          @id @default(uuid())
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind        ProjectCostKind @default(ACTUAL)
+  description String
+  category    String?
+  amount      Float
+  date        DateTime        @db.Date
+  notes       String?
+  createdById String?
+  createdAt   DateTime        @default(now())
+
+  @@index([projectId, date])
+}
+
+model ProjectRisk {
+  id          String            @id @default(uuid())
+  projectId   String
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind        ProjectRiskKind   @default(RISK)
+  title       String
+  description String?
+  probability Int               @default(3)
+  impact      Int               @default(3)
+  response    String?
+  ownerId     String?
+  owner       User?             @relation("ProjectRiskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerName   String?
+  dueDate     DateTime?
+  status      ProjectRiskStatus @default(OPEN)
+  resolvedAt  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([projectId, status])
+  @@index([ownerId])
+}
+
+model ProjectUpdate {
+  id           String        @id @default(uuid())
+  projectId    String
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  authorId     String?
+  authorName   String
+  health       ProjectHealth
+  reportDate   DateTime      @db.Date
+  summary      String
+  achievements String?
+  nextSteps    String?
+  blockers     String?
+  progress     Float
+  createdAt    DateTime      @default(now())
+
+  @@index([projectId, reportDate])
 }
 
 model RiskRegister {

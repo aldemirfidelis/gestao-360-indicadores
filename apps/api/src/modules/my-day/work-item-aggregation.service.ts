@@ -338,13 +338,18 @@ export class WorkItemAggregationService {
     return rows.map((artifact) => ({ sourceModule: 'processes', sourceEntityType: 'PROCESS_ARTIFACT', sourceEntityId: artifact.id, itemType: 'PROCESS_REVIEW', title: artifact.name, summary: `${artifact.process.name} · ${artifact.kind}`, status: 'REVIEW', criticality: artifact.reviewDueAt && artifact.reviewDueAt < new Date() ? 'HIGH' : 'MEDIUM', dueAt: artifact.reviewDueAt, assignedUserId: me.sub, orgNodeId: artifact.process.orgNodeId, processId: artifact.processId, requiresDecision: true, availableActions: [{ key: 'open', label: 'Revisar processo', href: `/processes/${artifact.processId}?artifact=${artifact.id}` }], sourceUpdatedAt: artifact.updatedAt }));
   }
 
-  /** Projetos legados guardam o responsável por nome; a comparação é exata e case-insensitive. */
+  /**
+   * Tarefas atribuídas ao usuário no cronograma. Tarefas legadas guardam só o nome do
+   * responsável; nelas a comparação é exata e case-insensitive.
+   */
   private async collectProjectTasks(me: AuthPayload): Promise<WorkItemDraft[]> {
-    if (!me.name.trim()) return [];
+    const byName = me.name.trim()
+      ? [{ assigneeId: null, responsible: { equals: me.name, mode: 'insensitive' as const } }]
+      : [];
     const rows = await this.prisma.projectTask.findMany({
       where: {
         progress: { lt: 100 },
-        responsible: { equals: me.name, mode: 'insensitive' },
+        OR: [{ assigneeId: me.sub }, ...byName],
         project: { companyId: me.companyId, deletedAt: null },
       },
       select: {

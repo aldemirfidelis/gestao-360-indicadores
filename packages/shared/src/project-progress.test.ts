@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildProjectCurve, projectExpectedProgress, projectMeasurementDay, projectProgress } from './project-progress';
+import { buildPortfolioCurve, buildProjectCurve, projectExpectedProgress, projectMeasurementDay, projectProgress } from './project-progress';
 
 const now = new Date('2026-01-11T15:00:00Z');
 const project = {
@@ -69,5 +69,54 @@ describe('avanço e curva S de projetos', () => {
     const curve = buildProjectCurve({ startsAt: '2000-01-01', endsAt: '2100-01-01', milestones: [], tasks: [{ progress: 200 }] }, now);
     expect(curve.points.length).toBeLessThan(110);
     expect(projectProgress({ milestones: [], tasks: [{ progress: 200 }, { progress: -100 }] })).toBe(50);
+  });
+});
+
+describe('curva S do portfólio de projetos', () => {
+  const linear = (startsAt: string, endsAt: string, progress: number, snapshots: Array<[string, number]> = []) => ({
+    startsAt, endsAt, milestones: [], tasks: [{ progress }],
+    progressSnapshots: snapshots.map(([measuredOn, value]) => ({ measuredOn, progress: value })),
+  });
+  const at = (curve: ReturnType<typeof buildPortfolioCurve>, date: string) => curve.points.find((point) => point.date.startsWith(date));
+
+  it('faz a média simples dos projetos com cronograma e deixa cancelados e sem datas de fora', () => {
+    const curve = buildPortfolioCurve([
+      linear('2026-01-01', '2026-01-21', 20, [['2026-01-01', 0]]),
+      linear('2026-01-01', '2026-01-21', 60, [['2026-01-01', 0]]),
+      { ...linear('2026-01-01', '2026-01-21', 100), status: 'CANCELLED' },
+      { milestones: [], tasks: [{ progress: 90 }] },
+    ], now);
+    expect(curve.projects).toBe(2);
+    expect(curve.withoutSchedule).toBe(1);
+    expect(curve.progress).toBe(40);
+    expect(curve.expectedProgress).toBe(50);
+    expect(at(curve, '2026-01-11')).toMatchObject({ planned: 50, actual: 40 });
+    expect(at(curve, '2026-01-21')).toMatchObject({ planned: 100, actual: null });
+  });
+
+  it('conta zero antes do início planejado e não inventa realizado sem medição', () => {
+    const curve = buildPortfolioCurve([
+      linear('2026-01-01', '2026-01-21', 30, [['2026-01-03', 10]]),
+      linear('2026-01-05', '2026-01-15', 20, [['2026-01-08', 20]]),
+    ], now);
+    expect(at(curve, '2026-01-01')?.actual).toBe(0);
+    expect(at(curve, '2026-01-02')?.actual).toBeNull();
+    expect(at(curve, '2026-01-03')?.actual).toBe(5);
+    expect(at(curve, '2026-01-05')?.actual).toBe(5);
+    expect(at(curve, '2026-01-06')?.actual).toBeNull();
+    expect(at(curve, '2026-01-08')?.actual).toBe(15);
+    expect(curve.historyStartsOn).toBe('2026-01-03T00:00:00.000Z');
+  });
+
+  it('sem projeto com cronograma não desenha a curva', () => {
+    const curve = buildPortfolioCurve([{ milestones: [], tasks: [{ progress: 50 }] }], now);
+    expect(curve.hasSchedule).toBe(false);
+    expect(curve.progress).toBeNull();
+    expect(curve.points.every((point) => point.planned === null && point.actual === null)).toBe(true);
+  });
+
+  it('limita a amostragem de portfólios longos', () => {
+    const curve = buildPortfolioCurve([linear('2000-01-01', '2100-01-01', 10), linear('2010-01-01', '2090-01-01', 30)], now);
+    expect(curve.points.length).toBeLessThan(160);
   });
 });

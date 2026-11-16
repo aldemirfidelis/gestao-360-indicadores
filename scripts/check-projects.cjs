@@ -75,7 +75,102 @@ async function run() {
   await board.propagateSourceStatus({ automationRuleId: 'PROJECT_TASK', sourceEntityId: otherTask.id }, 'DONE', me);
   assert.equal((await db.projectTask.findUnique({ where: { id: otherTask.id } })).progress, 0);
   assert.equal((await db.projectTask.findUnique({ where: { id: otherTask.id } })).projectId, foreign.id);
-  console.log('PASS: migração, medição inicial, avanço, marcos, isolamento, concorrência, dependências, quadro de tarefas e rollback.');
+  assert.ok((await db.projectTask.findUnique({ where: { id: t1.id } })).completedAt, 'conclusão pelo quadro registra a data');
+
+  // Gestão completa: código, gerente, equipe, custos, riscos, status report, reordenação e duplicação.
+  const user = await db.user.create({ data: { companyId: a.id, email: `gerente-${a.id}@example.test`, passwordHash: 'x', name: 'Gerente Fictício' } });
+  const outsider = await db.user.create({ data: { companyId: b.id, email: `externo-${b.id}@example.test`, passwordHash: 'x', name: 'Pessoa de Outra Empresa' } });
+  assert.match((await db.project.findUnique({ where: { id: project.id } })).code, /^PRJ-\d{4}$/);
+  const full = await service.create(me, {
+    name: 'Projeto completo', startsAt: '2026-01-01', endsAt: '2026-06-30', budget: 1000, priority: 'HIGH',
+    category: 'Melhoria', managerId: user.id, objective: 'Validar o módulo', status: 'IN_PROGRESS',
+  });
+  assert.notEqual(full.code, (await db.project.findUnique({ where: { id: project.id } })).code);
+  assert.equal(full.responsible, 'Gerente Fictício');
+  assert.ok(full.actualStartAt);
+  await assert.rejects(service.create(me, { name: 'Código repetido', code: full.code }), /código/);
+  await assert.rejects(service.create(me, { name: 'Gerente externo', managerId: outsider.id }), /pessoa inválida/);
+  await assert.rejects(service.update(me, full.id, { endsAt: '2025-12-31' }), /anterior ao início/);
+  const [parallelA, parallelB] = await Promise.all([service.create(me, { name: 'Paralelo A' }), service.create(me, { name: 'Paralelo B' })]);
+  assert.notEqual(parallelA.code, parallelB.code);
+
+  const first = await service.addTask(me, full.id, { name: 'Planejar', phase: 'Planejamento', startDate: '2026-01-01', endDate: '2026-01-31', assigneeId: user.id });
+  const second = await service.addTask(me, full.id, { name: 'Executar', phase: 'Execução', startDate: '2026-02-01', endDate: '2026-05-31', dependencyId: first.id });
+  assert.equal(first.responsible, 'Gerente Fictício');
+  assert.equal(second.position, first.position + 1);
+  await service.reorderTasks(me, full.id, [second.id, first.id]);
+  assert.deepEqual((await service.getById(me, full.id)).tasks.map((task) => task.id), [second.id, first.id]);
+  await assert.rejects(service.reorderTasks(me, full.id, [first.id]), /todas as tarefas/);
+  const gate = await service.addMilestone(me, full.id, 'Aprovação', '2026-03-01', 'Critério de aceite');
+  await service.updateMilestone(me, gate.id, { name: 'Aprovação final', dueDate: '2026-03-15' });
+
+  const member = await service.addMember(me, full.id, { userId: user.id, role: 'Líder', allocation: 50 });
+  await assert.rejects(service.addMember(me, full.id, { userId: user.id }), /já faz parte/);
+  await assert.rejects(service.addMember(me, full.id, { userId: outsider.id }), /pessoa inválida/);
+  await service.addMember(me, full.id, { name: 'Consultor externo' });
+  await service.updateMember(me, member.id, { allocation: 80 });
+
+  await service.addCost(me, full.id, { kind: 'PLANNED', description: 'Consultoria prevista', amount: 900, date: '2026-01-10', category: 'Serviços' });
+  const spent = await service.addCost(me, full.id, { kind: 'ACTUAL', description: 'Consultoria paga', amount: 700, date: '2026-02-10', category: 'Serviços' });
+  await service.addCost(me, full.id, { description: 'Material', amount: 500, date: '2026-02-12' });
+  await assert.rejects(service.addCost(me, full.id, { description: 'Negativo', amount: -1, date: '2026-02-12' }), /maior que zero/);
+  await service.updateCost(me, spent.id, { amount: 600 });
+
+  const risk = await service.addRisk(me, full.id, { title: 'Atraso do fornecedor', probability: 4, impact: 5, ownerId: user.id });
+  const issue = await service.addRisk(me, full.id, { kind: 'ISSUE', title: 'Licença pendente' });
+  await service.updateRisk(me, issue.id, { status: 'RESOLVED' });
+  assert.ok((await db.projectRisk.findUnique({ where: { id: issue.id } })).resolvedAt);
+  await assert.rejects(db.projectRisk.update({ where: { id: risk.id }, data: { probability: 9 } }));
+
+  await service.updateTask(me, first.id, { progress: 100 });
+  const report = await service.addUpdate(me, full.id, { health: 'YELLOW', summary: 'Planejamento concluído', nextSteps: 'Executar' });
+  assert.equal(report.authorName, 'Revisor');
+
+  const complete = await service.getById(me, full.id);
+  assert.equal(report.progress, complete.progressOverall);
+  assert.deepEqual(complete.finance, { budget: 1000, plannedCost: 900, actualCost: 1100, balance: -100, consumedPct: 110, overBudget: true });
+  assert.equal(complete.openRisks, 1);
+  assert.equal(complete.openIssues, 0);
+  assert.equal(complete.latestHealth, 'YELLOW');
+  assert.equal(complete.members.length, 2);
+  assert.equal(complete.manager.name, 'Gerente Fictício');
+  const listed = (await service.list(me, { priority: 'HIGH', managerId: user.id })).find((item) => item.id === full.id);
+  assert.equal(listed.finance.actualCost, 1100);
+  assert.equal(listed.costs, undefined);
+  const summary = await service.portfolio(me, { search: full.code });
+  assert.equal(summary.totalProjects, 1);
+  assert.equal(summary.actualCost, 1100);
+  assert.equal(summary.overBudget, 1);
+  assert.equal((await service.options(me)).categories.includes('Melhoria'), true);
+  assert.equal((await service.options(me)).people.some((person) => person.id === outsider.id), false);
+
+  const copy = await service.duplicate(me, full.id, { startsAt: '2026-07-01' });
+  const copied = await service.getById(me, copy.id);
+  assert.notEqual(copied.code, complete.code);
+  assert.equal(copied.status, 'PLANNED');
+  assert.equal(copied.progressOverall, 0);
+  assert.equal(copied.tasks.length, 2);
+  assert.equal(copied.milestones.length, 1);
+  assert.equal(copied.members.length, 2);
+  assert.equal(copied.costs.length + copied.projectRisks.length + copied.updates.length, 0);
+  assert.equal(copied.startsAt.toISOString().slice(0, 10), '2026-07-01');
+  const copiedSecond = copied.tasks.find((task) => task.name === 'Executar');
+  assert.equal(copiedSecond.dependency.name, 'Planejar');
+  assert.notEqual(copiedSecond.dependencyId, first.id);
+  await assert.rejects(service.duplicate(me, foreign.id, {}), /Projeto não encontrado/);
+
+  // Registros filhos de outra empresa não são alcançados; excluir o projeto preserva os dados (exclusão lógica).
+  const foreignCost = await db.projectCost.create({ data: { projectId: foreign.id, description: 'Externo', amount: 1, date: new Date('2026-01-01') } });
+  await assert.rejects(service.updateCost(me, foreignCost.id, { amount: 2 }), /não encontrado/);
+  await assert.rejects(service.removeCost(me, foreignCost.id), /não encontrado/);
+  await service.removeRisk(me, risk.id);
+  await service.removeUpdate(me, report.id);
+  await service.removeMember(me, member.id);
+  await service.removeMilestone(me, gate.id);
+  await service.remove(me, full.id);
+  await assert.rejects(service.getById(me, full.id), /Projeto não encontrado/);
+  assert.equal(await db.projectCost.count({ where: { projectId: full.id } }), 3);
+  console.log('PASS: migração, medição inicial, avanço, marcos, isolamento, concorrência, dependências, quadro de tarefas, rollback e gestão completa (código, equipe, custos, riscos, status report, duplicação).');
 }
 
 run().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => db.$disconnect());

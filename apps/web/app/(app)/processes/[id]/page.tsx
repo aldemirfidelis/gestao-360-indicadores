@@ -20,6 +20,7 @@ import { formatDate } from '@/lib/utils';
 import { ArtifactWorkspace } from '@/components/processes/artifact-workspace';
 import { EntityPicker } from '@/components/processes/entity-picker';
 import { STATE_LABEL, TARGET_LABEL, type Artifact, type ArtifactKind, type ProcessContext } from '@/components/processes/types';
+import { ProcessImprovement } from '@/components/processes/process-improvement';
 
 export default function ProcessDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,7 +28,7 @@ export default function ProcessDetailPage() {
   const qc = useQueryClient();
   const { user, hasPermission } = useAuth();
   const canEdit = !user?.isDemo && hasPermission(['processes:update']);
-  const [tab, setTab] = useState(params.has('artifact') ? 'BPMN' : 'overview');
+  const [tab, setTab] = useState(params.get('tab') === 'pmo' ? 'pmo' : params.has('artifact') ? 'BPMN' : 'overview');
   const [artifactId, setArtifactId] = useState(params.get('artifact') || '');
   const [dirty, setDirty] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -63,13 +64,14 @@ export default function ProcessDetailPage() {
   const data = context.data;
   return <div className="space-y-5">
     <Link href="/processes" className="text-sm text-muted-foreground hover:underline">← Processos</Link>
-    <PageHeader title={data.process.name} description="SIPOC, BPMN, responsabilidades e melhoria contínua no contexto do processo." actions={canEdit && <Button variant="outline" asChild><Link href={`/processes?id=${id}`}>Dados do processo e etapas</Link></Button>} />
+    <PageHeader title={data.process.name} description="SIPOC, BPMN, responsabilidades e melhoria contínua no contexto do processo." actions={canEdit && <Button variant="outline" asChild><Link href={`/processes?focus=${id}`}>Dados do processo e etapas</Link></Button>} />
     <Tabs value={tab} onValueChange={(next) => { if (discard()) { setTab(next); setArtifactId(''); setDirty(false); } }}>
-      <TabsList className="h-auto w-full flex-wrap justify-start gap-1"><TabsTrigger value="overview">Visão geral</TabsTrigger><TabsTrigger value="SIPOC">SIPOC</TabsTrigger><TabsTrigger value="BPMN">BPMN</TabsTrigger><TabsTrigger value="RACI">Matriz RACI</TabsTrigger><TabsTrigger value="links">Registros relacionados</TabsTrigger><TabsTrigger value="history">Histórico</TabsTrigger></TabsList>
+      <TabsList className="h-auto w-full flex-wrap justify-start gap-1"><TabsTrigger value="overview">Visão geral</TabsTrigger><TabsTrigger value="SIPOC">SIPOC</TabsTrigger><TabsTrigger value="BPMN">BPMN</TabsTrigger><TabsTrigger value="RACI">Matriz RACI</TabsTrigger><TabsTrigger value="pmo">Melhoria (PMO)</TabsTrigger><TabsTrigger value="links">Registros relacionados</TabsTrigger><TabsTrigger value="history">Histórico</TabsTrigger></TabsList>
       <TabsContent value="overview" className="space-y-4">
         <Card><CardContent className="space-y-2 p-4"><h2 className="font-semibold">Objetivo e governança</h2><p>{data.process.objective || data.process.description || 'Descreva o objetivo nos dados do processo.'}</p><p className="text-sm text-muted-foreground">Área: {data.process.orgNode?.name || 'Não definida'} · Proprietário: {data.process.owner?.name || 'Não definido'} · Status: {data.process.status === 'ACTIVE' ? 'Ativo' : data.process.status === 'ARCHIVED' ? 'Arquivado' : data.process.status === 'UNDER_REVIEW' ? 'Em revisão' : 'Rascunho'}</p></CardContent></Card>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[['Artefatos em revisão', data.metrics.inReview], ['Revisões vencidas', data.metrics.overdueReview], ['Atividades sem responsável', data.metrics.withoutOwner], ['Indicadores fora da meta', data.metrics.indicatorsOffTarget]].map(([label, value]) => <Card key={label}><CardContent className="p-4"><div className="text-xs text-muted-foreground">{label}</div><div className="mt-1 text-2xl font-semibold">{value}</div></CardContent></Card>)}</div>
-        <div className="grid gap-3 md:grid-cols-3">{(['SIPOC', 'BPMN', 'RACI'] as const).map((kind) => <Card key={kind}><CardContent className="space-y-2 p-4"><h3 className="font-semibold">{kind === 'RACI' ? 'Matriz RACI' : kind}</h3><p className="text-sm text-muted-foreground">{data.artifacts.filter((item) => item.kind === kind).length} artefatos · {data.artifacts.filter((item) => item.kind === kind && item.state === 'PUBLISHED').length} publicados</p><Button variant="outline" onClick={() => setTab(kind)}>Abrir {kind}</Button></CardContent></Card>)}</div>
+        <ProcessBasics process={data.process} />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{(['SIPOC', 'BPMN', 'RACI'] as const).map((kind) => <Card key={kind}><CardContent className="space-y-2 p-4"><h3 className="font-semibold">{kind === 'RACI' ? 'Matriz RACI' : kind}</h3><p className="text-sm text-muted-foreground">{data.artifacts.filter((item) => item.kind === kind).length} artefatos · {data.artifacts.filter((item) => item.kind === kind && item.state === 'PUBLISHED').length} publicados</p><Button variant="outline" onClick={() => setTab(kind)}>Abrir {kind}</Button></CardContent></Card>)}<Card><CardContent className="space-y-2 p-4"><h3 className="font-semibold">Melhoria (PMO)</h3><p className="text-sm text-muted-foreground">{new Set(data.integrations.filter((item) => item.type === 'PROJECT').map((item) => item.target.id)).size} projeto(s) de melhoria vinculado(s)</p><Button variant="outline" onClick={() => setTab('pmo')}>Abrir portfólio</Button></CardContent></Card></div>
         <section className="rounded-lg border p-4"><h3 className="mb-2 font-semibold">Atividades modeladas</h3>{!data.activities.length && <p className="text-sm text-muted-foreground">Crie e salve um BPMN para documentar as atividades.</p>}<div className="divide-y">{data.activities.map((activity) => <div key={activity.id} className="flex flex-wrap justify-between gap-2 py-2 text-sm"><span>{activity.name} · {activity.artifact?.scenario === 'TO_BE' ? 'TO-BE' : 'AS-IS'}</span><span className="text-muted-foreground">{activity.ownerUserId || activity.orgNodeId || activity.orgJobId ? 'Responsabilidade operacional definida' : 'Responsabilidade pendente'}</span></div>)}</div></section>
       </TabsContent>
       {(['SIPOC', 'BPMN', 'RACI'] as const).map((kind) => <TabsContent key={kind} value={kind} className="space-y-4">
@@ -80,11 +82,57 @@ export default function ProcessDetailPage() {
         {tab === kind && artifact.data && <ArtifactWorkspace key={`${artifact.data.id}:${artifact.data.revision}`} artifact={artifact.data} context={data} onSaved={refresh} onDirty={setDirty} />}
         {kind === 'BPMN' && <section className="space-y-3 rounded-lg border p-4"><h3 className="font-semibold">Comparar AS-IS e TO-BE</h3><div className="grid gap-3 md:grid-cols-2">{(['before', 'after'] as const).map((side) => <div key={side}><Label>{side === 'before' ? 'Modelo de referência' : 'Modelo proposto'}</Label><NativeSelect value={compareIds[side]} onChange={(event) => setCompareIds({ ...compareIds, [side]: event.target.value })}><option value="">Selecionar BPMN</option>{data.artifacts.filter((item) => item.kind === 'BPMN').map((item) => <option key={item.id} value={item.id}>{item.name} · {item.scenario}</option>)}</NativeSelect></div>)}</div>{comparison.isLoading && compareIds.before && compareIds.after && <p>Comparando...</p>}{comparison.isError && <p role="alert">{comparison.error.message}</p>}{comparison.data && <div className="grid gap-3 sm:grid-cols-3">{([['added', 'Adicionadas'], ['removed', 'Removidas'], ['modified', 'Modificadas']] as const).map(([key, label]) => <div key={key}><h4 className="font-medium">{label}: {comparison.data[key].length}</h4>{comparison.data[key].map((activity) => <p key={activity.elementId} className="text-sm text-muted-foreground">{activity.name}</p>)}</div>)}</div>}</section>}
       </TabsContent>)}
+      <TabsContent value="pmo"><ProcessImprovement context={data} canEditProcess={canEdit && data.process.status !== 'ARCHIVED'} onLinksChanged={() => refresh()} onOpenLinks={() => setTab('links')} /></TabsContent>
       <TabsContent value="links"><ProcessIntegrations context={data} canEdit={canEdit} refresh={() => refresh()} /></TabsContent>
       <TabsContent value="history"><div className="divide-y rounded-lg border">{data.history.map((event) => <div key={event.id} className="p-4"><div className="font-medium">{event.title}</div><p className="text-sm">{event.description}</p><p className="text-xs text-muted-foreground">{formatDate(event.occurredAt)}</p></div>)}{!data.history.length && <p className="p-6 text-muted-foreground">Nenhum evento registrado.</p>}</div></TabsContent>
     </Tabs>
     <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>Criar {form.kind}</DialogTitle></DialogHeader><div className="space-y-3"><div className="space-y-1"><Label>Nome</Label><Input aria-label="Nome do novo artefato" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></div><div className="space-y-1"><Label>Cenário</Label><NativeSelect value={form.scenario} onChange={(event) => setForm({ ...form, scenario: event.target.value })}><option value="AS_IS">AS-IS — processo atual</option><option value="TO_BE">TO-BE — processo proposto</option></NativeSelect></div><div className="space-y-1"><Label>Usar modelo existente como base</Label><NativeSelect value={form.basedOnId} onChange={(event) => setForm({ ...form, basedOnId: event.target.value })}><option value="">Iniciar com dados do processo</option>{data.artifacts.filter((item) => item.kind === form.kind).map((item) => <option key={item.id} value={item.id}>{item.name} · versão {item.version}</option>)}</NativeSelect></div></div><DialogFooter><Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button><Button disabled={create.isPending || !form.name.trim()} onClick={() => create.mutate()}>{create.isPending ? 'Criando...' : 'Criar artefato'}</Button></DialogFooter></DialogContent></Dialog>
   </div>;
+}
+
+/** Dados cadastrais do processo: SIPOC resumido, indicador e etapas do fluxo. */
+function ProcessBasics({ process }: { process: ProcessContext['process'] }) {
+  const lines = (value?: string | null) => (value ?? '').split(/\r?\n|;/).map((item) => item.trim()).filter(Boolean);
+  const sipoc: Array<[string, string[]]> = [['Fornecedores', lines(process.suppliers)], ['Entradas', lines(process.inputs)], ['Saídas', lines(process.outputs)], ['Clientes', lines(process.customers)]];
+  const steps = [...(process.steps ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">Dados do processo</h2>
+          {process.indicator && (
+            <Link href={`/indicators/${process.indicator.id}`} className="text-sm text-primary hover:underline">
+              Indicador: {process.indicator.code ? `${process.indicator.code} - ` : ''}{process.indicator.name}
+            </Link>
+          )}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {sipoc.map(([title, items]) => (
+            <div key={title} className="rounded-md border p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+              {items.length ? (
+                <ul className="mt-1.5 space-y-0.5 text-sm">{items.map((item, index) => <li key={`${title}-${index}`}>{item}</li>)}</ul>
+              ) : <p className="mt-1.5 text-sm text-muted-foreground">Não informado</p>}
+            </div>
+          ))}
+        </div>
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Etapas do fluxo ({steps.length})</p>
+          {steps.length ? (
+            <ol className="space-y-1 text-sm">
+              {steps.map((step, index) => (
+                <li key={step.id} className="rounded-md border px-3 py-2">
+                  <span className="font-medium">{step.order ?? index + 1}. {step.name}</span>
+                  {step.responsible ? <span className="text-muted-foreground"> · {step.responsible}</span> : null}
+                  {step.description ? <p className="text-xs text-muted-foreground">{step.description}</p> : null}
+                </li>
+              ))}
+            </ol>
+          ) : <p className="text-sm text-muted-foreground">Nenhuma etapa cadastrada. Use “Dados do processo e etapas” para incluir.</p>}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function ProcessIntegrations({ context, canEdit, refresh }: { context: ProcessContext; canEdit: boolean; refresh: () => void }) {

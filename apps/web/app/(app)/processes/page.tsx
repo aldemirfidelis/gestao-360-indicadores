@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Edit, Filter, ListChecks, Network, Plus, Trash2, X } from 'lucide-react';
+import { Edit, Filter, FolderKanban, ListChecks, Network, Plus, Trash2, X } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,6 +24,9 @@ import { cn, formatNumber } from '@/lib/utils';
 import { useVision360 } from '@/components/ui/vision360-context';
 import { ImpactConfirmationModal } from '@/components/ui/impact-confirmation-modal';
 import { ProcessDashboard } from '@/components/processes/process-dashboard';
+import { ProcessPmoPanel, useProcessPmo } from '@/components/processes/process-pmo-panel';
+import { ConfirmDialog } from '@/components/platform/confirm-dialog';
+import { PMO_LABEL } from '@/components/projects/types';
 
 type ProcessType = 'CORE' | 'SUPPORT' | 'MANAGEMENT';
 type ProcessStatus = 'DRAFT' | 'ACTIVE' | 'UNDER_REVIEW' | 'ARCHIVED';
@@ -152,6 +155,7 @@ export default function ProcessesPage() {
   const canCreate = !user?.isDemo && hasPermission(['processes:create']);
   const canUpdate = !user?.isDemo && hasPermission(['processes:update']);
   const canDelete = !user?.isDemo && hasPermission(['processes:delete']);
+  const canViewProjects = hasPermission(['projects:view']);
   const [filters, setFilters] = useState({ search: '', status: '', type: '' });
   const [processOpen, setProcessOpen] = useState(false);
   const [stepOpen, setStepOpen] = useState(false);
@@ -160,6 +164,12 @@ export default function ProcessesPage() {
   const [stepProcessId, setStepProcessId] = useState<string | null>(null);
   const [form, setForm] = useState<ProcessForm>(EMPTY_FORM);
   const [stepForm, setStepForm] = useState<StepForm>(EMPTY_STEP);
+  const [stepToDelete, setStepToDelete] = useState<ProcessStep | null>(null);
+  const pmoQuery = useProcessPmo();
+  const pmoByProcess = useMemo(
+    () => new Map(pmoQuery.data?.available ? pmoQuery.data.processes.map((row) => [row.process.id, row] as const) : []),
+    [pmoQuery.data],
+  );
   const [impactModalConfig, setImpactModalConfig] = useState<{
     isOpen: boolean;
     entityType: string;
@@ -241,11 +251,14 @@ export default function ProcessesPage() {
   const summary = summaryQuery.data;
   const options = optionsQuery.data;
 
+  // `?focus=` (e o antigo `?id=`) abre as etapas do processo e leva a tela até ele.
   useEffect(() => {
-    const focus = searchParams.get('focus');
+    const focus = searchParams.get('focus') ?? searchParams.get('id');
     if (!focus || !processes.length) return;
     const found = processes.find((item) => item.id === focus);
-    if (found) setSelectedId(found.id);
+    if (!found) return;
+    setSelectedId(found.id);
+    window.setTimeout(() => document.getElementById(`process-${found.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }, [processes, searchParams]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['processes'] });
@@ -369,6 +382,7 @@ export default function ProcessesPage() {
       />
 
       <ProcessDashboard />
+      <ProcessPmoPanel />
       <div className="grid gap-3 md:grid-cols-4">
         <MetricCard title="Processos" value={formatNumber(summary?.total)} description="Mapeamentos registrados" icon={<Network className="h-4 w-4" />} tone="blue" />
         <MetricCard title="Ativos" value={formatNumber(summary?.active)} description="Processos vigentes" icon={<ListChecks className="h-4 w-4" />} tone="green" />
@@ -402,11 +416,31 @@ export default function ProcessesPage() {
 
       <div className="grid gap-4">
         {listQuery.isLoading ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando processos...</CardContent></Card> : null}
-        {!listQuery.isLoading && processes.length === 0 ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhum processo encontrado.</CardContent></Card> : null}
+        {listQuery.isError ? (
+          <Card>
+            <CardContent role="alert" className="space-y-3 p-6 text-sm">
+              <p>Não foi possível carregar os processos: {listQuery.error.message}</p>
+              <Button variant="outline" size="sm" onClick={() => listQuery.refetch()}>Tentar novamente</Button>
+            </CardContent>
+          </Card>
+        ) : null}
+        {!listQuery.isLoading && !listQuery.isError && processes.length === 0 ? (
+          <Card>
+            <CardContent className="space-y-3 p-6 text-sm text-muted-foreground">
+              {filters.search || filters.status || filters.type ? (
+                <p>Nenhum processo encontrado para os filtros atuais.</p>
+              ) : (
+                <p>Nenhum processo cadastrado. Cadastre o primeiro processo para mapear SIPOC, BPMN e RACI e acompanhar os projetos de melhoria.</p>
+              )}
+              {canCreate && !(filters.search || filters.status || filters.type) ? <Button size="sm" onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Novo processo</Button> : null}
+            </CardContent>
+          </Card>
+        ) : null}
         {processes.map((item) => {
           const selected = selectedId === item.id;
+          const pmo = pmoByProcess.get(item.id);
           return (
-            <Card key={item.id} className={cn('transition-colors', selected && 'border-primary/70 bg-primary/5')}>
+            <Card key={item.id} id={`process-${item.id}`} className={cn('scroll-mt-20 transition-colors', selected && 'border-primary/70 bg-primary/5')}>
               <CardContent className="space-y-4 p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <button type="button" onClick={() => setSelectedId(selected ? null : item.id)} className="min-w-0 text-left">
@@ -422,7 +456,12 @@ export default function ProcessesPage() {
                     </p>
                   </button>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" asChild><Link href={`/processes/${item.id}`}>SIPOC · BPMN · RACI</Link></Button>
+                    <Button size="sm" asChild><Link href={`/processes/${item.id}`}>Abrir processo</Link></Button>
+                    {canViewProjects ? (
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/processes/${item.id}?tab=pmo`}><FolderKanban className="mr-2 h-4 w-4" /> Melhoria (PMO)</Link>
+                      </Button>
+                    ) : null}
                     <Button size="sm" variant="outline" onClick={() => openVision360('PROCESS', item.id)} className="gap-1.5">
                       <Network className="h-4 w-4 text-primary" /> 360°
                     </Button>
@@ -431,6 +470,18 @@ export default function ProcessesPage() {
                     {canDelete ? <Button size="sm" variant="outline" className="text-status-red" onClick={() => handleDeleteTrigger(item.id, item.name)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</Button> : null}
                   </div>
                 </div>
+
+                {pmo ? (
+                  <Link
+                    href={`/processes/${item.id}?tab=pmo`}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border bg-background/60 px-3 py-2 text-xs hover:bg-muted/50"
+                  >
+                    <span className="inline-flex items-center gap-1.5 font-medium"><FolderKanban className="h-3.5 w-3.5" /> {pmo.active} projeto(s) de melhoria ativo(s)</span>
+                    <span>Avanço {pmo.avgProgress ?? 0}%{pmo.expectedProgress !== null ? ` (planejado ${pmo.expectedProgress}%)` : ''}</span>
+                    {pmo.pmoStatus ? <span className={cn(pmo.pmoStatus === 'CRITICAL' && 'font-semibold text-status-red', pmo.pmoStatus === 'AT_RISK' && 'font-semibold text-status-yellow')}>{PMO_LABEL[pmo.pmoStatus]}</span> : null}
+                    {pmo.tasksOverdue + pmo.milestonesOverdue > 0 ? <span className="font-semibold text-status-red">{pmo.tasksOverdue + pmo.milestonesOverdue} pendência(s) vencida(s)</span> : null}
+                  </Link>
+                ) : null}
 
                 <div className="grid gap-3 md:grid-cols-4">
                   <SipocBlock title="Fornecedores" value={item.suppliers} />
@@ -457,7 +508,7 @@ export default function ProcessesPage() {
                           {canUpdate ? (
                             <div className="flex gap-2">
                               <Button size="sm" variant="outline" onClick={() => openStep(item.id, step)}><Edit className="h-4 w-4" /></Button>
-                              <Button size="sm" variant="outline" className="text-status-red" onClick={() => deleteStep.mutate(step.id)}><Trash2 className="h-4 w-4" /></Button>
+                              <Button size="sm" variant="outline" className="text-status-red" aria-label={`Excluir etapa ${step.name}`} disabled={deleteStep.isPending} onClick={() => setStepToDelete(step)}><Trash2 className="h-4 w-4" /></Button>
                             </div>
                           ) : null}
                         </div>
@@ -545,6 +596,18 @@ export default function ProcessesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(stepToDelete)}
+        onOpenChange={(open) => !open && setStepToDelete(null)}
+        title="Excluir etapa"
+        description={stepToDelete ? `A etapa “${stepToDelete.name}” será removida do fluxo do processo.` : undefined}
+        confirmLabel="Excluir"
+        destructive
+        onConfirm={async () => {
+          if (stepToDelete) await deleteStep.mutateAsync(stepToDelete.id).catch(() => undefined);
+        }}
+      />
 
       {impactModalConfig && (
         <ImpactConfirmationModal

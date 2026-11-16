@@ -23,7 +23,14 @@ export interface Artifact extends ArtifactSummary {
 export interface RelatedTarget { id: string; type: ProcessIntegrationType; name: string; href: string; status: string | null; result?: { periodRef: string; value: number; light: string; attainment: number | null } | null }
 export interface Subject { id: string; name: string; subjectType: 'USER' | 'AREA' | 'JOB' }
 export interface ProcessContext {
-  process: { id: string; name: string; objective: string | null; description: string | null; status: string; orgNodeId: string | null; ownerUserId: string | null; indicatorId: string | null; orgNode: { id: string; name: string } | null; owner: { id: string; name: string } | null; steps: Array<{ id: string; name: string; description: string | null }> };
+  process: {
+    id: string; name: string; objective: string | null; description: string | null; status: string; orgNodeId: string | null; ownerUserId: string | null; indicatorId: string | null;
+    orgNode: { id: string; name: string } | null; owner: { id: string; name: string } | null;
+    steps: Array<{ id: string; name: string; description: string | null; order?: number; responsible?: string | null }>;
+    code?: string | null; type?: string; version?: string | null;
+    suppliers?: string | null; inputs?: string | null; outputs?: string | null; customers?: string | null;
+    indicator?: { id: string; name: string; code: string | null } | null;
+  };
   artifacts: ArtifactSummary[]; activities: ProcessActivity[];
   integrations: Array<{ id: string; type: ProcessIntegrationType; label: string | null; activityId: string | null; artifactId?: string | null; target: RelatedTarget }>;
   hiddenIntegrations: number;

@@ -108,3 +108,81 @@ export function buildProjectCurve(project: ProjectProgressInput, now = new Date(
 }
 
 export type ProjectCurve = ReturnType<typeof buildProjectCurve>;
+
+export interface PortfolioCurveProject extends ProjectProgressInput {
+  status?: string | null;
+}
+
+/**
+ * Curva S de um portfólio: média simples dos projetos com cronograma (cancelados ficam fora).
+ * O realizado de cada projeto vale zero enquanto nada estava planejado; depois disso só existe
+ * a partir da primeira medição. O realizado do portfólio aparece apenas nos dias em que todos
+ * os projetos da curva têm valor, para nunca misturar conjuntos diferentes de projetos.
+ */
+export function buildPortfolioCurve(projects: PortfolioCurveProject[], now = new Date()) {
+  const today = projectMeasurementDay(now).getTime();
+  const candidates = projects.filter((project) => project.status !== 'CANCELLED');
+  const series = candidates
+    .filter((project) => plannedAt(project, today) !== null)
+    .map((project) => ({
+      project,
+      progress: projectProgress(project),
+      snapshots: (project.progressSnapshots ?? [])
+        .map((snapshot) => ({ time: day(snapshot.measuredOn), progress: clamp(snapshot.progress) }))
+        .filter((snapshot): snapshot is { time: number; progress: number } => snapshot.time !== null && snapshot.time <= today)
+        .sort((a, b) => a.time - b.time),
+    }));
+
+  const dates = [today];
+  for (const { project, snapshots } of series) {
+    const addDate = (value: DateValue) => { const time = day(value); if (time !== null) dates.push(time); };
+    addDate(project.startsAt);
+    addDate(project.endsAt);
+    for (const task of project.tasks ?? []) { addDate(task.startDate); addDate(task.endDate); }
+    for (const milestone of project.milestones) addDate(milestone.dueDate);
+    if (snapshots.length) dates.push(snapshots[0].time);
+  }
+  const first = Math.min(...dates);
+  const last = Math.max(...dates);
+  const step = Math.max(1, Math.ceil((last - first) / DAY / 150)) * DAY;
+  const stamps = new Set([first, last, today]);
+  for (let time = first; time <= last; time += step) stamps.add(time);
+
+  const actualAt = (entry: (typeof series)[number], time: number): number | null => {
+    if (time > today) return null;
+    if (time === today) return entry.progress;
+    let value: number | null = null;
+    for (const snapshot of entry.snapshots) {
+      if (snapshot.time > time) break;
+      value = snapshot.progress;
+    }
+    if (value !== null) return value;
+    return plannedAt(entry.project, time) === 0 ? 0 : null;
+  };
+  const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+
+  const points = [...stamps].sort((a, b) => a - b).map((time) => {
+    if (!series.length) return { date: new Date(time).toISOString(), planned: null, actual: null };
+    const actuals = series.map((entry) => actualAt(entry, time));
+    return {
+      date: new Date(time).toISOString(),
+      planned: Math.round(mean(series.map((entry) => plannedAt(entry.project, time) ?? 0))),
+      actual: actuals.every((value) => value !== null) ? Math.round(mean(actuals as number[])) : null,
+    };
+  });
+  const firstMeasurements = series.flatMap((entry) => (entry.snapshots.length ? [entry.snapshots[0].time] : []));
+  return {
+    points,
+    historyStartsOn: firstMeasurements.length ? new Date(Math.min(...firstMeasurements)).toISOString() : null,
+    measuredOn: new Date(today).toISOString(),
+    hasSchedule: series.length > 0,
+    /** Projetos considerados na curva (com cronograma e não cancelados). */
+    projects: series.length,
+    /** Projetos fora da curva por falta de cronograma. */
+    withoutSchedule: candidates.length - series.length,
+    progress: series.length ? Math.round(mean(series.map((entry) => entry.progress))) : null,
+    expectedProgress: series.length ? Math.round(mean(series.map((entry) => plannedAt(entry.project, today) ?? 0))) : null,
+  };
+}
+
+export type PortfolioCurve = ReturnType<typeof buildPortfolioCurve>;
