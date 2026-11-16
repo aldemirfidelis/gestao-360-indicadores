@@ -1224,6 +1224,87 @@ commit `38bc965` (registro da publicação na seção "Processos com PMO integra
 - O `prisma generate` foi executado nesta máquina: o client local já inclui os
   modelos novos. A demonstração pública continua sem projetos cadastrados.
 
+
+## Pacto Soluções e cenários da UGE (2026-11-16, carga concluída)
+
+- Pedido original recuperado do histórico da sessão de 16/11/2026 às 15:22Z,
+  retomado pelo usuário nesta conversa. Autorização para criar a empresa e o
+  primeiro administrador, popular os cenários dos anexos, analisar melhorias e
+  elaborar procedimento de uso. Fontes originais continuam em Downloads:
+  `teste - analista de processo.docx`, `presentation.pptx` e
+  `Proposta_Estrutura_UGE_PACTO (1).pdf`.
+- Empresa criada no Postgres da Vultr em transação única, ID
+  `2e2371bf-fdcb-461a-8864-db37a670cbb0`, slug `pacto-solucoes`.
+  Acesso confirmado em `https://pacto-solucoes.gestao360.org/login`, com TLS.
+  Primeiro usuário `admin@pactosolucoes.com.br`, papel `COMPANY_ADMIN` e perfil
+  `ADMIN`. Plano administrativo Corporativo e 26 módulos atuais configurados.
+  Endereço `Rua C-200, 246 - Jardim América`, Goiânia/GO, segmento de software
+  para gestão fitness, site e perfil institucional foram extraídos das imagens
+  do cabeçalho/rodapé do DOCX e incorporados ao cadastro com auditoria. CNPJ e
+  telefone não informados ficaram sem preencher.
+- Todos os dados operacionais são simulados e identificados dessa forma.
+  Estrutura, nomes de participantes, datas, metas não informadas, custos e casos
+  são premissas propostas para aplicar o estudo. A UGE coordena método e
+  acompanhamento; os gestores das áreas executam e validam suas entregas.
+- Carga inicial: 12 usuários, 24 nós, 11 cargos, quatro perspectivas e oito
+  objetivos BSC; um ciclo OKR, quatro objetivos, 12 KRs e 12 check-ins.
+  Vinte KPIs com 60 metas/resultados de agosto a outubro de 2026. Cento e
+  cinquenta casos sintéticos (50 por mês) permitem conciliar mediana, P90,
+  retrabalho, SLA, reabertura e volume. Vinte e quatro casos atuais e seis
+  acompanhamentos de carteira completam as 180 tarefas do quadro.
+- Seis projetos: A–E e piloto de 90 dias, com 24 tarefas, 24 marcos e seis
+  medições iniciais de 16/11. Projeto A conserva compromisso de 19/10, reunião
+  D0 em 09/11 e previsão condicional de 23–25/11. Calendário do exemplo considera
+  segunda a sexta e requer validação corporativa. Prioridades recalculadas pelos
+  pesos: E 4,45; A 4,05; B 3,50; C 3,20; D 2,65, conforme a apresentação.
+- Seis processos com 24 artefatos SIPOC/BPMN AS-IS/BPMN TO-BE/RACI, 54 atividades,
+  27 linhas RACI, 105 atribuições e 93 vínculos com os registros operacionais.
+  AS-IS e modelos de treinamento publicados por fluxo auditado. TO-BE e RACI
+  do processo transversal e da recuperação de A estão em revisão no cenário.
+- Dezenove desvios/tratativas/planos com 76 tarefas, 76 sessões de análise,
+  114 hipóteses Ishikawa, 95 respostas dos 5 Porquês, 19 5W2H, 76 etapas PDCA e
+  19 evidências textuais sintéticas. Três reuniões mensais fechadas com 60
+  snapshots, decisões, follow-ups, aprendizados e padronizações; 28 reuniões
+  técnicas e de governança. A Ata integrada e as curvas foram conferidas.
+- A primeira tentativa foi revertida integralmente porque faltavam seis chaves
+  do catálogo de Processos em produção. A carga corrigida provisionou de forma
+  aditiva `processes:create/update/delete/approve/publish/manage` antes de gerar
+  os perfis da empresa. Esses seis registros novos de catálogo e os novos
+  registros da Pacto foram excluídos da comparação dos registros preexistentes.
+  Contagens e hashes dos registros anteriores nas 545 tabelas ficaram idênticos,
+  incluindo perfis e concessões anteriores.
+- Backup protegido antes da carga efetiva:
+  `db-backups/pre-pacto-20261116/g360-20261116-162956.dump`, 5.474.349 bytes,
+  modo 600, `pg_restore --list` validado. SHA-256
+  `fec9e5473f67b9996f8c9f2e04c7cbe398bd99ec3f073dcf432f151967160ac8`.
+  Credencial inicial está somente em `ACESSO_PACTO.txt` no mesmo diretório
+  protegido e na entrega local ignorada pelo Git. Nunca mostrar seu conteúdo
+  em logs nem versionar o arquivo.
+- Entrega local em `output/pacto-solucoes/`, excluída pelo `.git/info/exclude`:
+  procedimento PDF de oito páginas, relatório de melhorias PDF de cinco páginas,
+  fontes Markdown e arquivo privado de acesso. Layout renderizado e conferido.
+  O procedimento completo também está na wiki do quadro da Pacto.
+- Ensaio em Postgres 17 descartável, tmpfs e rede Docker própria, com esquema
+  sem dados reais. Verificações de fórmulas, datas, prioridades, dependências,
+  RACI, persistência e isolamento aprovadas. Playwright/Chromium confirmou login,
+  consultas, 13 menus, seis curvas, três fechamentos, atas, análises, SIPOC/BPMN/
+  RACI e BPMN a 390 pixels; 12 grupos, zero erros JavaScript.
+- Após a carga, 63 verificações pela API pública da empresa aprovadas, incluindo
+  acesso do administrador, entidades e artefatos, wiki e tentativa de leitura
+  de indicador de outra empresa com 404. API/Web/Postgres saudáveis. Ensaio
+  encerrado com remoção dos três containers próprios e da rede isolada.
+- Referência de validação: imagens publicadas `0.1.0+eead7ac7`, código remoto
+  `f2d589e`. O trabalho paralelo local de ampliação do PMO foi preservado.
+  Scripts, fontes extraídas e evidências locais em `.git/pacto-uge/`; cópia
+  executada e relatório em `db-backups/pre-pacto-20261116/`; ensaio arquivado em
+  `/tmp/g360-pacto-20261116`.
+- O relatório de melhorias cobre execução de casos, regras de medição,
+  priorização/capacidade, baseline/previsão e implantação de capacidades
+  suspensas. Também documenta uma limitação verificada: `passwordResetRequired`
+  é gravado, mas o login atual não exige a troca. O arquivo de acesso orienta a
+  troca manual no Perfil. As propostas devem ser reconciliadas com a entrega
+  paralela de PMO antes de novo desenvolvimento.
+
 ## Processos com PMO integrado (2026-11-16, publicado)
 
 Pedido do usuário: verificar o módulo Processos ("nada de funcional") e aplicar
@@ -1299,3 +1380,167 @@ Projetos acima.
 - Evidências e scripts em `/tmp/g360-pmo-release-20261116` na Vultr. Sem teste em
   navegador. Alterações locais da demonstração corporativa e a seção da Pacto
   (outra IA) preservadas e mantidas fora dos commits.
+
+## Pacto Soluções: revisão para seis indicadores (2026-11-16, concluída)
+
+- Pedido explícito do usuário: excluir todos os indicadores criados para a Pacto,
+  cadastrar os seis indicadores informados e adaptar os dados e vínculos anteriores.
+  Executado no banco de produção, somente na empresa
+  `2e2371bf-fdcb-461a-8864-db37a670cbb0`, sem commit, push, deploy ou migration.
+- Os vinte indicadores iniciais foram fisicamente excluídos; seus sessenta pares
+  de metas/resultados foram substituídos por dezoito pares, em seis novos UUIDs.
+  Permanecem exclusivamente: Produtividade, Lead Time, Taxa de retrabalho,
+  Cumprimento de SLA, Taxa de conformidade e Satisfação do cliente.
+- Resultados simulados de agosto/setembro/outubro de 2026, reconciliados com os
+  cinquenta casos concluídos de cada mês: Produtividade 50/50/50 (meta 50);
+  Lead Time 7,72/6,44/5,44 dias úteis (meta até 6); retrabalho 20/16/12% (até 12%);
+  SLA 72/80/88% (ao menos 90%); conformidade 68/84/94% (ao menos 95%);
+  satisfação 7,2/7,8/8,4 na escala de zero a dez (ao menos 8,5).
+  Lead Time considera abertura até conclusão, incluindo espera e execução, com
+  média mensal em dias úteis. Retrabalho conta cada caso uma vez. Avaliações de
+  conformidade e satisfação foram acrescentadas e identificadas como simuladas.
+- Projetos A–E e piloto, seis processos, BSC, doze KRs, dezenove desvios/planos,
+  reuniões e suas referências foram adaptados. A unicidade de tratativa por
+  indicador/período exigiu consolidar dezenove tratativas em cinco, preservando
+  todos os dezenove planos e desvios e religando suas reuniões técnicas.
+  Execução das ações preservada; eficácia deve ser revista na nova base de medição.
+- Três reuniões mensais recompostas sem bloqueios, com 78 snapshots próprios e
+  compartilhados e apenas seis indicadores distintos por fechamento. Integrações
+  tipadas atualizadas, com deduplicação. SIPOCs atualizados por serviço auditado;
+  versões imutáveis anteriores dos artefatos preservadas integralmente.
+  Existem 25 artefatos atuais: os 24 iniciais e um registro preexistente à revisão.
+- Transação ensaiada com reversão deliberada e verificação da restauração dos
+  vinte indicadores anteriores. Aplicação efetiva atômica e idempotente pelo
+  marcador `pacto.indicators.six.v2`. Contagens e hashes dos registros externos à
+  Pacto comparados nas 549 tabelas, sem qualquer alteração externa pela revisão.
+- Backup protegido anterior à substituição:
+  `db-backups/pre-pacto-six-indicators-20261116/g360-20261116-193955.dump`,
+  5.828.381 bytes, modo 600, `pg_restore --list` validado. SHA-256
+  `460bbd2d75f3169b00978321d74e183a9d076fd7ecec5c339fcc53a8169a2e97`.
+- Validação final: 77 verificações na API pública aprovadas, incluindo os seis
+  indicadores, 404 para os vinte IDs excluídos, planos/análises, projetos/curvas,
+  processos/artefatos/PMO, reuniões/ata, BSC/OKR, tarefas e isolamento entre empresas.
+  Playwright na fixture isolada da versão atual confirmou os seis indicadores e
+  a aba PMO com projetos, sem erros JavaScript. Imagem publicada verificada:
+  `0.1.0+38bc9652`. API, Web e Postgres de produção permaneceram saudáveis.
+- Ensaio em Postgres 17 descartável, dados sintéticos e tmpfs; os três containers
+  próprios `g360-pacto-metrics-{web,api,postgres}` e a rede
+  `g360-pacto-metrics-review` foram removidos. Nenhum volume de produção foi tocado.
+- Procedimento v1.1 (oito páginas) e relatório de melhorias (cinco páginas)
+  revisados, renderizados e conferidos visualmente, entregues em
+  `output/pacto-solucoes/` com fontes Markdown. Procedimento também atualizado na
+  wiki. PDFs e fontes arquivados no diretório protegido desta revisão; credencial
+  anterior preservada, sem alteração de acesso.
+- Manifesto de produção atual: `.git/pacto-uge/manifest-production.json`, cópia do
+  `revision.json` protegido. O manifesto local v1 foi preservado como
+  `manifest-production-v1.json`; o arquivo original no backup da carga inicial é
+  histórico e não descreve os indicadores atuais. Scripts/fontes da revisão em
+  `.git/pacto-uge/`, evidências em `validation/metrics-six/`; ensaio remoto em
+  `/tmp/g360-pacto-indicators-20261116`. Não reexecutar a carga inicial sobre a Pacto.
+
+## Cabeçalhos e cards de resumo (2026-11-16, publicados)
+
+- Pedido do usuário: aplicar o card moderno da Central de Trabalho aos cabeçalhos
+  equivalentes e colocar os cards informativos dentro dele, com o mesmo acabamento.
+  Implementado em 28 arquivos da web. `PageHeader` compartilhado agora tem bordas
+  arredondadas, gradiente discreto, brilho decorativo, ações e área de resumo;
+  mantém breadcrumbs e oferece conteúdo adicional e modo compacto. `MetricCard`
+  ganhou ícones em blocos coloridos, números destacados, bordas suaves e descrições
+  sem corte. Valores monetários longos usam tamanho de fonte adaptado.
+- Resumos agrupados no cabeçalho das páginas que usam os cards compartilhados,
+  inclusive Árvore, Indicadores, Mapa Estratégico, Plano de Ação, Processos, Ata,
+  Relatórios e Usuários, além das páginas correspondentes dos módulos suspensos.
+  Tarefas reutiliza o mesmo cabeçalho e incorpora seus oito resumos; preserva
+  preferências, filtros, busca, visualizações e criação. Meu Dia, Reunião Mensal,
+  Painel Executivo e Projetos receberam a adaptação dos seus layouts próprios.
+  Governança de Processos e PMO também têm superfícies e resumos modernizados.
+  Grade de resumo em duas colunas no celular; filtros de OKRs ajustados para não
+  ultrapassar a largura disponível. Nenhuma alteração de API, schema ou dados.
+- Validação: `tsc --noEmit` aprovado; 113 testes existentes da web aprovados;
+  lint dos 28 arquivos sem erros, com os mesmos 11 avisos presentes no HEAD.
+  Build Docker focado da web aprovado, incluindo tipos e runtime standalone.
+  Ensaio do artefato compilado em Chromium: 16 rotas a 1600, 900 e 390 pixels,
+  resumos dentro do cabeçalho, sem transbordamento do cabeçalho e zero erros JS.
+  Personalizar, Filtros, Lista e Nova tarefa conferidos; novos cards também
+  inspecionados no tema escuro. Somente respostas sintéticas foram usadas no ensaio.
+- Evidências e prévias em `output/layout-cabecalhos/compiled/`, ignoradas no Git;
+  scripts e pacote em `.git/layout-review/`. Build isolado na Vultr em
+  `/tmp/g360-header-review-20261116`, imagem `g360-web:headers-review-20261116`.
+  Container temporário, túnel SSH e servidor local de revisão encerrados; imagem
+  e relatórios preservados. API, Web e Postgres de produção seguem saudáveis.
+- Publicação autorizada pelo usuário e concluída com os ajustes da rodada abaixo.
+  Alterações anteriores da memória, da carga Pacto e da demonstração corporativa
+  foram preservadas. O registro da publicação está ao fim deste documento.
+
+## Reunião Mensal, Curva S e Governança (2026-11-16, publicados)
+
+- Continuação do layout anterior: o usuário pediu o nome do indicador acima dos
+  gráficos em Reunião Mensal > Conduzir, o Realizado na Curva S e uma seta para
+  recolher/expandir Governança de processos no Painel Executivo.
+- `IndicatorDetailView` agora identifica o indicador no cabeçalho do próprio
+  gráfico, inclusive no modo embutido da apresentação, em Barras e Curva S.
+  Esse título também acompanha a exportação da visão de decisão.
+- Consulta de diagnóstico exclusivamente READ ONLY na Pacto confirmou uma única
+  medição de progresso em cada um dos seis projetos, todas em 16/11/2026. O
+  realizado individual só tinha um ponto, portanto ainda não havia segmento
+  histórico para desenhar. `ProjectCurve` destaca a última medição com ponto e
+  rótulo, reserva espaço nos eixos para valores em 0%/100% e informa quando há
+  somente a primeira medição. Duas datas com valores desenham a linha normalmente;
+  lacunas e períodos futuros continuam sem valores estimados. A mesma correção
+  atende o portfólio e os projetos individuais. Nenhum histórico foi preenchido.
+- `ProcessDashboard` tem botão com seta, `aria-expanded`, `aria-controls` e
+  acionamento pelo teclado. Começa recolhido no Painel Executivo; em Processos
+  mantém o padrão expandido. Conteúdo e link para Processos permanecem acessíveis.
+- Validação: tipos da web aprovados; 113 testes da web e 14 de progresso/Curva S
+  aprovados; lint dos 30 arquivos acumulados sem erros, com os mesmos 11 avisos
+  do HEAD. Novo build Docker da web aprovado, incluindo tipos e standalone.
+  Chromium no artefato compilado: seis cenários aprovados, zero erros JS e zero
+  respostas de fixture ausentes. Conferidos abrir/recolher por mouse e teclado,
+  título após clicar no indicador em Conduzir e alternar Barras/Curva S, primeira
+  medição, Realizado 0%, linha com duas medições e portfólio, em desktop e celular.
+- Fontes e scripts em `.git/layout-review/`; evidências e prévias em
+  `output/layout-cabecalhos/fixes/compiled/`, ignoradas no Git. Novo artefato
+  `g360-web:headers-fixes-review-20261116`, no ambiente isolado
+  `/tmp/g360-header-review-20261116`, com `build-fixes.log` e
+  `browser-fixes-report.json`. Container, túnel e servidor local de revisão
+  encerrados; produção saudável, sem troca das imagens publicadas.
+- O usuário autorizou commit, push, deploy e migrations necessárias. O conjunto
+  foi publicado junto com o novo layout, conforme o registro abaixo.
+
+## Publicação dos cabeçalhos e correções visuais (2026-11-16, concluída)
+
+- Autorização explícita recebida nesta conversa. Commit `05b3da5`, enviado a
+  `origin/main`, com os 30 arquivos da web. API, shared, schema e migrations não
+  tiveram alterações. O trabalho paralelo da demonstração corporativa permanece
+  fora dos commits desta publicação; a documentação própria da Pacto foi preservada.
+- Preflight confirmou branch `main`, servidor sem alterações rastreadas e URLs
+  `DATABASE_URL`/`DIRECT_URL` no Postgres local, com credenciais conferidas sem
+  exibição. As 157 migrations estavam aplicadas. `make deploy` executou novamente
+  `prisma migrate deploy`: nenhuma migration pendente e nenhuma alteração de schema.
+- Imagens finais preparadas com o portal no ar. Publicação por `make deploy` de
+  20:55:18Z a 20:55:50Z (32 segundos). Versão servida `0.1.0+05b3da5f`.
+  API, Web e Postgres saudáveis; inicialização da API sem eventos de nível >= 50.
+- Backup anterior protegido:
+  `db-backups/pre-headers-20261116/g360-20261116-205034.dump`, 5.879.744 bytes,
+  modo 600, `pg_restore --list` validado. SHA-256
+  `9d7f7c71278bc3884b593135df4c205654b984a03c84332d116a0abc0367f5f1`.
+  Imagens para retorno: `g360-api:rollback-38bc965-headers-20261116` e Web equivalente.
+- Pós-publicação: nove verificações HTTP públicas aprovadas, incluindo versão no
+  login, saúde e 401 sem sessão nas rotas de projetos/PMO. Na API real da Pacto,
+  77 verificações aprovadas: seis indicadores, resultados, projetos, processos,
+  artefatos, planos, reuniões, BSC/OKR, tarefas e isolamento entre empresas.
+  Mantidos os seis indicadores, 19 planos e cinco tratativas consolidadas.
+- Chromium nos assets efetivamente publicados, com respostas de API sintéticas:
+  seis cenários aprovados, zero erros JS. Conferidos o nome acima do gráfico em
+  Conduzir (Barras e Curva S), seta de Governança por mouse e teclado, Realizado
+  em primeira medição e em 0%, linha com duas datas e Curva S do portfólio, em
+  desktop e celular. Evidências locais em
+  `output/layout-cabecalhos/fixes/production-05b3da5/`.
+- Logs, relatórios de API/HTTP/navegador e IDs de imagens arquivados em
+  `db-backups/pre-headers-20261116/`. No Docker 29, o prebuild e o deploy da Web
+  tiveram o mesmo manifest/config, mas IDs de manifest list distintos devido à
+  nova atestação. Conferir a imagem em execução contra a tag final e a versão
+  servida, em vez de exigir igualdade com o ID da exportação de prebuild.
+- O commit posterior de documentação não exige outro build: a versão publicada
+  continua vinculada ao commit de código `05b3da5`, mesmo com HEAD mais recente
+  contendo somente o registro operacional.
