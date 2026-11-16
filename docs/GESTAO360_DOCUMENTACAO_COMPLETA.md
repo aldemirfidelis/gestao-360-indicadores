@@ -1,6 +1,6 @@
 # Gestão 360 — documentação completa
 
-Referência: 16/11/2026. Base: código local sobre `57aeed6`, incluindo a implementação SIPOC/BPMN/RACI. Este documento descreve a implementação; **a nova funcionalidade ainda depende de publicação e da migration em produção**. Não confundir código disponível, módulo ativo no produto, licença da empresa e versão efetivamente publicada.
+Referência: 16/11/2026. SIPOC/BPMN/RACI publicados na versão **0.1.0+eead7ac7**, com a migration aplicada em produção após autorização do usuário. Não confundir código disponível, módulo ativo no produto e licença da empresa. Evidências da publicação no relatório vinculado abaixo.
 
 Leitura complementar: [mapa funcional](MAPA_FUNCIONALIDADES.md), [inventário de rotas e entidades](INVENTARIO_ROTAS_CODIGO.md), [arquitetura](ARQUITETURA_E_INTEGRACOES.md), [manual](MANUAL_DO_USUARIO.md), [guia técnico](GUIA_TECNICO.md), [visão comercial](VISAO_COMERCIAL_GESTAO360.md) e [relatório desta implementação](RELATORIO_IMPLEMENTACAO_SIPOC_BPMN_RACI.md).
 

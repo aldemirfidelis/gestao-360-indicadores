@@ -1,6 +1,6 @@
 # Manual do usuário — Gestão 360
 
-Referência: 16/11/2026. O menu depende do perfil, área e módulos liberados para a empresa. Recursos de Processos descritos aqui pertencem à nova implementação e precisam ser publicados antes do uso em produção.
+Referência: 16/11/2026, versão `0.1.0+eead7ac7`. O menu depende do perfil, área e módulos liberados para a empresa. Recursos de Processos publicados; a demonstração pública possui consulta e exportação, com edição bloqueada.
 
 ## Acesso e organização do trabalho
 

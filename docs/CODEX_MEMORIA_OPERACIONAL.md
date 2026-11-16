@@ -1113,7 +1113,7 @@ português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`
   Alterações locais anteriores de demonstração corporativa preservadas e
   mantidas fora dos commits desta publicação.
 
-## SIPOC, BPMN e RACI (2026-11-16, implementação local)
+## SIPOC, BPMN e RACI (2026-11-16, publicado)
 
 - Pedido do usuário: implementar o prompt anexo de gestão integrada de processos
   e documentar toda a plataforma. Relatório e evidências:
@@ -1131,7 +1131,7 @@ português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`
 - Governança, revisão concorrente, snapshots e auditoria transacionais. Novas
   permissões de aprovar/publicar no catálogo aditivo existente. Respeitar overrides
   e licenças empresariais. Módulos corporativos suspensos continuam suspensos.
-- Migration **ainda não aplicada em produção**:
+- Migration **aplicada em produção após backup**:
   `20261116140000_process_governance`, seis tabelas, quatro enums e CHECKs/FKs
   aditivos. Sem seed, conversão destrutiva ou alteração de dados reais.
 - Vínculos tipados e navegação reversa em registros centrais, painel de governança,
@@ -1160,6 +1160,21 @@ português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`
 - Alterações anteriores de interface preservadas: sequência sem números,
   minimapas React Flow removidos e linhas selecionadas do mapa estratégico com
   traçado animado. Alterações/scripts anteriores da demonstração preservados.
-- **Sem commit, push ou deploy desta nova entrega.** Publicação requer revisão
-  do resultado e OK do usuário, conforme fluxo operacional deste arquivo. Não
-  incluir scripts/dados anteriores da demonstração no commit da implementação.
+- Publicado após OK explícito do usuário: commit `eead7ac`, push em `main`, versão
+  `0.1.0+eead7ac7`. Builds com o portal no ar; `make deploy` entre 14:58:04Z e
+  14:58:47Z (43 s). Migration nova aplicada; 156 em dia, cinco CHECKs validados.
+- Backup protegido: `db-backups/pre-processes-20261116/g360-20261116-145802.dump`,
+  5.440.105 bytes, modo 600, `pg_restore --list` com 4.091 entradas. SHA-256:
+  `fe311c27ddcc4f6418663a1c0e28a0fa487181d573ce70bdf2cff4b0daaedbff`.
+- Contagens/hashes preservados em 25 tabelas de negócio. Base sem processos
+  anteriores; as seis tabelas novas continuam vazias. Sem seed/exemplos fictícios.
+- Perfil público da demonstração recebeu somente `processes:view` e
+  `processes:export` (41 → 43 permissões), em transação auditada. Demais perfis e
+  concessões individuais preservados por hash; edição da demo continua 403.
+- Pós-deploy: API/Web/Postgres saudáveis, zero erros; versão pública conferida.
+  HTTP 200 no portal e consultas de Processos/painel/vínculos/participantes pela
+  demo. Fluxo de artefatos completo validado somente no ambiente descartável,
+  pois não há processo real cadastrado. Menu Processos disponível para consulta.
+- Rollback: `g360-api:rollback-b120801-processes-20261116` e Web equivalente.
+  Logs/scripts em `/tmp/g360-process-release-20261116`. Alterações/scripts
+  anteriores da demonstração preservados e mantidos fora destes commits.

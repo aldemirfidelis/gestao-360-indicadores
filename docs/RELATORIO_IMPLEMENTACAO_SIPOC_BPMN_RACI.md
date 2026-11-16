@@ -1,6 +1,6 @@
 # SIPOC, BPMN e RACI — relatório de implementação
 
-Solicitação: prompt anexo do usuário, 16/11/2026. Implementação local concluída; validação final registrada abaixo. Commit, push e deploy não realizados para este novo escopo.
+Solicitação: prompt anexo do usuário, 16/11/2026. Implementação publicada com autorização explícita do usuário: commit `eead7ac7c8ebaeff845da4df2b2a962873862b3a`, push em `main`, versão `0.1.0+eead7ac7`. Validação e publicação registradas abaixo.
 
 ## Diagnóstico técnico
 
@@ -92,5 +92,17 @@ O [inventário estático](INVENTARIO_ROTAS_CODIGO.md), gerado por `scripts/gener
 - Modelos publicados mantêm snapshots; não há coedição em tempo real. Data de revisão gera pendência; não transfere responsabilidade automaticamente.
 - Participantes usam User, OrgNode e OrgJob existentes. O cargo textual do usuário e seu cadastro de colaborador são conceitos distintos no legado; não foi criada correspondência automática por nome entre eles.
 - Integrações com módulos suspensos requerem reativação e ensaio próprio. Não foram apresentados como testados os fluxos completos desses módulos.
-- Produção não recebeu esta migration, novos registros ou seeds; nenhuma empresa real foi usada como fixture. Serviços do produto permaneceram saudáveis durante a validação.
-- Para publicação, seguir o fluxo de resumo e OK explícito de [memória operacional](CODEX_MEMORIA_OPERACIONAL.md). Preservar alterações locais anteriores e manter scripts/dados corporativos de demonstração fora de commits desta entrega.
+- Nenhuma empresa real foi usada como fixture e nenhum seed foi executado em produção. A migration foi aplicada após backup; não foram criados processos ou diagramas fictícios no produto.
+- Publicação autorizada pelo OK do usuário após apresentação do resumo, conforme [memória operacional](CODEX_MEMORIA_OPERACIONAL.md). Alterações locais anteriores e scripts/dados corporativos de demonstração foram preservados fora dos commits desta entrega.
+
+## Publicação em produção — 16/11/2026
+
+- Commit de código `eead7ac`, push em `main`; versão pública `0.1.0+eead7ac7` conferida no login e no ambiente do frontend.
+- API e web construídas antes da parada do portal. `make deploy`: **14:58:04Z–14:58:47Z**, 43 segundos. API, web e Postgres saudáveis; Caddy preservado.
+- Backup anterior: `db-backups/pre-processes-20261116/g360-20261116-145802.dump`, 5.440.105 bytes, modo 600; `pg_restore --list` validado com 4.091 entradas. SHA-256 `fe311c27ddcc4f6418663a1c0e28a0fa487181d573ce70bdf2cff4b0daaedbff`.
+- `20261116140000_process_governance` aplicada, 156 migrations em dia e cinco CHECKs novos validados. As seis tabelas novas estão vazias, como esperado: a base não continha processos. Nenhum dado de exemplo foi inserido.
+- Contagens e hashes dos registros preservados em **25 tabelas de negócio**, incluindo processos/etapas, projetos, indicadores, resultados, ações, desvios, reuniões, organização, usuários e estratégia.
+- Ajuste restrito de configuração: adicionados `processes:view` e `processes:export` ao perfil `DEMO_PUBLIC` da Empresa Demonstração, em transação e com auditoria. Passou de 41 para 43 permissões; demais perfis e concessões individuais permaneceram idênticos por hash. Escrita da demonstração continua bloqueada com 403.
+- HTTP 200 em health, home, login, demonstração, Processos, Projetos e Estratégia. Sessão pública conferiu lista/painel de processos, tipos de integração e participantes; módulo disponível para consulta. Sem processos existentes para exercitar um artefato em produção; o fluxo completo foi validado no banco descartável.
+- Zero erros estruturados da API e zero erros do frontend nas verificações pós-deploy. Rollback de imagens preservado em `g360-api:rollback-b120801-processes-20261116` e Web equivalente; não apagar a nova estrutura com histórico em eventual reversão.
+- Logs, scripts e evidências da publicação em `/tmp/g360-process-release-20261116`. Scripts de ensaio permanecem protegidos contra execução na base do produto.

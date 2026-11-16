@@ -1,11 +1,11 @@
 # Mapa de funcionalidades — Gestão 360
 
-Referência: 16/11/2026, código local sobre `57aeed6` com SIPOC/BPMN/RACI. O [inventário extraído do código](INVENTARIO_ROTAS_CODIGO.md) relaciona **61 diretórios de módulos, 1.747 operações HTTP decoradas, 201 páginas, 544 modelos Prisma e 156 migrations**. Inclui fonte suspensa; não equivale a catálogo de funcionalidades publicadas/licenciadas.
+Referência: 16/11/2026, versão `0.1.0+eead7ac7` com SIPOC/BPMN/RACI publicados. O [inventário extraído do código](INVENTARIO_ROTAS_CODIGO.md) relaciona **61 diretórios de módulos, 1.747 operações HTTP decoradas, 201 páginas, 544 modelos Prisma e 156 migrations**. Inclui fonte suspensa; não equivale a catálogo de funcionalidades publicadas/licenciadas.
 
 ## Como interpretar o mapa
 
 - **Ativo:** participa do núcleo atual, sujeito a licença, permissões, área e configuração.
-- **Novo:** implementado localmente nesta entrega; aguarda publicação/migration em produção.
+- **Novo:** acrescentado nesta entrega e publicado na versão `0.1.0+eead7ac7`, sujeito a licença e permissões.
 - **Suspenso:** fonte e dados preservados; o produto bloqueia suas rotas e/ou não carrega seu módulo principal. Não reativado nesta entrega.
 - **Infraestrutura/parcial:** serviço transversal; algumas rotas de negócio associadas podem estar suspensas.
 
@@ -26,7 +26,7 @@ Cada linha apresenta objetivo/problema, funcionalidades e fluxo, perfis/regras, 
 | **Tratativas** — `treatments`, contexto de indicador/plano | Manter o encadeamento de resultado fora da meta e tratamento | Permissões/escopo da fonte | Resultado, desvio, sessão de análise, reunião e plano; rastreabilidade | Ativo; utiliza fontes existentes |
 | **Planos e análise** — `actions`, `/actions/:id` | Analisar causa; manter plano, tarefas, evidências, participantes e eficácia | `actions:*`, responsável/gestor, área; controles de conclusão/validação | Ishikawa, 5 Porquês, 5W2H, PDCA e estruturas MASP; tarefas/Meu Dia; processos e indicadores | Ativo; Pareto é compatibilidade legada, não novo editor entregue |
 | **Projetos** — `projects`, `/projects/cronograma`, `/projects/:id` | Planejar portfólio, Gantt, orçamento, tarefas, dependências e marcos; atualizar avanço | `projects:*`, área do indicador quando vinculada | Curva S, medições diárias e PMO; tarefas, processos/atividades e indicador | Ativo; não inventa histórico anterior; responsável de tarefa legado é texto |
-| **Processos** — `processes`, `/processes`, `/processes/:id` | Cadastro central e etapas; SIPOC em cinco colunas; BPMN AS-IS/TO-BE; RACI; governança | `processes:*`, permissões específicas de aprovação/publicação e escopo de área | Atividades, vínculos tipados, versões/auditoria, painel, Meu Dia, organização e registros reais | Novo; módulo reativado no código; BPMN documenta, não executa |
+| **Processos** — `processes`, `/processes`, `/processes/:id` | Cadastro central e etapas; SIPOC em cinco colunas; BPMN AS-IS/TO-BE; RACI; governança | `processes:*`, permissões específicas de aprovação/publicação e escopo de área | Atividades, vínculos tipados, versões/auditoria, painel, Meu Dia, organização e registros reais | Novo e publicado; módulo reativado; BPMN documenta, não executa |
 | **Reuniões** — `meetings`, `/meetings/:id` | Agendar, manter participantes, pautas, decisões e acompanhamentos | `meetings:*`; área/vínculo com indicador | Planos, desvios, calendário/convites quando configurados, processos e ata | Ativo; envio externo depende de configuração e ação autorizada |
 | **Reunião Mensal** — `monthly-results`, `/monthly-results` | Consolidar mês e áreas, decisões, escalonamentos, acompanhamentos, aprendizados e padronização | Gestores com permissões do domínio; regras de fechamento | Snapshots dos indicadores e integração de planos/atas | Ativo; período fechado preserva visão histórica |
 | **Meu Dia** — `my-day`, `/meu-dia` | Consolidar pendências/prioridades; abrir fonte e atuar nela | `myday:view` e políticas das fontes; visão pessoal/equipe | WorkItemIndex, tarefas, planos, projetos, notificações e revisão de processos | Ativo; projeção não substitui fontes; coletores de módulos suspensos são desativados |

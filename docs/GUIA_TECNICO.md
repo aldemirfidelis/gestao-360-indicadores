@@ -34,7 +34,7 @@ pnpm dev:web
 
 Confirme o alvo da conexão antes de qualquer migration. Para nova alteração de schema, desenvolva a migration no banco local e revise o SQL. Não use `db push` para substituir o histórico de produção. Não execute `prisma reset` ou seed geral em produção.
 
-Nova migration: `20261116140000_process_governance`, aditiva, seis tabelas de governança/atividades/RACI/vínculos e quatro enums. Preserva Process/ProcessStep e os dados antigos. Os CHECKs adicionais estão no SQL e não são representados integralmente pelo Prisma. São 156 migrations na árvore atual. No ambiente descartável, todas aplicaram do zero.
+Nova migration: `20261116140000_process_governance`, aditiva, seis tabelas de governança/atividades/RACI/vínculos e quatro enums. Preserva Process/ProcessStep e os dados antigos. Os CHECKs adicionais estão no SQL e não são representados integralmente pelo Prisma. São 156 migrations na árvore atual. Todas aplicaram do zero no ambiente descartável; a nova migration também foi aplicada em produção na publicação `0.1.0+eead7ac7`, em 16/11/2026, após backup validado.
 
 ## Desenvolvimento de processos
 

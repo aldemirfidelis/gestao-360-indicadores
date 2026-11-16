@@ -1,6 +1,6 @@
 # Gestão 360 — visão comercial
 
-Referência funcional: código de 16/11/2026. Recursos novos de Processos aguardam publicação. A disponibilidade de cada módulo depende do escopo ativo e da contratação/configuração da empresa.
+Referência funcional: versão `0.1.0+eead7ac7`, publicada em 16/11/2026, incluindo SIPOC/BPMN/RACI. A disponibilidade de cada módulo depende do escopo ativo e da contratação/configuração da empresa.
 
 ## Proposta de valor
 
