@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UserRoleEnum } from '@prisma/client';
 import { ProjectsService } from './projects.service';
 import type { AuthPayload } from '../auth/auth.types';
@@ -27,14 +27,17 @@ function makeService(opts?: {
     project: {
       findMany: vi.fn().mockResolvedValue(opts?.projects ?? []),
       findFirst: vi.fn().mockResolvedValue(opts?.project ?? null),
+      findUniqueOrThrow: vi.fn().mockResolvedValue(opts?.project ?? { tasks: [], milestones: [] }),
       create: vi.fn().mockResolvedValue({ id: 'p1' }),
       update: vi.fn().mockResolvedValue({ id: 'p1' }),
     },
     projectMilestone: {
+      create: vi.fn().mockResolvedValue({ id: 'm1' }),
       findFirst: vi.fn().mockResolvedValue(opts?.milestone ?? null),
       update: vi.fn().mockResolvedValue({ id: 'm1' }),
     },
     projectTask: {
+      create: vi.fn().mockResolvedValue({ id: 't1' }),
       findFirst: vi.fn().mockResolvedValue(opts?.task ?? null),
       count: vi.fn().mockResolvedValue(0),
       delete: vi.fn().mockResolvedValue({ id: 't1' }),
@@ -44,7 +47,11 @@ function makeService(opts?: {
       findFirst: vi.fn().mockResolvedValue(opts?.indicator ?? null),
       findMany: vi.fn().mockResolvedValue(opts?.indicators ?? []),
     },
+    projectProgressSnapshot: { upsert: vi.fn().mockResolvedValue({ id: 's1' }) },
+    $queryRaw: vi.fn().mockResolvedValue([{ id: 'p1' }]),
+    $transaction: vi.fn(),
   } as any;
+  prisma.$transaction.mockImplementation((callback: (tx: any) => unknown) => callback(prisma));
   const access = {
     listAreaFilter: vi.fn().mockResolvedValue(opts?.listAreaFilter ?? null),
     assertCanWrite: vi.fn().mockResolvedValue(undefined),
@@ -162,9 +169,11 @@ describe('ProjectsService - isolamento e PMO', () => {
   it('update: nao persiste companyId/id forjados', async () => {
     const project = { id: 'p1', companyId: 'companyA', indicator: { ownerNodeId: 'areaA' } };
     const { service, prisma } = makeService({ project });
-    await service.update(me, 'p1', { name: 'novo', companyId: 'companyB', id: 'hack' });
+    await service.update(me, 'p1', { name: 'novo', companyId: 'companyB', id: 'hack', company: { connect: { id: 'companyB' } }, progressSnapshots: { deleteMany: {} } });
     const data = prisma.project.update.mock.calls[0][0].data;
     expect(data.companyId).toBeUndefined();
+    expect(data.company).toBeUndefined();
+    expect(data.progressSnapshots).toBeUndefined();
     expect(data.name).toBe('novo');
   });
 
@@ -184,5 +193,57 @@ describe('ProjectsService - isolamento e PMO', () => {
     const { service, prisma } = makeService({ task: null });
     await expect(service.removeTask(me, 't-outra')).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.projectTask.delete).not.toHaveBeenCalled();
+  });
+
+  it('updateTask: grava avanço e medição no mesmo dia em uma transação com bloqueio do projeto', async () => {
+    const { service, prisma } = makeService({
+      task: { id: 't1', projectId: 'p1', project: { indicator: null } },
+      project: { id: 'p1', tasks: [{ progress: 80 }], milestones: [{ done: false }] },
+    });
+    await service.updateTask(me, 't1', { progress: 80, projectId: 'outra', project: { connect: { id: 'outra' } } });
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
+    expect(prisma.$queryRaw).toHaveBeenCalledOnce();
+    expect(prisma.projectTask.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { progress: 80 } });
+    expect(prisma.projectProgressSnapshot.upsert).toHaveBeenCalledWith({
+      where: { projectId_measuredOn: { projectId: 'p1', measuredOn: expect.any(Date) } },
+      create: { projectId: 'p1', measuredOn: expect.any(Date), progress: 40 }, update: { progress: 40 },
+    });
+  });
+
+  it('toggleMilestone: registra a medição após concluir um marco', async () => {
+    const { service, prisma } = makeService({
+      milestone: { id: 'm1', projectId: 'p1', project: { indicator: { ownerNodeId: 'areaA' } } },
+      project: { id: 'p1', tasks: [], milestones: [{ done: true }] },
+    });
+    await service.toggleMilestone(me, 'm1', true);
+    expect(prisma.projectProgressSnapshot.upsert.mock.calls[0][0].update.progress).toBe(100);
+  });
+
+  it('create: inicia o histórico diário do projeto com avanço zero', async () => {
+    const { service, prisma } = makeService();
+    await service.create(me, { name: 'Novo' });
+    expect(prisma.project.create.mock.calls[0][0].data.progressSnapshots.create).toEqual({ measuredOn: expect.any(Date), progress: 0 });
+  });
+
+  it.each([-1, 101, Number.NaN, '50'])('updateTask: rejeita progresso inválido %s antes de gravar', async (progress) => {
+    const { service, prisma } = makeService({ task: { id: 't1', projectId: 'p1', project: { indicator: null } } });
+    await expect(service.updateTask(me, 't1', { progress })).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('updateTask: rejeita dependência de outro projeto sem alterar a tarefa', async () => {
+    const { service, prisma } = makeService({ task: { id: 't1', projectId: 'p1', project: { indicator: null } } });
+    prisma.projectTask.findFirst.mockResolvedValueOnce({ id: 't1', projectId: 'p1', project: { indicator: null } }).mockResolvedValueOnce(null);
+    await expect(service.updateTask(me, 't1', { dependencyId: 'outro-projeto' })).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.projectTask.update).not.toHaveBeenCalled();
+    expect(prisma.projectProgressSnapshot.upsert).not.toHaveBeenCalled();
+  });
+
+  it('updateTask: impede ciclos indiretos no cronograma', async () => {
+    const { service, prisma } = makeService();
+    prisma.projectTask.findFirst.mockResolvedValueOnce({ id: 't1', projectId: 'p1', project: { indicator: null } })
+      .mockResolvedValueOnce({ id: 't2', dependencyId: 't1' }).mockResolvedValueOnce({ id: 't1' });
+    await expect(service.updateTask(me, 't1', { dependencyId: 't2' })).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.projectTask.update).not.toHaveBeenCalled();
   });
 });

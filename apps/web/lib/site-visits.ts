@@ -197,6 +197,8 @@ const DEMO_SUBPAGE_LABEL: Record<string, string> = {
 
 /** "/gestao-premio/espelhos" → "Gestão de Prêmio › Espelhos"; "/indicators/:id" → "Indicadores › detalhe". */
 export function demoPageLabel(path: string | null | undefined): string {
+  if (path?.split(/[?#]/)[0] === '/projects/cronograma') return 'Projetos';
+  if (path?.startsWith('/projects/')) return 'Projetos › detalhe';
   const [area, ...rest] = (path ?? '').split('/').filter(Boolean);
   if (!area) return 'Demonstração';
   const parts = [DEMO_AREA_LABEL[area] ?? area, ...rest.map((s) => DEMO_SUBPAGE_LABEL[s] ?? s.replace(/-/g, ' '))];

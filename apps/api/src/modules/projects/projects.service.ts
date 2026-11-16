@@ -1,10 +1,12 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { listTake } from '../../common/http/list-take';
-import { ProjectStatus } from '@prisma/client';
+import { Prisma, ProjectStatus } from '@prisma/client';
+import { buildProjectCurve, projectExpectedProgress, projectMeasurementDay, projectProgress } from '@g360/shared';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
 import { AuthPayload } from '../auth/auth.types';
+import { withProjectProgressSnapshot } from './project-progress-snapshot';
 
 // Projetos não têm área própria: derivam do indicador vinculado (quando houver).
 // Projetos sem indicador são "gerais" (company-wide) e não restringem por área.
@@ -42,26 +44,19 @@ export class ProjectsService {
     return project;
   }
 
-  private expectedProgress(startsAt?: Date | string | null, endsAt?: Date | string | null, now = new Date()) {
-    if (!startsAt || !endsAt) return null;
-    const start = new Date(startsAt).getTime();
-    const end = new Date(endsAt).getTime();
-    const current = now.getTime();
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
-    if (current <= start) return 0;
-    if (current >= end) return 100;
-    return Math.round(((current - start) / (end - start)) * 100);
+  private async withProgressSnapshot<T>(projectId: string, write: (tx: Prisma.TransactionClient) => Promise<T>) {
+    return withProjectProgressSnapshot(this.prisma, projectId, write);
   }
 
   private enrichProject(p: any) {
     const now = new Date();
-    const progressOverall = this.projectProgress(p as any);
+    const progressOverall = projectProgress(p);
     const milestones = p.milestones ?? [];
     const tasks = p.tasks ?? [];
     const milestonesDone = milestones.filter((m: any) => m.done).length;
     const milestonesOverdue = milestones.filter((m: any) => !m.done && m.dueDate && new Date(m.dueDate) < now).length;
     const tasksOverdue = tasks.filter((t: any) => (t.progress ?? 0) < 100 && t.endDate && new Date(t.endDate) < now).length;
-    const expectedProgress = this.expectedProgress(p.startsAt, p.endsAt, now);
+    const expectedProgress = projectExpectedProgress(p, now);
     const scheduleVariance = expectedProgress === null ? null : progressOverall - expectedProgress;
     const isFinal = FINAL_PROJECT_STATUSES.has(p.status);
     const isPastEnd = Boolean(p.endsAt && new Date(p.endsAt) < now && !isFinal);
@@ -198,24 +193,12 @@ export class ProjectsService {
     };
   }
 
-  private projectProgress(p: { milestones: { done: boolean }[]; tasks?: { progress: number }[] }) {
-    const taskProgress = p.tasks && p.tasks.length > 0
-      ? p.tasks.reduce((acc, t) => acc + (t.progress ?? 0), 0) / p.tasks.length
-      : null;
-    const msProgress = p.milestones.length > 0
-      ? (p.milestones.filter((m) => m.done).length / p.milestones.length) * 100
-      : null;
-    if (taskProgress !== null && msProgress !== null) return Math.round((taskProgress + msProgress) / 2);
-    if (taskProgress !== null) return Math.round(taskProgress);
-    if (msProgress !== null) return Math.round(msProgress);
-    return 0;
-  }
-
   async getById(me: AuthPayload, id: string) {
     const proj = await this.prisma.project.findFirst({
       where: { id, companyId: me.companyId, deletedAt: null },
       include: {
         milestones: { orderBy: { dueDate: 'asc' } },
+        progressSnapshots: { orderBy: { measuredOn: 'asc' } },
         tasks: {
           orderBy: { position: 'asc' },
           include: { dependency: { select: { id: true, name: true } } },
@@ -237,7 +220,7 @@ export class ProjectsService {
         throw new ForbiddenException('Você não tem acesso aos projetos desta área.');
       }
     }
-    return this.enrichProject(proj);
+    return { ...this.enrichProject(proj), curve: buildProjectCurve(proj) };
   }
 
   async create(me: AuthPayload, body: { name: string; description?: string; startsAt?: string; endsAt?: string; responsible?: string; budget?: number; status?: ProjectStatus; indicatorId?: string }) {
@@ -262,6 +245,7 @@ export class ProjectsService {
         budget: body.budget ?? null,
         status: body.status ?? ProjectStatus.PLANNED,
         indicatorId: body.indicatorId || null,
+        progressSnapshots: { create: { measuredOn: projectMeasurementDay(), progress: 0 } },
       },
     });
   }
@@ -269,8 +253,11 @@ export class ProjectsService {
   async update(me: AuthPayload, id: string, patch: any) {
     const project = await this.loadScoped(id, me.companyId);
     await this.assertWriteArea(me, this.areaOf(project), 'edit');
-    const { companyId: _c, id: _i, ...rest } = patch ?? {};
-    const data: any = { ...rest };
+    // Aceita somente campos editáveis; relações e medições não vêm do cliente.
+    const data: any = {};
+    for (const key of ['name', 'description', 'startsAt', 'endsAt', 'responsible', 'budget', 'status', 'indicatorId']) {
+      if (patch?.[key] !== undefined) data[key] = patch[key];
+    }
     if (data.startsAt) data.startsAt = new Date(data.startsAt);
     if (data.endsAt) data.endsAt = new Date(data.endsAt);
     if (data.indicatorId === '') data.indicatorId = null;
@@ -308,9 +295,9 @@ export class ProjectsService {
   async addMilestone(me: AuthPayload, projectId: string, name: string, dueDate: string) {
     const project = await this.loadScoped(projectId, me.companyId);
     await this.assertWriteArea(me, this.areaOf(project), 'edit');
-    return this.prisma.projectMilestone.create({
+    return this.withProgressSnapshot(projectId, (tx) => tx.projectMilestone.create({
       data: { projectId, name, dueDate: new Date(dueDate) },
-    });
+    }));
   }
 
   async toggleMilestone(me: AuthPayload, id: string, done: boolean) {
@@ -320,7 +307,8 @@ export class ProjectsService {
     });
     if (!ms) throw new NotFoundException('Marco não encontrado');
     await this.assertWriteArea(me, ms.project.indicator?.ownerNodeId ?? null, 'edit');
-    return this.prisma.projectMilestone.update({ where: { id }, data: { done } });
+    if (typeof done !== 'boolean') throw new BadRequestException('Informe se o marco foi concluído.');
+    return this.withProgressSnapshot(ms.projectId, (tx) => tx.projectMilestone.update({ where: { id }, data: { done } }));
   }
 
   async addTask(me: AuthPayload, projectId: string, body: {
@@ -332,33 +320,63 @@ export class ProjectsService {
   }) {
     const project = await this.loadScoped(projectId, me.companyId);
     await this.assertWriteArea(me, this.areaOf(project), 'edit');
-    const count = await this.prisma.projectTask.count({ where: { projectId } });
-    return this.prisma.projectTask.create({
-      data: {
-        projectId,
-        name: body.name,
-        startDate: body.startDate ? new Date(body.startDate) : null,
-        endDate: body.endDate ? new Date(body.endDate) : null,
-        responsible: body.responsible ?? null,
-        dependencyId: body.dependencyId ?? null,
-        position: count,
-      },
+    return this.withProgressSnapshot(projectId, async (tx) => {
+      if (body.dependencyId) await this.assertDependency(tx, projectId, body.dependencyId);
+      const count = await tx.projectTask.count({ where: { projectId } });
+      return tx.projectTask.create({
+        data: {
+          projectId,
+          name: body.name,
+          startDate: body.startDate ? new Date(body.startDate) : null,
+          endDate: body.endDate ? new Date(body.endDate) : null,
+          responsible: body.responsible ?? null,
+          dependencyId: body.dependencyId || null,
+          position: count,
+        },
+      });
     });
   }
 
   async updateTask(me: AuthPayload, id: string, patch: any) {
     const task = await this.loadScopedTask(me.companyId, id);
     await this.assertWriteArea(me, task.project.indicator?.ownerNodeId ?? null, 'edit');
-    const { id: _i, projectId: _p, ...data } = patch ?? {};
-    if (data.startDate) data.startDate = new Date(data.startDate);
-    if (data.endDate) data.endDate = new Date(data.endDate);
-    return this.prisma.projectTask.update({ where: { id }, data });
+    const data: Prisma.ProjectTaskUncheckedUpdateInput = {};
+    for (const key of ['name', 'responsible', 'position'] as const) {
+      if (patch?.[key] !== undefined) (data as any)[key] = patch[key];
+    }
+    if (patch?.progress !== undefined) {
+      if (typeof patch.progress !== 'number' || !Number.isFinite(patch.progress) || patch.progress < 0 || patch.progress > 100) {
+        throw new BadRequestException('O progresso deve estar entre 0 e 100.');
+      }
+      data.progress = patch.progress;
+    }
+    for (const key of ['startDate', 'endDate'] as const) {
+      if (patch?.[key] !== undefined) data[key] = patch[key] ? new Date(patch[key]) : null;
+    }
+    if (patch?.dependencyId !== undefined) data.dependencyId = patch.dependencyId || null;
+    return this.withProgressSnapshot(task.projectId, async (tx) => {
+      if (patch?.dependencyId) await this.assertDependency(tx, task.projectId, patch.dependencyId, id);
+      return tx.projectTask.update({ where: { id }, data });
+    });
   }
 
   async removeTask(me: AuthPayload, id: string) {
     const task = await this.loadScopedTask(me.companyId, id);
     await this.assertWriteArea(me, task.project.indicator?.ownerNodeId ?? null, 'edit');
-    return this.prisma.projectTask.delete({ where: { id } });
+    return this.withProgressSnapshot(task.projectId, (tx) => tx.projectTask.delete({ where: { id } }));
+  }
+
+  private async assertDependency(tx: Prisma.TransactionClient, projectId: string, dependencyId: string, taskId?: string) {
+    const dependency = await tx.projectTask.findFirst({ where: { id: dependencyId, projectId } });
+    if (!dependency || dependency.id === taskId) throw new BadRequestException('Escolha uma dependência do mesmo projeto.');
+    // Impede ciclos que tornariam o cronograma impossível de executar.
+    const visited = new Set<string>();
+    let current: typeof dependency | null = dependency;
+    while (current) {
+      if (current.id === taskId || visited.has(current.id)) throw new BadRequestException('A dependência cria um ciclo no cronograma.');
+      visited.add(current.id);
+      current = current.dependencyId ? await tx.projectTask.findFirst({ where: { id: current.dependencyId, projectId } }) : null;
+    }
   }
 
   private async loadScopedTask(companyId: string, id: string) {

@@ -3,10 +3,13 @@
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import type { ProjectCurve as ProjectCurveData } from '@g360/shared';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { AlertTriangle, ArrowLeft, Clock3, Plus, Target, TrendingUp, TrendingDown } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { useAuth } from '@/components/auth/auth-provider';
+import { ProjectCurve } from '@/components/platform/project-curve';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -78,6 +81,7 @@ interface ProjectDetail {
   indicator: LinkedIndicator | null;
   milestones: Milestone[];
   tasks: Task[];
+  curve: ProjectCurveData;
 }
 
 const PMO_LABEL: Record<PmoStatus, string> = {
@@ -97,6 +101,12 @@ const PMO_CLASS: Record<PmoStatus, string> = {
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const { user, hasPermission } = useAuth();
+  const canEdit = !user?.isDemo && hasPermission(['projects:update']);
+  const refreshProject = () => {
+    qc.invalidateQueries({ queryKey: ['project', id] });
+    qc.invalidateQueries({ queryKey: ['projects'] });
+  };
 
   const query = useQuery<ProjectDetail>({
     queryKey: ['project', id],
@@ -126,31 +136,36 @@ export default function ProjectDetailPage() {
     mutationFn: () => api(`/projects/${id}/milestones`, { method: 'POST', json: milestone }),
     onSuccess: () => {
       setMilestone({ name: '', dueDate: '' });
-      qc.invalidateQueries({ queryKey: ['project', id] });
+      refreshProject();
     },
+    onError: (e: Error) => toast.error(e.message || 'Não foi possível adicionar o marco'),
   });
 
   const toggleMilestone = useMutation({
     mutationFn: ({ msId, done }: { msId: string; done: boolean }) =>
       api(`/projects/milestones/${msId}`, { method: 'PATCH', json: { done } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['project', id] }),
+    onSuccess: refreshProject,
+    onError: (e: Error) => toast.error(e.message || 'Não foi possível atualizar o marco'),
   });
 
   const addTask = useMutation({
     mutationFn: () => api(`/projects/${id}/tasks`, { method: 'POST', json: { ...task, dependencyId: task.dependencyId || undefined } }),
     onSuccess: () => {
       setTask({ name: '', startDate: '', endDate: '', responsible: '', dependencyId: '' });
-      qc.invalidateQueries({ queryKey: ['project', id] });
+      refreshProject();
     },
+    onError: (e: Error) => toast.error(e.message || 'Não foi possível adicionar a tarefa'),
   });
 
   const updateTask = useMutation({
     mutationFn: ({ taskId, patch }: { taskId: string; patch: any }) =>
       api(`/projects/tasks/${taskId}`, { method: 'PATCH', json: patch }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['project', id] }),
+    onSuccess: refreshProject,
+    onError: (e: Error) => toast.error(e.message || 'Não foi possível atualizar a tarefa'),
   });
 
   if (query.isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
+  if (query.isError) return <div className="space-y-3"><p role="alert">Não foi possível carregar o projeto: {query.error.message}</p><Button variant="outline" onClick={() => query.refetch()}>Tentar novamente</Button></div>;
   if (!query.data) return null;
   const p = query.data;
   const varianceLabel = p.scheduleVariance === null
@@ -254,7 +269,7 @@ export default function ProjectDetailPage() {
               <NativeSelect
                 value={p.indicatorId ?? ''}
                 onChange={(e) => linkIndicator.mutate(e.target.value)}
-                disabled={linkIndicator.isPending}
+                disabled={!canEdit || linkIndicator.isPending}
               >
                 <option value="">Sem indicador</option>
                 {(indicatorsQuery.data ?? []).map((ind) => (
@@ -278,6 +293,8 @@ export default function ProjectDetailPage() {
         </CardContent>
       </Card>
 
+      <ProjectCurve curve={p.curve} progress={p.progressOverall} expectedProgress={p.expectedProgress} />
+
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Cronograma (Gantt)</CardTitle>
@@ -293,7 +310,7 @@ export default function ProjectDetailPage() {
             <CardTitle>Marcos ({p.milestones.length})</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="grid grid-cols-[1fr,140px,auto] gap-2">
+            <fieldset disabled={!canEdit || addMilestone.isPending} className="grid grid-cols-1 sm:grid-cols-[1fr,140px,auto] gap-2">
               <Input
                 placeholder="Nome do marco"
                 value={milestone.name}
@@ -307,7 +324,7 @@ export default function ProjectDetailPage() {
               <Button onClick={() => addMilestone.mutate()} disabled={!milestone.name || !milestone.dueDate}>
                 <Plus className="h-4 w-4" />
               </Button>
-            </div>
+            </fieldset>
             {p.milestones.map((m) => {
               const late = !m.done && new Date(m.dueDate) < new Date();
               return (
@@ -322,6 +339,7 @@ export default function ProjectDetailPage() {
                   <input
                     type="checkbox"
                     checked={m.done}
+                    disabled={!canEdit || toggleMilestone.isPending}
                     onChange={(e) => toggleMilestone.mutate({ msId: m.id, done: e.target.checked })}
                   />
                   <span className={cn('flex-1', m.done && 'line-through')}>{m.name}</span>
@@ -339,7 +357,7 @@ export default function ProjectDetailPage() {
             <CardTitle>Tarefas ({p.tasks.length})</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+            <fieldset disabled={!canEdit || addTask.isPending} className="grid grid-cols-2 gap-2">
               <Input
                 placeholder="Nome da tarefa"
                 className="col-span-2"
@@ -380,7 +398,7 @@ export default function ProjectDetailPage() {
               >
                 <Plus className="h-4 w-4 mr-2" /> Adicionar tarefa
               </Button>
-            </div>
+            </fieldset>
             <div className="space-y-1.5">
               {p.tasks.map((t) => (
                 <div key={t.id} className="grid grid-cols-[1fr,80px,auto] gap-2 items-center rounded-md border p-2 text-sm">
@@ -392,14 +410,22 @@ export default function ProjectDetailPage() {
                     </div>
                   </div>
                   <Input
+                    key={`${t.id}:${t.progress}`}
                     type="number"
+                    aria-label={`Progresso de ${t.name} (%)`}
+                    disabled={!canEdit || updateTask.isPending}
                     min={0}
                     max={100}
                     defaultValue={t.progress}
                     className="h-8 text-right"
                     onBlur={(e) => {
                       const v = Number(e.target.value);
-                      if (!Number.isFinite(v) || v === t.progress) return;
+                      if (!Number.isFinite(v) || v < 0 || v > 100 || e.target.value === '') {
+                        e.target.value = String(t.progress);
+                        toast.error('Informe um progresso entre 0 e 100.');
+                        return;
+                      }
+                      if (v === t.progress) return;
                       updateTask.mutate({ taskId: t.id, patch: { progress: v } });
                     }}
                   />

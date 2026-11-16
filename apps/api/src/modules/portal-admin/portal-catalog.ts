@@ -141,8 +141,8 @@ export const CATALOG_PAGES: CatalogPage[] = ([
   { code: 'processes.workflow', moduleCode: 'processes', name: 'Processos', title: 'Processos', route: '/processes', menuOrder: 54 },
   { code: 'forms.list', moduleCode: 'forms', name: 'Formulários', title: 'Formulários e Checklists', route: '/forms', menuOrder: 55 },
   { code: 'projects.minutes', moduleCode: 'projects', name: 'Ata da Reunião', title: 'Ata da Reunião Mensal', route: '/projects', menuOrder: 56 },
-  { code: 'projects.list', moduleCode: 'projects', name: 'Cronogramas', title: 'Cronogramas', route: '/projects/cronograma', menuOrder: 56.1 },
-  { code: 'projects.detail', moduleCode: 'projects', name: 'Detalhe do Cronograma', title: 'Cronograma', route: '/projects/[id]', menuOrder: 56.1 },
+  { code: 'projects.list', moduleCode: 'projects', name: 'Projetos', title: 'Projetos e Cronogramas', route: '/projects/cronograma', menuOrder: 56.1 },
+  { code: 'projects.detail', moduleCode: 'projects', name: 'Detalhe do Projeto', title: 'Projeto, Cronograma e Curva S', route: '/projects/[id]', menuOrder: 56.2 },
   { code: 'vision360.impacts', moduleCode: 'vision360', name: 'Impactos', title: 'Central de Impactos', route: '/central-impactos', menuOrder: 57 },
 
   { code: 'food-safety.flow', moduleCode: 'food-safety', name: 'Fluxograma', title: 'Fluxograma', route: '/seguranca-alimentos?tab=flow', menuOrder: 60 },

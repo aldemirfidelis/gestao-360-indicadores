@@ -4,6 +4,7 @@ import { NotificationKind, Prisma, UserRoleEnum, WorkspaceTask } from '@prisma/c
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth/auth.types';
 import { WorkItemAggregationService } from '../my-day/work-item-aggregation.service';
+import { withProjectProgressSnapshot } from '../projects/project-progress-snapshot';
 
 const BOARD_KEY_PREFIX = 'CENTRAL_TRABALHO';
 const ADMIN_ROLES = new Set<UserRoleEnum>([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.COMPANY_ADMIN]);
@@ -806,10 +807,14 @@ export class TasksService {
       return;
     }
     if (task.automationRuleId === 'PROJECT_TASK' && status === 'DONE') {
-      await this.prisma.projectTask.updateMany({
-        where: { id: task.sourceEntityId, project: { companyId: me.companyId } },
-        data: { progress: 100 },
+      const sourceId = task.sourceEntityId;
+      const source = await this.prisma.projectTask.findFirst({
+        where: { id: sourceId, project: { companyId: me.companyId, deletedAt: null } },
+        select: { projectId: true },
       });
+      if (!source) return;
+      await withProjectProgressSnapshot(this.prisma, source.projectId, (tx) =>
+        tx.projectTask.update({ where: { id: sourceId }, data: { progress: 100 } }));
     }
   }
 

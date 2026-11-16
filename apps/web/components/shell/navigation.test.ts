@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   canAccessRoute,
+  isActivePath,
   defaultLandingFor,
   visibleAllNavSections,
   visibleNavSections,
@@ -20,6 +21,7 @@ describe('granular navigation', () => {
       'Indicadores',
       'Desvios',
       'Plano de Ação',
+      'Projetos',
       'Ata da Reunião',
       'Reuniões',
       'Reunião Mensal',
@@ -36,6 +38,22 @@ describe('granular navigation', () => {
     expect(canAccessRoute(user, '/settings')).toBe(false);
     expect(canAccessRoute(user, '/gestao-premio/integracoes')).toBe(false);
     expect(canAccessRoute(user, '/indicators')).toBe(true);
+  });
+  it('separa Projetos da Ata e exige permissão de projetos para o portfólio e detalhe', () => {
+    const viewer = { role: 'VIEWER', permissions: ['projects:view'] };
+    const hrefs = visibleNavSections(viewer).flatMap((section) => section.items.map((item) => item.href));
+    expect(hrefs).toContain('/projects/cronograma');
+    expect(hrefs).toContain('/projects');
+    expect(canAccessRoute(viewer, '/projects/cronograma?status=PLANNED')).toBe(true);
+    expect(canAccessRoute(viewer, '/projects/abc')).toBe(true);
+    const actionsOnly = { role: 'VIEWER', permissions: ['actions:view'] };
+    expect(canAccessRoute(actionsOnly, '/projects')).toBe(true);
+    expect(canAccessRoute(actionsOnly, '/projects/cronograma')).toBe(false);
+    expect(canAccessRoute(actionsOnly, '/projects/abc')).toBe(false);
+    expect(canAccessRoute({ ...viewer, isDemo: true }, '/projects/cronograma')).toBe(true);
+    expect(isActivePath('/projects/abc', '/projects/cronograma')).toBe(true);
+    expect(isActivePath('/projects', '/projects/cronograma')).toBe(false);
+    expect(isActivePath('/projects/abc', '/projects', true)).toBe(false);
   });
   it('protege a identidade visual com as permissões de configurações da empresa', () => {
     const route = '/settings/identidade-visual';

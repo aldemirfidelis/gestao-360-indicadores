@@ -343,7 +343,7 @@ export class WorkItemAggregationService {
       dueAt: task.endDate,
       assignedUserId: me.sub,
       recommendedAction: 'Atualizar o progresso no cronograma',
-      availableActions: [{ key: 'open', label: 'Abrir cronograma', href: `/projects?id=${task.projectId}` }],
+      availableActions: [{ key: 'open', label: 'Abrir projeto', href: `/projects/${task.projectId}` }],
       context: { projectId: task.projectId, projectName: task.project.name, progress: task.progress, startDate: task.startDate },
     }));
   }

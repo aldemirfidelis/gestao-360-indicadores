@@ -37,6 +37,9 @@ describe('visitantes do site', () => {
     expect(sitePageLabel('/solucoes/gestao-de-indicadores')).toBe('Solução: Gestão de indicadores');
     expect(sitePageLabel('/pagina-nova')).toBe('/pagina-nova');
     expect(demoPageLabel('/meu-dia')).toBe('Meu Dia');
+    expect(demoPageLabel('/projects')).toBe('Ata da Reunião');
+    expect(demoPageLabel('/projects/cronograma?status=PLANNED')).toBe('Projetos');
+    expect(demoPageLabel('/projects/:id')).toBe('Projetos › detalhe');
     expect(demoPageLabel('/indicators/:id')).toBe('Indicadores › detalhe');
     expect(demoPageLabel('/gestao-premio/espelhos')).toBe('Gestão de Prêmio › Espelhos');
   });

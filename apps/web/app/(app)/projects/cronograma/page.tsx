@@ -128,8 +128,8 @@ export default function ProjectsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const qc = useQueryClient();
-  const { hasPermission } = useAuth();
-  const canCreate = hasPermission(['projects:create']);
+  const { user, hasPermission } = useAuth();
+  const canCreate = !user?.isDemo && hasPermission(['projects:create']);
   const [open, setOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [milestoneOpen, setMilestoneOpen] = useState(false);
@@ -250,7 +250,7 @@ export default function ProjectsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Projetos e Cronogramas"
-        description="Iniciativas estratégicas, cronograma de auditorias, marcos de conformidade e painel PMO integrado."
+        description="Portfólio de projetos, cronogramas Gantt, curva S de avanço, tarefas, marcos e painel PMO integrado."
         actions={canCreate ? <Button onClick={() => setOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"><Plus className="mr-1.5 h-4 w-4" />Novo projeto</Button> : null}
       />
 

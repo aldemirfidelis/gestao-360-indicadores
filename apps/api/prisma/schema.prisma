@@ -1910,10 +1910,21 @@ model Project {
 
   milestones ProjectMilestone[]
   tasks      ProjectTask[]
+  progressSnapshots ProjectProgressSnapshot[]
   risks      RiskRegister[]     @relation("RiskProject")
 
   @@index([companyId])
   @@index([indicatorId])
+}
+
+model ProjectProgressSnapshot {
+  id         String   @id @default(uuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  measuredOn DateTime @db.Date
+  progress   Float
+
+  @@unique([projectId, measuredOn])
 }
 
 model ProjectMilestone {

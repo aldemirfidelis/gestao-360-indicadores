@@ -20,6 +20,7 @@ import {
   FileText,
   FileWarning,
   Fingerprint,
+  FolderKanban,
   GanttChartSquare,
   Gauge,
   Goal,
@@ -175,6 +176,7 @@ export const navSections: NavSection[] = [
     { href: '/indicators', label: 'Indicadores', description: 'Farol, ranking e histórico', icon: Target, permissions: ['indicators:view'], exact: true },
     { href: '/deviations', label: 'Desvios', description: 'Indicadores fora da meta, causas e tratativas', icon: AlertTriangle, permissions: ['deviations:view'] },
     { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },
+    { href: '/projects/cronograma', label: 'Projetos', description: 'Portfólio, Gantt, curva S, tarefas e marcos', icon: FolderKanban, permissions: ['projects:view'] },
     { href: '/projects', label: 'Ata da Reunião', description: 'Ações da reunião mensal por área, setor e responsável', icon: GanttChartSquare, permissions: ['projects:view', 'actions:view'], exact: true },
     { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: CalendarDays, permissions: ['meetings:view'] },
     { href: '/monthly-results', label: 'Reunião Mensal', description: 'Fechamento de resultados, pauta, ata e acompanhamento semanal', icon: CalendarDays, permissions: ['monthly:view'] },
@@ -442,6 +444,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permissions: string[]; e
 ];
 
 export function findRoutePermissions(pathname: string): string[] | null {
+  if (pathname === '/projects') return ['projects:view', 'actions:view'];
   if (pathname.startsWith('/perfil/')) return ['directory:view'];
   const ordered = [...ROUTE_PERMISSIONS].sort((a, b) => b.prefix.length - a.prefix.length);
   for (const route of ordered) {
@@ -512,6 +515,7 @@ export function canAccess(user: NavUser | null | undefined, permissions?: string
 
 export function isActivePath(pathname: string, href: string, exact = false, currentSearch = '') {
   const [cleanHref, expectedSearch] = href.split('?');
+  if (cleanHref === '/projects/cronograma' && pathname.startsWith('/projects/')) return true;
   if (expectedSearch) {
     if (pathname !== cleanHref) return false;
     const expected = new URLSearchParams(expectedSearch);
