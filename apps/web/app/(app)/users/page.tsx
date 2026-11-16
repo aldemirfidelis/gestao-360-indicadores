@@ -334,13 +334,14 @@ export default function UsersPage() {
             </div>
           ) : null
         }
+        summary={
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <MetricCard title="Usuários" value={formatNumber(users.data?.length)} description="Cadastrados" icon={<UsersRound className="h-4 w-4" />} tone="blue" />
+            <MetricCard title="Ativos" value={formatNumber(active)} description="Com acesso liberado" icon={<UsersRound className="h-4 w-4" />} tone="green" />
+            <MetricCard title="Administradores" value={formatNumber(admins)} description="Perfil administrativo" icon={<KeyRound className="h-4 w-4" />} tone="purple" />
+          </div>
+        }
       />
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <MetricCard title="Usuários" value={formatNumber(users.data?.length)} description="Cadastrados" icon={<UsersRound className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Ativos" value={formatNumber(active)} description="Com acesso liberado" icon={<UsersRound className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Administradores" value={formatNumber(admins)} description="Perfil administrativo" icon={<KeyRound className="h-4 w-4" />} tone="purple" />
-      </div>
 
       <SectionCard title="Equipe" description="Cadastros e acessos da empresa atual." contentClassName="p-0">
         <div className="border-b p-3">

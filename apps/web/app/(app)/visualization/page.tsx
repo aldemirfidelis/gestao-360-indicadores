@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Download, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { exportNodeToPng } from '@/lib/export-image';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -161,17 +162,19 @@ export default function VisualizationPage() {
 
   return (
     <div className="space-y-5">
-      <ProcessDashboard />
-      {/* Painel enxuto: sem título/descrição de escopo — só filtros, cards e mensagem-chave. */}
-      <div className="flex justify-end">
+      <PageHeader
+        eyebrow="Visualização"
+        tone="view"
+        title="Painel Executivo"
+        description="Acompanhe os resultados, as metas e as prioridades da área em uma visão integrada."
+        actions={
         <Button type="button" variant="outline" className="gap-2" onClick={exportPanel} disabled={exporting || indicators.isLoading || !selectedNodeId}>
           <Download className="h-4 w-4" />
           {exporting ? 'Exportando...' : 'Exportar imagem'}
         </Button>
-      </div>
-
-      <Card className="overflow-hidden">
-        <CardContent className="space-y-4 p-4">
+        }
+      >
+        <div className="space-y-4">
           <div className="flex flex-wrap items-end gap-4">
           <div className="min-w-[220px] flex-1 basis-64">
             <Label htmlFor="area-select" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -243,8 +246,10 @@ export default function VisualizationPage() {
             </p>
           </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </PageHeader>
+
+      <ProcessDashboard defaultCollapsed />
 
       <section ref={exportRef} className="grid gap-5 bg-background p-1">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -330,7 +335,7 @@ function ExecutiveIndicatorCard({
   return (
     <Link
       href={href}
-      className="panel panel-hover group relative flex min-h-[178px] min-w-0 flex-col overflow-hidden p-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="panel-hover group relative flex min-h-[178px] min-w-0 flex-col overflow-hidden rounded-2xl border bg-card p-4 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       aria-label={`Abrir detalhe do indicador ${indicator.name}`}
     >
       <div className="flex min-w-0 items-start justify-between gap-3">

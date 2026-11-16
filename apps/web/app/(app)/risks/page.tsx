@@ -301,14 +301,15 @@ export default function RisksPage() {
         title="Riscos"
         description="Registro corporativo de riscos, impacto, probabilidade e planos de mitigação."
         actions={canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Novo risco</Button> : null}
+        summary={
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard title="Riscos abertos" value={formatNumber(summary?.openRisks)} description={`${formatNumber(summary?.totalRisks)} registrados`} icon={<ShieldAlert className="h-4 w-4" />} tone="blue" />
+            <MetricCard title="Críticos" value={formatNumber(summary?.criticalRisks)} description="Score acima de 16" icon={<AlertTriangle className="h-4 w-4" />} tone={(summary?.criticalRisks ?? 0) > 0 ? 'red' : 'green'} />
+            <MetricCard title="Mitigações vencidas" value={formatNumber(summary?.overdueMitigations)} description="Riscos abertos com prazo expirado" icon={<CalendarClock className="h-4 w-4" />} tone={(summary?.overdueMitigations ?? 0) > 0 ? 'yellow' : 'green'} />
+            <MetricCard title="Score médio" value={formatNumber(summary?.avgScore, { maximumFractionDigits: 1 })} description="Probabilidade x impacto" icon={<CheckCircle2 className="h-4 w-4" />} tone="purple" />
+          </div>
+        }
       />
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Riscos abertos" value={formatNumber(summary?.openRisks)} description={`${formatNumber(summary?.totalRisks)} registrados`} icon={<ShieldAlert className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Críticos" value={formatNumber(summary?.criticalRisks)} description="Score acima de 16" icon={<AlertTriangle className="h-4 w-4" />} tone={(summary?.criticalRisks ?? 0) > 0 ? 'red' : 'green'} />
-        <MetricCard title="Mitigações vencidas" value={formatNumber(summary?.overdueMitigations)} description="Riscos abertos com prazo expirado" icon={<CalendarClock className="h-4 w-4" />} tone={(summary?.overdueMitigations ?? 0) > 0 ? 'yellow' : 'green'} />
-        <MetricCard title="Score médio" value={formatNumber(summary?.avgScore, { maximumFractionDigits: 1 })} description="Probabilidade x impacto" icon={<CheckCircle2 className="h-4 w-4" />} tone="purple" />
-      </div>
 
       {/* Matriz de risco (heatmap 5x5): inerente x residual */}
       {summary && (

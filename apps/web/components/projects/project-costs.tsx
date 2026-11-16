@@ -211,10 +211,10 @@ export function ProjectCosts({ project, canEdit, action }: { project: ProjectDet
 
 export function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: string }) {
   return (
-    <div className="rounded-md border p-3">
-      <div className="text-[11px] uppercase text-muted-foreground">{label}</div>
-      <div className={cn('mt-1 text-lg font-semibold tabular-nums', tone)}>{value}</div>
-      {hint && <div className="mt-0.5 text-xs text-muted-foreground">{hint}</div>}
+    <div className="flex min-w-0 flex-col rounded-xl border border-border/70 bg-card/90 p-3.5 shadow-sm">
+      <div className={cn('break-words font-semibold tracking-tight tabular-nums', value.length > 9 ? 'text-base sm:text-lg' : 'text-2xl', tone)}>{value}</div>
+      <div className="mt-3 text-xs font-medium text-muted-foreground">{label}</div>
+      {hint && <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{hint}</div>}
     </div>
   );
 }

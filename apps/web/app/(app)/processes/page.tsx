@@ -379,16 +379,18 @@ export default function ProcessesPage() {
         title="Processos"
         description="Mapeie processos com SIPOC, BPMN e RACI, conectando responsáveis, indicadores e projetos."
         actions={canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Novo processo</Button> : null}
+        summary={
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <MetricCard title="Processos" value={formatNumber(summary?.total)} description="Mapeamentos registrados" icon={<Network className="h-4 w-4" />} tone="blue" />
+            <MetricCard title="Ativos" value={formatNumber(summary?.active)} description="Processos vigentes" icon={<ListChecks className="h-4 w-4" />} tone="green" />
+            <MetricCard title="Em revisão" value={formatNumber(summary?.underReview)} description="Ajustes pendentes" icon={<Edit className="h-4 w-4" />} tone="yellow" />
+            <MetricCard title="Sem etapas" value={formatNumber(summary?.withoutSteps)} description={`${formatNumber(summary?.mappedSteps)} etapas mapeadas`} icon={<Filter className="h-4 w-4" />} tone="red" />
+          </div>
+        }
       />
 
       <ProcessDashboard />
       <ProcessPmoPanel />
-      <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard title="Processos" value={formatNumber(summary?.total)} description="Mapeamentos registrados" icon={<Network className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Ativos" value={formatNumber(summary?.active)} description="Processos vigentes" icon={<ListChecks className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Em revisão" value={formatNumber(summary?.underReview)} description="Ajustes pendentes" icon={<Edit className="h-4 w-4" />} tone="yellow" />
-        <MetricCard title="Sem etapas" value={formatNumber(summary?.withoutSteps)} description={`${formatNumber(summary?.mappedSteps)} etapas mapeadas`} icon={<Filter className="h-4 w-4" />} tone="red" />
-      </div>
 
       <Card>
         <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-end">

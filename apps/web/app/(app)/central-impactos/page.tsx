@@ -100,39 +100,41 @@ export default function CentralImpactosPage() {
             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Atualizar
           </Button>
         }
+        summary={
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <MetricCard
+              title="Total Pendentes"
+              value={stats.total}
+              description="Aguardando adequação"
+              icon={<Clock className="h-4 w-4" />}
+              tone="blue"
+            />
+            <MetricCard
+              title="Impactos Críticos"
+              value={stats.critical}
+              description="Risco alto ou crítico"
+              icon={<ShieldAlert className="h-4 w-4" />}
+              tone={stats.critical > 0 ? 'red' : 'green'}
+            />
+            <MetricCard
+              title="Tarefas Atrasadas"
+              value={stats.expired}
+              description="Prazo de adequação vencido"
+              icon={<AlertTriangle className="h-4 w-4" />}
+              tone={stats.expired > 0 ? 'red' : 'green'}
+            />
+            <MetricCard
+              title="Em Prazo"
+              value={stats.pendingReview}
+              description="Adequação em andamento"
+              icon={<CheckCircle2 className="h-4 w-4" />}
+              tone="green"
+            />
+          </div>
+        }
       />
 
       {/* Cards de Métricas */}
-      <div className="grid gap-3 md:grid-cols-4">
-        <MetricCard
-          title="Total Pendentes"
-          value={stats.total}
-          description="Aguardando adequação"
-          icon={<Clock className="h-4 w-4" />}
-          tone="blue"
-        />
-        <MetricCard
-          title="Impactos Críticos"
-          value={stats.critical}
-          description="Risco alto ou crítico"
-          icon={<ShieldAlert className="h-4 w-4" />}
-          tone={stats.critical > 0 ? 'red' : 'green'}
-        />
-        <MetricCard
-          title="Tarefas Atrasadas"
-          value={stats.expired}
-          description="Prazo de adequação vencido"
-          icon={<AlertTriangle className="h-4 w-4" />}
-          tone={stats.expired > 0 ? 'red' : 'green'}
-        />
-        <MetricCard
-          title="Em Prazo"
-          value={stats.pendingReview}
-          description="Adequação em andamento"
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          tone="green"
-        />
-      </div>
 
       {/* Bloco de Filtros */}
       <Card>

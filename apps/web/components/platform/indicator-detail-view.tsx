@@ -691,6 +691,7 @@ export function IndicatorDetailView({
       <div ref={decisionExportRef} className="mb-6 grid grid-cols-1 gap-5 bg-background p-1 xl:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)]">
         <Card className="overflow-hidden">
           <CardHeader className="pb-2">
+            <CardTitle className="break-words text-base leading-snug sm:text-lg">{ind.name}</CardTitle>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="inline-flex rounded-md border bg-card/60 p-0.5">
                 {(['monthly', 'cumulative', 'weekly', 'daily'] as const).map((mode) => (

@@ -129,20 +129,21 @@ export default function OrcamentoPessoalPage() {
         title="Orçamento de Pessoal"
         description="Planejamento de headcount, folha, benefícios e encargos por período, área e centro de custo — com comparação ao realizado."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Orçamento de Pessoal' }]}
+        summary={
+          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <MetricCard title="Headcount planejado" value={formatNumber(totals.headcount)} tone="blue" />
+            <MetricCard title="Folha planejada" value={formatMoney(totals.payroll)} description="Sem benefícios/encargos" tone="purple" />
+            <MetricCard title="Custo total planejado" value={formatMoney(totalCost)} description="Folha + benefícios + encargos" tone="green" />
+            <MetricCard
+              title="Planejado x realizado"
+              value={masked ? 'Restrito' : formatMoney(variation)}
+              description={masked ? 'Sem permissão' : `Realizado ${formatMoney(realized)} de ${formatMoney(planned)}`}
+              tone={variation != null && variation < 0 ? 'red' : 'yellow'}
+            />
+          </div>
+        }
       />
       <CompensationModuleNav />
-
-      <div className="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <MetricCard title="Headcount planejado" value={formatNumber(totals.headcount)} tone="blue" />
-        <MetricCard title="Folha planejada" value={formatMoney(totals.payroll)} description="Sem benefícios/encargos" tone="purple" />
-        <MetricCard title="Custo total planejado" value={formatMoney(totalCost)} description="Folha + benefícios + encargos" tone="green" />
-        <MetricCard
-          title="Planejado x realizado"
-          value={masked ? 'Restrito' : formatMoney(variation)}
-          description={masked ? 'Sem permissão' : `Realizado ${formatMoney(realized)} de ${formatMoney(planned)}`}
-          tone={variation != null && variation < 0 ? 'red' : 'yellow'}
-        />
-      </div>
 
       <FilterBar
         actions={

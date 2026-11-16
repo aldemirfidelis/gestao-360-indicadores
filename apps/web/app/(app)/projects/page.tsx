@@ -191,14 +191,15 @@ export default function MeetingMinutesPage() {
             </Link>
           </Button>
         }
+        summary={
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard compact title="Ações da ata" value={formatNumber(summary?.total ?? 0)} description={`${formatNumber(summary?.closed ?? 0)} encerradas`} icon={<ClipboardList className="h-4 w-4" />} tone="blue" />
+            <MetricCard compact title="Em andamento" value={formatNumber(summary?.inProgress ?? 0)} description={`${formatNumber(summary?.notStarted ?? 0)} não iniciadas`} icon={<Loader2 className="h-4 w-4" />} tone="purple" />
+            <MetricCard compact title="Atrasadas" value={formatNumber(summary?.overdue ?? 0)} description="Prazo vencido e ainda abertas" icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
+            <MetricCard compact title="Avanço médio" value={`${formatNumber(summary?.avgProgress ?? 0)}%`} description="Das ações ainda abertas" icon={<TrendingUp className="h-4 w-4" />} tone="green" />
+          </div>
+        }
       />
-
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard compact title="Ações da ata" value={formatNumber(summary?.total ?? 0)} description={`${formatNumber(summary?.closed ?? 0)} encerradas`} icon={<ClipboardList className="h-4 w-4" />} tone="blue" />
-        <MetricCard compact title="Em andamento" value={formatNumber(summary?.inProgress ?? 0)} description={`${formatNumber(summary?.notStarted ?? 0)} não iniciadas`} icon={<Loader2 className="h-4 w-4" />} tone="purple" />
-        <MetricCard compact title="Atrasadas" value={formatNumber(summary?.overdue ?? 0)} description="Prazo vencido e ainda abertas" icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
-        <MetricCard compact title="Avanço médio" value={`${formatNumber(summary?.avgProgress ?? 0)}%`} description="Das ações ainda abertas" icon={<TrendingUp className="h-4 w-4" />} tone="green" />
-      </div>
 
       {/* Os dois tipos de ação que a reunião trata de forma diferente. Clicar
           filtra a ata inteira pelo tipo. */}

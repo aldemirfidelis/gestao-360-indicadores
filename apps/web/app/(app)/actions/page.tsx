@@ -224,14 +224,15 @@ export default function ActionsPage() {
             )}
           </>
         }
+        summary={
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard title="Total de planos" value={formatNumber(actions.length)} description={`${formatNumber(actions.length - done)} em aberto`} icon={<ClipboardList className="h-4 w-4" />} tone="blue" />
+            <MetricCard title="Atrasados" value={formatNumber(overdue)} description={`${formatNumber(doneLate)} concluídos fora do prazo`} icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
+            <MetricCard title="Sem responsável" value={formatNumber(withoutOwner)} description={`${formatNumber(critical)} críticos`} icon={<UserRound className="h-4 w-4" />} tone="yellow" />
+            <MetricCard title="Eficácia pendente" value={formatNumber(pendingEffectiveness)} description="Aguardando verificação" icon={<ShieldCheck className="h-4 w-4" />} tone="green" />
+          </div>
+        }
       />
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Total de planos" value={formatNumber(actions.length)} description={`${formatNumber(actions.length - done)} em aberto`} icon={<ClipboardList className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Atrasados" value={formatNumber(overdue)} description={`${formatNumber(doneLate)} concluídos fora do prazo`} icon={<AlertTriangle className="h-4 w-4" />} tone="red" />
-        <MetricCard title="Sem responsável" value={formatNumber(withoutOwner)} description={`${formatNumber(critical)} críticos`} icon={<UserRound className="h-4 w-4" />} tone="yellow" />
-        <MetricCard title="Eficácia pendente" value={formatNumber(pendingEffectiveness)} description="Aguardando verificação" icon={<ShieldCheck className="h-4 w-4" />} tone="green" />
-      </div>
 
       <SectionCard title="Filtros avançados" description="Busque por origem, status, indicador, área ou eficácia." className="mb-6">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-6">

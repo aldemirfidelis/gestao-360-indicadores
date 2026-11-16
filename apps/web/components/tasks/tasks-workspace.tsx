@@ -17,10 +17,10 @@ import {
   Search,
   Settings2,
   SlidersHorizontal,
-  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/auth/auth-provider';
+import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -214,16 +214,13 @@ export function TasksWorkspace() {
 
   return (
     <div className="space-y-4">
-      <section className={cn('relative overflow-hidden rounded-2xl border bg-gradient-to-br from-card via-card to-primary/[0.045]', compactHeader ? 'p-4' : 'p-5 lg:p-6')}>
-        <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-3xl">
-            <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.16em] text-primary">
-              <Sparkles className="h-3.5 w-3.5" />Tarefas — Central de Trabalho
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Central de Trabalho da Equipe</h1>
-            {!compactHeader && <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Todas as tarefas manuais e automáticas da empresa organizadas em um quadro visual, simples e interativo.</p>}
-          </div>
+      <PageHeader
+        eyebrow="Tarefas — Central de Trabalho"
+        title="Central de Trabalho da Equipe"
+        description={compactHeader ? undefined : 'Todas as tarefas manuais e automáticas da empresa organizadas em um quadro visual, simples e interativo.'}
+        compact={compactHeader}
+        summary={data && showSummary ? <TaskSummaryCards summary={data.summary} /> : null}
+        actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setFiltersOpen((open) => !open)}>
               <SlidersHorizontal className="mr-2 h-4 w-4" />Filtros
@@ -241,8 +238,9 @@ export function TasksWorkspace() {
               {user?.avatarUrl ? <Image src={user.avatarUrl} alt={user.name} width={36} height={36} unoptimized className="h-full w-full object-cover" /> : initials(user?.name)}
             </span>
           </div>
-        </div>
-        <div className="relative mt-5 flex flex-col gap-3 lg:flex-row lg:items-center">
+        }
+      >
+        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center">
           <label className="relative block min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -274,11 +272,9 @@ export function TasksWorkspace() {
             <RefreshCw className={cn('h-4 w-4', refresh.isPending && 'animate-spin')} />
           </Button>
         </div>
-      </section>
+      </PageHeader>
 
       <TaskFilters open={filtersOpen} filters={filters} context={context.data} onChange={setFilters} onClose={() => setFiltersOpen(false)} />
-
-      {data && showSummary && <TaskSummaryCards summary={data.summary} />}
 
       {board.isLoading && (
         <div className="grid min-h-[520px] place-items-center rounded-2xl border bg-card">

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import type { ProjectCurve as ProjectCurveData } from '@g360/shared';
-import { CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, ComposedChart, Legend, Line, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Download, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,9 @@ export function ProjectCurve({
 }) {
   const delta = expectedProgress === null ? null : progress - expectedProgress;
   const data = curve.points.map((point) => ({ ...point, time: Date.parse(point.date) }));
+  const recordedPoints = data.filter((point) => point.actual !== null && point.date >= (curve.historyStartsOn ?? curve.measuredOn));
+  const latestActual = recordedPoints[recordedPoints.length - 1];
+  const actualColor = delta !== null && delta < 0 ? '#ef4444' : '#10b981';
   return (
     <Card className="mb-6" id={id}>
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
@@ -52,16 +55,34 @@ export function ProjectCurve({
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 20, right: 18, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
-              <XAxis dataKey="time" type="number" domain={['dataMin', 'dataMax']} tickFormatter={dateLabel} tick={{ fontSize: 11 }} minTickGap={30} />
-              <YAxis domain={[0, 100]} unit="%" width={45} tick={{ fontSize: 11 }} />
+              <XAxis dataKey="time" type="number" domain={['dataMin', 'dataMax']} padding={{ left: 20, right: 48 }} tickFormatter={dateLabel} tick={{ fontSize: 11 }} minTickGap={30} />
+              <YAxis domain={[0, 100]} padding={{ top: 10, bottom: 10 }} unit="%" width={45} tick={{ fontSize: 11 }} />
               <Tooltip labelFormatter={(value) => dateLabel(value as number)} formatter={(value: number, name: string) => [`${formatNumber(value)}%`, name]} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <ReferenceLine x={Date.parse(curve.measuredOn)} stroke="#64748b" strokeDasharray="3 3" label={{ value: 'Hoje', position: 'insideTopRight', fontSize: 11 }} />
               <Line dataKey="planned" name="Planejado" type="linear" stroke="#1e3a8a" strokeDasharray="6 4" strokeWidth={2} dot={false} isAnimationActive={false} />
-              <Line dataKey="actual" name="Realizado" type="stepAfter" stroke={delta !== null && delta < 0 ? '#ef4444' : '#10b981'} strokeWidth={2.5} dot={{ r: 3 }} connectNulls={false} isAnimationActive={false} />
+              <Line dataKey="actual" name="Realizado" type="stepAfter" stroke={actualColor} strokeWidth={2.5} dot={{ r: 3 }} connectNulls={false} isAnimationActive={false} />
+              {latestActual && (
+                <ReferenceDot
+                  x={latestActual.time}
+                  y={latestActual.actual!}
+                  r={6}
+                  fill={actualColor}
+                  stroke="hsl(var(--card))"
+                  strokeWidth={2}
+                  ifOverflow="visible"
+                  label={{ value: `Realizado: ${formatNumber(latestActual.actual)}%`, position: delta !== null && delta < 0 && (latestActual.actual ?? 0) > 10 ? 'bottom' : 'top', offset: 10, fill: actualColor, fontSize: 11 }}
+                />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
+        {recordedPoints.length === 1 && latestActual && (
+          <p className="rounded-lg border border-border/70 bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+            Primeira medição do Realizado: {formatNumber(latestActual.actual)}% em {dateLabel(latestActual.time)}, destacada no gráfico.
+            {' '}As medições dos próximos dias formarão a linha de evolução do Realizado.
+          </p>
+        )}
         {note ?? <p className="text-xs text-muted-foreground">
           Planejado pelos prazos das tarefas e dos marcos; quando ambos existem, cada grupo representa metade do avanço.
           Sem tarefas nem marcos, o planejado segue as datas do projeto.

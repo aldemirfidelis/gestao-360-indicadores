@@ -487,15 +487,16 @@ export default function OrganogramaPage() {
         title="Estrutura e Quadro"
         description="Hierarquia de áreas, cargos, posições, vagas e colaboradores dentro do módulo de Cargos e Salários."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Estrutura e Quadro' }]}
+        summary={
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard title="Total" value={formatNumber(stats.total)} description="Colaboradores e vagas" icon={<Users className="h-4 w-4" />} tone="blue" />
+            <MetricCard title="Ativos" value={formatNumber(stats.active)} description="Alocados no quadro" icon={<User className="h-4 w-4" />} tone="green" />
+            <MetricCard title="Dentro do orçamento" value={formatNumber(stats.budgeted)} description="Previstos no plano" icon={<Briefcase className="h-4 w-4" />} tone="purple" />
+            <MetricCard title="Vagas em aberto" value={formatNumber(stats.vacant)} description="Posições disponíveis" icon={<Building2 className="h-4 w-4" />} tone="yellow" />
+          </div>
+        }
       />
       <CompensationModuleNav />
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Total" value={formatNumber(stats.total)} description="Colaboradores e vagas" icon={<Users className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Ativos" value={formatNumber(stats.active)} description="Alocados no quadro" icon={<User className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Dentro do orçamento" value={formatNumber(stats.budgeted)} description="Previstos no plano" icon={<Briefcase className="h-4 w-4" />} tone="purple" />
-        <MetricCard title="Vagas em aberto" value={formatNumber(stats.vacant)} description="Posições disponíveis" icon={<Building2 className="h-4 w-4" />} tone="yellow" />
-      </div>
 
       <SectionCard
         title="Estrutura de pessoas"

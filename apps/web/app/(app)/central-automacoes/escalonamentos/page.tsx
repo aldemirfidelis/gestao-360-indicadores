@@ -118,39 +118,41 @@ export default function SlaMonitoringPage() {
         eyebrow="Central de Automações"
         title="Prazos & SLAs de Processo"
         description="Monitore prazos de resposta corporativos, o cumprimento de SLAs e os níveis de escalonamento ativos para desvios e planos de ação."
+        summary={
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 shrink-0">
+            <MetricCard
+              title="Taxa de SLA no Prazo"
+              value={metrics?.onTimeRate != null ? `${metrics.onTimeRate}%` : '—'}
+              description="Tarefas de fluxo concluídas dentro do prazo"
+              icon={<TrendingUp className="h-4 w-4" />}
+              tone="green"
+            />
+            <MetricCard
+              title="Alarmes de Atraso Ativos"
+              value={metrics?.activeAlarms ?? 0}
+              description="Tarefas com prazo estourado aguardando ação"
+              icon={<AlertTriangle className="h-4 w-4" />}
+              tone="yellow"
+            />
+            <MetricCard
+              title="Escalonamentos Nível 2+"
+              value={metrics?.level2plus ?? 0}
+              description="Casos graves com notificação à gerência"
+              icon={<ShieldAlert className="h-4 w-4" />}
+              tone="red"
+            />
+            <MetricCard
+              title="Processos Monitorados"
+              value={metrics?.policiesCount ?? policies.filter((p) => p.active).length}
+              description="Políticas de prazo ativas"
+              icon={<Clock className="h-4 w-4" />}
+              tone="blue"
+            />
+          </div>
+        }
       />
 
       {/* SLA Metric Cards (dados reais) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 shrink-0">
-        <MetricCard
-          title="Taxa de SLA no Prazo"
-          value={metrics?.onTimeRate != null ? `${metrics.onTimeRate}%` : '—'}
-          description="Tarefas de fluxo concluídas dentro do prazo"
-          icon={<TrendingUp className="h-4 w-4" />}
-          tone="green"
-        />
-        <MetricCard
-          title="Alarmes de Atraso Ativos"
-          value={metrics?.activeAlarms ?? 0}
-          description="Tarefas com prazo estourado aguardando ação"
-          icon={<AlertTriangle className="h-4 w-4" />}
-          tone="yellow"
-        />
-        <MetricCard
-          title="Escalonamentos Nível 2+"
-          value={metrics?.level2plus ?? 0}
-          description="Casos graves com notificação à gerência"
-          icon={<ShieldAlert className="h-4 w-4" />}
-          tone="red"
-        />
-        <MetricCard
-          title="Processos Monitorados"
-          value={metrics?.policiesCount ?? policies.filter((p) => p.active).length}
-          description="Políticas de prazo ativas"
-          icon={<Clock className="h-4 w-4" />}
-          tone="blue"
-        />
-      </div>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr,380px] gap-6 min-h-0 w-full overflow-hidden">
         {/* Left Side: SLA Policies & Incidents */}

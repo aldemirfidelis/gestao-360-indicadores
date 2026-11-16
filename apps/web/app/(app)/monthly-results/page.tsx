@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { PageHeader } from '@/components/shell/page-header';
+import { MetricCard } from '@/components/platform/metric-card';
 import { useAuth } from '@/components/auth/auth-provider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,7 @@ export default function MonthlyResultsHome() {
       <PageHeader
         title="Reunião Mensal de Resultados"
         description="Fechamento corporativo: meta, desvio, causa, ação, decisão e acompanhamento — tudo conectado aos dados do sistema."
+        summary={<MetricGrid dashboard={dashboard} loading={dashboardQuery.isLoading} />}
         actions={
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1">
@@ -117,8 +119,6 @@ export default function MonthlyResultsHome() {
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">{(dashboardQuery.error as Error).message}</div>
       )}
 
-      <MetricGrid dashboard={dashboard} loading={dashboardQuery.isLoading} />
-
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_0.7fr]">
         <FarolPanel dashboard={dashboard} />
         <MeetingsPanel
@@ -149,29 +149,16 @@ function MetricGrid({ dashboard, loading }: { dashboard?: MonthlyDashboard; load
   const m = dashboard?.metrics;
   const items = [
     { title: 'Reuniões no mês', value: m?.meetingsInPeriod ?? 0, detail: `${m?.areasReady ?? 0} área(s) prontas`, icon: CalendarDays, tone: 'blue' },
-    { title: 'Áreas participantes', value: m?.participantAreas ?? 0, detail: `${m?.areasWithoutUpdate ?? 0} sem atualização`, icon: Network, tone: 'slate' },
+    { title: 'Áreas participantes', value: m?.participantAreas ?? 0, detail: `${m?.areasWithoutUpdate ?? 0} sem atualização`, icon: Network, tone: 'neutral' },
     { title: 'Dentro da meta', value: m?.indicatorsGreen ?? 0, detail: 'Verde ou azul', icon: CheckCircle2, tone: 'green' },
     { title: 'Fora da meta', value: m?.indicatorsRed ?? 0, detail: `${m?.indicatorsYellow ?? 0} em atenção`, icon: AlertTriangle, tone: 'red' },
-    { title: 'Ações atrasadas', value: m?.overdueActions ?? 0, detail: `${m?.doneActions ?? 0} concluídas`, icon: Clock3, tone: 'amber' },
-    { title: 'Decisões pendentes', value: m?.pendingDecisions ?? 0, detail: `${m?.openEscalations ?? 0} escalonamentos`, icon: MessageSquareText, tone: 'violet' },
-  ];
+    { title: 'Ações atrasadas', value: m?.overdueActions ?? 0, detail: `${m?.doneActions ?? 0} concluídas`, icon: Clock3, tone: 'yellow' },
+    { title: 'Decisões pendentes', value: m?.pendingDecisions ?? 0, detail: `${m?.openEscalations ?? 0} escalonamentos`, icon: MessageSquareText, tone: 'purple' },
+  ] as const;
   return (
     <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
       {items.map((item) => (
-        <Card key={item.title} className="min-w-0">
-          <CardContent className="p-2.5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{item.title}</p>
-                <p className="mt-1.5 truncate text-lg font-semibold leading-none tabular-nums">{loading ? '-' : item.value}</p>
-              </div>
-              <div className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-md', toneClass(item.tone))}>
-                <item.icon className="h-3.5 w-3.5" />
-              </div>
-            </div>
-            <p className="mt-1.5 truncate text-[10px] text-muted-foreground">{loading ? 'Carregando...' : item.detail}</p>
-          </CardContent>
-        </Card>
+        <MetricCard key={item.title} compact title={item.title} value={loading ? '-' : item.value} description={loading ? 'Carregando...' : item.detail} icon={<item.icon className="h-4 w-4" />} tone={item.tone} />
       ))}
     </div>
   );
@@ -503,17 +490,5 @@ const STATUS_LABEL: Record<string, string> = {
   REOPENED: 'Reaberta',
   CANCELLED: 'Cancelada',
 };
-
-function toneClass(tone: string) {
-  const tones: Record<string, string> = {
-    green: 'bg-emerald-50 text-emerald-700',
-    red: 'bg-red-50 text-red-700',
-    amber: 'bg-amber-50 text-amber-700',
-    blue: 'bg-blue-50 text-blue-700',
-    violet: 'bg-violet-50 text-violet-700',
-    slate: 'bg-slate-100 text-slate-700',
-  };
-  return tones[tone] ?? tones.slate;
-}
 
 export type { Light };

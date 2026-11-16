@@ -20,6 +20,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { NativeSelect } from '@/components/ui/select';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useVision360 } from '@/components/ui/vision360-context';
+import { PageHeader } from '@/components/shell/page-header';
+import { MetricCard } from '@/components/platform/metric-card';
 import { api } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 
@@ -356,88 +358,44 @@ export default function MeuDiaPage() {
 
   return (
     <div className="space-y-5">
-      {/* Cabeçalho */}
-      {tab === 'overview' ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div>
-            <div className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900">
-              {greeting()}, {user?.name?.split(' ')[0] ?? 'Usuário'}! 👋
-            </div>
-            <p className="mt-1 text-sm text-slate-500">
-              Vamos transformar planos em resultados extraordinários hoje.
-            </p>
+      <PageHeader
+        eyebrow="Meu Dia"
+        title={greeting() + ', ' + (user?.name?.split(' ')[0] ?? 'bem-vindo') + '!'}
+        description={tab === 'overview'
+          ? 'Vamos transformar planos em resultados extraordinários hoje.'
+          : (s?.pending ?? 0) > 0
+            ? 'Você possui ' + formatQuantity(s?.pending ?? 0, 'item', 'itens') + ' para tratar — ' + formatQuantity(s?.overdue ?? 0, 'item vencido', 'itens vencidos') + '.'
+            : 'Tudo em dia! Nenhuma pendência atribuída a você.'}
+        actions={tab === 'overview' ? (
+          <div className="flex items-center gap-2 rounded-xl border bg-card/80 px-3 py-2 text-xs font-medium text-muted-foreground">
+            <CalendarDays className="h-4 w-4" />
+            <span>{formatTodayDate()}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 border bg-card px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm text-slate-700">
-              <CalendarDays className="h-4 w-4 text-slate-400" />
-              <span>{formatTodayDate()}</span>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 text-xl font-semibold">
-              <Inbox className="h-5 w-5 text-primary" />
-              {greeting()}, {user?.name?.split(' ')[0] ?? 'bem-vindo'}.
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {(s?.pending ?? 0) > 0
-                ? `Você possui ${formatQuantity(s?.pending ?? 0, 'item', 'itens')} para tratar — ${formatQuantity(s?.overdue ?? 0, 'item vencido', 'itens vencidos')}.`
-                : 'Tudo em dia! Nenhuma pendência atribuída a você.'}
-              {' · '}{formatDate(new Date().toISOString())}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+        ) : (
+          <>
+            <div className="relative min-w-0 flex-1 sm:flex-none">
               <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input className="h-9 w-56 pl-8" placeholder="Buscar nos meus itens..." value={q} onChange={(e) => setQ(e.target.value)} />
+              <Input className="h-9 w-full pl-8 sm:w-56" placeholder="Buscar nos meus itens..." value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
-            {isManager && (
-              <Button variant="outline" size="sm" onClick={() => router.push('/meu-dia/equipe')}>
-                <Users className="mr-2 h-4 w-4" />Equipe
-              </Button>
-            )}
-            <Button variant="outline" size="sm" disabled={user?.isDemo} onClick={() => setDelegationsOpen(true)}>
-              <UserPlus className="mr-2 h-4 w-4" />Delegações
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={user?.isDemo || refresh.isPending}>
-              <RefreshCw className={cn('mr-2 h-4 w-4', refresh.isPending && 'animate-spin')} />Atualizar
-            </Button>
+            {isManager && <Button variant="outline" size="sm" onClick={() => router.push('/meu-dia/equipe')}><Users className="mr-2 h-4 w-4" />Equipe</Button>}
+            <Button variant="outline" size="sm" disabled={user?.isDemo} onClick={() => setDelegationsOpen(true)}><UserPlus className="mr-2 h-4 w-4" />Delegações</Button>
+            <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={user?.isDemo || refresh.isPending}><RefreshCw className={cn('mr-2 h-4 w-4', refresh.isPending && 'animate-spin')} />Atualizar</Button>
+          </>
+        )}
+        summary={
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+            {cards.filter((c) => !hiddenCards.includes(c.key)).map((c) => {
+              const Icon = CARD_META[c.key]?.icon ?? CheckSquare;
+              const tone = c.key === 'overdue' ? 'red' : c.key === 'today' ? 'yellow' : c.key === 'meetingsToday' ? 'green' : c.key === 'indicators' ? 'purple' : 'blue';
+              return (
+                <button key={c.key} type="button" onClick={() => pickCard(c.key as any)} className="min-w-0 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                  <MetricCard compact title={c.label} value={c.value} description={c.value > 0 ? 'Toque para abrir' : 'Tudo em dia'} tone={tone} icon={<Icon className="h-4 w-4" />} className="transition-colors hover:border-primary/25" />
+                </button>
+              );
+            })}
           </div>
-        </div>
-      )}
-
-      {/* Resumo */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
-        {cards.filter((c) => !hiddenCards.includes(c.key)).map((c) => {
-          const meta = CARD_META[c.key] ?? { icon: CheckSquare, iconColor: 'text-slate-500 bg-slate-50' };
-          const IconComp = meta.icon;
-          return (
-            <button
-              key={c.key}
-              type="button"
-              onClick={() => pickCard(c.key as any)}
-              className="rounded-xl border border-border bg-card p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:border-primary/20 transition-all flex flex-col min-h-[120px]"
-            >
-              <div className="flex items-start justify-between w-full gap-1.5">
-                <div className={cn('p-1.5 rounded-lg shrink-0', meta.iconColor)}>
-                  <IconComp className="h-4 w-4" />
-                </div>
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right leading-tight">{c.label}</span>
-              </div>
-
-              <div className="mt-2 text-2xl font-bold text-slate-800 leading-none">{c.value}</div>
-
-              <div className="mt-auto w-full border-t border-slate-50 pt-2">
-                <span className={cn('text-[10px] font-semibold', c.value > 0 ? 'text-slate-500' : 'text-emerald-600')}>
-                  {c.value > 0 ? 'Toque para abrir' : 'Tudo em dia'}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+        }
+      />
 
       {/* Abas */}
       <div className="flex flex-wrap gap-1 border-b">

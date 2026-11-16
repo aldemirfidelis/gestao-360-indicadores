@@ -65,7 +65,7 @@ export function ProcessPmoPanel() {
   const pending = totals.tasksOverdue + totals.milestonesOverdue;
 
   return (
-    <section className="space-y-4 rounded-lg border bg-card p-4">
+    <section className="space-y-4 rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card to-primary/[0.045] p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="flex items-center gap-2 font-semibold"><FolderKanban className="h-4 w-4" /> Melhoria de processos (PMO)</h2>

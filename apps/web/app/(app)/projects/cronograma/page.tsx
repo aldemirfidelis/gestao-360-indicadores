@@ -161,17 +161,17 @@ export default function ProjectsPage() {
         title="Projetos e Cronogramas"
         description="Portfólio de projetos com cronograma, curva S, custos, riscos, equipe e status report."
         actions={canCreate ? <Button onClick={() => setOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"><Plus className="mr-1.5 h-4 w-4" />Novo projeto</Button> : null}
+        summary={
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <KpiCard title="Projetos Ativos" value={formatNumber(pmo?.activeProjects)} change={`${formatNumber(pmo?.totalProjects)} no portfólio`} color="sky" icon={FolderKanban} />
+            <KpiCard title="Progresso Médio" value={`${formatNumber(pmo?.avgProgress, { maximumFractionDigits: 0 })}%`} change={`${formatNumber(pmo?.behindSchedule)} abaixo do plano`} color="amber" icon={Clock3} />
+            <KpiCard title="Marcos Concluídos" value={`${formatNumber(pmo?.milestonesDone)}/${formatNumber(pmo?.milestonesTotal)}`} change={`${formatNumber(pmo?.milestonesOverdue)} vencidos`} color="emerald" icon={Flag} />
+            <KpiCard title="Tarefas Vencidas" value={formatNumber(pmo?.tasksOverdue)} change={`${formatNumber(pmo?.tasksTotal)} tarefas no total`} color="rose" icon={AlertTriangle} />
+            <KpiCard title="Orçamento Ativo" value={formatMoney(pmo?.activeBudget ?? 0)} change={`Realizado ${formatMoney(pmo?.actualCost ?? 0)}`} color="purple" icon={Wallet} />
+            <KpiCard title="Riscos Abertos" value={formatNumber((pmo?.openRisks ?? 0) + (pmo?.openIssues ?? 0))} change={`${formatNumber(pmo?.openIssues)} impedimento(s)`} color="rose" icon={ShieldAlert} />
+          </div>
+        }
       />
-
-      {/* PMO KPIs superiores */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <KpiCard title="Projetos Ativos" value={formatNumber(pmo?.activeProjects)} change={`${formatNumber(pmo?.totalProjects)} no portfólio`} color="sky" icon={FolderKanban} />
-        <KpiCard title="Progresso Médio" value={`${formatNumber(pmo?.avgProgress, { maximumFractionDigits: 0 })}%`} change={`${formatNumber(pmo?.behindSchedule)} abaixo do plano`} color="amber" icon={Clock3} />
-        <KpiCard title="Marcos Concluídos" value={`${formatNumber(pmo?.milestonesDone)}/${formatNumber(pmo?.milestonesTotal)}`} change={`${formatNumber(pmo?.milestonesOverdue)} vencidos`} color="emerald" icon={Flag} />
-        <KpiCard title="Tarefas Vencidas" value={formatNumber(pmo?.tasksOverdue)} change={`${formatNumber(pmo?.tasksTotal)} tarefas no total`} color="rose" icon={AlertTriangle} />
-        <KpiCard title="Orçamento Ativo" value={formatMoney(pmo?.activeBudget ?? 0)} change={`Realizado ${formatMoney(pmo?.actualCost ?? 0)}`} color="purple" icon={Wallet} />
-        <KpiCard title="Riscos Abertos" value={formatNumber((pmo?.openRisks ?? 0) + (pmo?.openIssues ?? 0))} change={`${formatNumber(pmo?.openIssues)} impedimento(s)`} color="rose" icon={ShieldAlert} />
-      </div>
 
       {/* Ações Rápidas */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
@@ -587,26 +587,8 @@ function toQueryString(filters: Partial<Filters>) {
 }
 
 function KpiCard({ title, value, change, color, icon: Icon }: { title: string; value: any; change: string; color: 'emerald' | 'sky' | 'purple' | 'rose' | 'amber'; icon: any }) {
-  const colors = {
-    emerald: 'border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/10 dark:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400',
-    sky: 'border-sky-100 dark:border-sky-900/30 bg-sky-50/10 dark:bg-sky-950/10 text-sky-600 dark:text-sky-400',
-    purple: 'border-purple-100 dark:border-purple-900/30 bg-purple-50/10 dark:bg-purple-950/10 text-purple-600 dark:text-purple-400',
-    rose: 'border-rose-100 dark:border-rose-900/30 bg-rose-50/10 dark:bg-rose-950/10 text-rose-600 dark:text-rose-400',
-    amber: 'border-amber-100 dark:border-amber-900/30 bg-amber-50/10 dark:bg-amber-950/10 text-amber-600 dark:text-amber-400'
-  };
-
-  return (
-    <Card className={cn("border bg-card shadow-sm p-4 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.01] flex items-center justify-between gap-2", colors[color])}>
-      <div className="min-w-0 space-y-1">
-        <span className="text-[10px] uppercase font-bold tracking-wider opacity-85 text-slate-550 dark:text-slate-400">{title}</span>
-        <div className="truncate text-xl font-extrabold text-slate-900 dark:text-white leading-none">{value ?? '0'}</div>
-        <span className="block truncate text-[10px] text-slate-400 font-medium">{change}</span>
-      </div>
-      <div className="shrink-0 p-2.5 rounded-xl bg-white dark:bg-slate-900 shadow-sm border border-slate-50 dark:border-slate-800">
-        <Icon className="h-5 w-5" />
-      </div>
-    </Card>
-  );
+  const tones = { emerald: 'green', sky: 'blue', purple: 'purple', rose: 'red', amber: 'yellow' } as const;
+  return <MetricCard compact title={title} value={value ?? '0'} description={change} tone={tones[color]} icon={<Icon className="h-4 w-4" />} />;
 }
 
 function QuickActionBtn({ icon: Icon, title, onClick, disabled = false }: { icon: any; title: string; onClick?: () => void; disabled?: boolean }) {

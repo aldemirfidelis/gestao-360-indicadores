@@ -235,25 +235,27 @@ export default function RecruitmentPage() {
             )}
           </div>
         }
+        summary={
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+            <button type="button" className="text-left" onClick={() => setStatusFilter('GROUP:draft')}>
+              <MetricCard compact title="1 · Rascunhos" value={counts.draft} description="Requisições a enviar" icon={<FileSignature className="h-3.5 w-3.5" />} tone="neutral" />
+            </button>
+            <button type="button" className="text-left" onClick={() => setStatusFilter('SUBMITTED')}>
+              <MetricCard compact title="2 · Em aprovação" value={counts.approval} description="Aguardando decisão" icon={<ClipboardCheck className="h-3.5 w-3.5" />} tone={counts.approval > 0 ? 'yellow' : 'neutral'} />
+            </button>
+            <button type="button" className="text-left" onClick={() => setStatusFilter('GROUP:recruitment')}>
+              <MetricCard compact title="3 · No recrutamento" value={counts.recruitment} description="Aprovadas, criar vaga" icon={<Send className="h-3.5 w-3.5" />} tone={counts.recruitment > 0 ? 'blue' : 'neutral'} />
+            </button>
+            <MetricCard compact title="4 · Vagas no ar" value={counts.published} description="Publicadas em carreiras" icon={<Megaphone className="h-3.5 w-3.5" />} tone={counts.published > 0 ? 'purple' : 'neutral'} href="/recrutamento/vagas" />
+            <MetricCard compact title="5 · Candidaturas" value={counts.applications} description="Recebidas nas vagas" icon={<Users className="h-3.5 w-3.5" />} tone={counts.applications > 0 ? 'blue' : 'neutral'} href="/recrutamento/vagas" />
+            <button type="button" className="text-left" onClick={() => setStatusFilter('FILLED')}>
+              <MetricCard compact title="6 · Preenchidas" value={counts.filled} description="Admissões concluídas" icon={<UserCheck className="h-3.5 w-3.5" />} tone={counts.filled > 0 ? 'green' : 'neutral'} />
+            </button>
+          </div>
+        }
       />
 
       {/* Funil do processo com contagens reais — cada cartão filtra ou navega. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <button type="button" className="text-left" onClick={() => setStatusFilter('GROUP:draft')}>
-          <MetricCard compact title="1 · Rascunhos" value={counts.draft} description="Requisições a enviar" icon={<FileSignature className="h-3.5 w-3.5" />} tone="neutral" />
-        </button>
-        <button type="button" className="text-left" onClick={() => setStatusFilter('SUBMITTED')}>
-          <MetricCard compact title="2 · Em aprovação" value={counts.approval} description="Aguardando decisão" icon={<ClipboardCheck className="h-3.5 w-3.5" />} tone={counts.approval > 0 ? 'yellow' : 'neutral'} />
-        </button>
-        <button type="button" className="text-left" onClick={() => setStatusFilter('GROUP:recruitment')}>
-          <MetricCard compact title="3 · No recrutamento" value={counts.recruitment} description="Aprovadas, criar vaga" icon={<Send className="h-3.5 w-3.5" />} tone={counts.recruitment > 0 ? 'blue' : 'neutral'} />
-        </button>
-        <MetricCard compact title="4 · Vagas no ar" value={counts.published} description="Publicadas em carreiras" icon={<Megaphone className="h-3.5 w-3.5" />} tone={counts.published > 0 ? 'purple' : 'neutral'} href="/recrutamento/vagas" />
-        <MetricCard compact title="5 · Candidaturas" value={counts.applications} description="Recebidas nas vagas" icon={<Users className="h-3.5 w-3.5" />} tone={counts.applications > 0 ? 'blue' : 'neutral'} href="/recrutamento/vagas" />
-        <button type="button" className="text-left" onClick={() => setStatusFilter('FILLED')}>
-          <MetricCard compact title="6 · Preenchidas" value={counts.filled} description="Admissões concluídas" icon={<UserCheck className="h-3.5 w-3.5" />} tone={counts.filled > 0 ? 'green' : 'neutral'} />
-        </button>
-      </div>
 
       <Card>
         <CardContent className="p-0">

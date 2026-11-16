@@ -99,15 +99,16 @@ export default function SimulacoesPage() {
         title="Simulações"
         description="Cenários de impacto para mérito, enquadramento, promoção, headcount e reestruturação."
         breadcrumbs={[{ label: 'Início', href: '/' }, { label: 'Cargos e Salários', href: '/cargos-salarios' }, { label: 'Simulações' }]}
+        summary={
+          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <MetricCard title="Cenários" value={formatNumber(kpis.total)} tone="blue" />
+            <MetricCard title="Aprovados" value={formatNumber(kpis.approved)} tone="green" />
+            <MetricCard title="Pessoas afetadas" value={formatNumber(kpis.affected)} tone="yellow" />
+            <MetricCard title="Impacto anual somado" value={formatMoney(kpis.annual)} tone="purple" />
+          </div>
+        }
       />
       <CompensationModuleNav />
-
-      <div className="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <MetricCard title="Cenários" value={formatNumber(kpis.total)} tone="blue" />
-        <MetricCard title="Aprovados" value={formatNumber(kpis.approved)} tone="green" />
-        <MetricCard title="Pessoas afetadas" value={formatNumber(kpis.affected)} tone="yellow" />
-        <MetricCard title="Impacto anual somado" value={formatMoney(kpis.annual)} tone="purple" />
-      </div>
 
       <FilterBar
         actions={

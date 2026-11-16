@@ -332,15 +332,16 @@ export default function AuditsPage() {
         title="Auditorias e Compliance"
         description="Programas, planejamento por risco, execução, evidências, constatações, NCs, acompanhamento e relatórios."
         actions={canCreate ? <Button onClick={() => setAuditOpen(true)}><Plus className="mr-2 h-4 w-4" />Nova auditoria</Button> : null}
+        summary={
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <MetricCard title="Em aberto" value={formatNumber(dashboard?.summary.open)} description={`${formatNumber(dashboard?.summary.total)} no total`} icon={<ClipboardCheck className="h-4 w-4" />} tone="blue" />
+            <MetricCard title="Concluídas" value={formatNumber(dashboard?.summary.completed)} description="Concluídas ou encerradas" icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
+            <MetricCard title="Atrasadas" value={formatNumber(dashboard?.summary.overdueAudits)} description={`${formatNumber(dashboard?.summary.overdueFindings)} constatações vencidas`} icon={<AlertTriangle className="h-4 w-4" />} tone={(dashboard?.summary.overdueAudits ?? 0) > 0 ? 'red' : 'green'} />
+            <MetricCard title="Constatações" value={formatNumber(dashboard?.summary.openFindings)} description={`${formatNumber(dashboard?.summary.criticalFindings)} críticas`} icon={<ClipboardList className="h-4 w-4" />} tone="yellow" />
+            <MetricCard title="NCs a gerar" value={formatNumber(dashboard?.summary.pendingNc)} description="Constatações sem NC" icon={<FileCheck2 className="h-4 w-4" />} tone={(dashboard?.summary.pendingNc ?? 0) > 0 ? 'red' : 'green'} />
+          </div>
+        }
       />
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricCard title="Em aberto" value={formatNumber(dashboard?.summary.open)} description={`${formatNumber(dashboard?.summary.total)} no total`} icon={<ClipboardCheck className="h-4 w-4" />} tone="blue" />
-        <MetricCard title="Concluídas" value={formatNumber(dashboard?.summary.completed)} description="Concluídas ou encerradas" icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Atrasadas" value={formatNumber(dashboard?.summary.overdueAudits)} description={`${formatNumber(dashboard?.summary.overdueFindings)} constatações vencidas`} icon={<AlertTriangle className="h-4 w-4" />} tone={(dashboard?.summary.overdueAudits ?? 0) > 0 ? 'red' : 'green'} />
-        <MetricCard title="Constatações" value={formatNumber(dashboard?.summary.openFindings)} description={`${formatNumber(dashboard?.summary.criticalFindings)} críticas`} icon={<ClipboardList className="h-4 w-4" />} tone="yellow" />
-        <MetricCard title="NCs a gerar" value={formatNumber(dashboard?.summary.pendingNc)} description="Constatações sem NC" icon={<FileCheck2 className="h-4 w-4" />} tone={(dashboard?.summary.pendingNc ?? 0) > 0 ? 'red' : 'green'} />
-      </div>
 
       <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList className="flex h-auto flex-wrap">

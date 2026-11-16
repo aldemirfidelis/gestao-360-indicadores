@@ -444,7 +444,7 @@ export default function OkrsPage() {
             )}
           </div>
         ))}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
           <NativeSelect
             className="h-9 w-[200px] text-xs"
             value={areaFilterId}

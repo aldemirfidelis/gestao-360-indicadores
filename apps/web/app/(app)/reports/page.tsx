@@ -152,14 +152,15 @@ export default function ReportsPage() {
             </Button>
           </>
         }
+        summary={
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard title="Indicadores" value={formatNumber(overview.data?.totalIndicators)} description="Base do relatório" icon={<FileSpreadsheet className="h-4 w-4" />} tone="blue" href="/indicators" />
+            <MetricCard title="Atingimento geral" value={formatPercent(overview.data?.generalAttainment)} description="Resumo executivo" icon={<FileText className="h-4 w-4" />} tone="green" href="/visualization" />
+            <MetricCard title="Ações em aberto" value={formatNumber(overview.data?.openActions)} description={`${formatNumber(overview.data?.overdueActions)} atrasadas`} icon={<SlidersHorizontal className="h-4 w-4" />} tone="yellow" href="/actions" />
+            <MetricCard title="Exportações" value={formatNumber(CSV_REPORTS.length + 1)} description="PDF e CSV" icon={<Download className="h-4 w-4" />} tone="purple" />
+          </div>
+        }
       />
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Indicadores" value={formatNumber(overview.data?.totalIndicators)} description="Base do relatório" icon={<FileSpreadsheet className="h-4 w-4" />} tone="blue" href="/indicators" />
-        <MetricCard title="Atingimento geral" value={formatPercent(overview.data?.generalAttainment)} description="Resumo executivo" icon={<FileText className="h-4 w-4" />} tone="green" href="/visualization" />
-        <MetricCard title="Ações em aberto" value={formatNumber(overview.data?.openActions)} description={`${formatNumber(overview.data?.overdueActions)} atrasadas`} icon={<SlidersHorizontal className="h-4 w-4" />} tone="yellow" href="/actions" />
-        <MetricCard title="Exportações" value={formatNumber(CSV_REPORTS.length + 1)} description="PDF e CSV" icon={<Download className="h-4 w-4" />} tone="purple" />
-      </div>
 
       <FilterBar
         actions={

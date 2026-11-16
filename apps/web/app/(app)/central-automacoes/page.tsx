@@ -121,43 +121,45 @@ export default function AutomationsOverview() {
         eyebrow="Central de Automações"
         title="Painel de Controle e Monitoramento"
         description="Acompanhe a integridade das automações corporativas, volume de execuções de fluxos de trabalho, tarefas pendentes, aprovações de SLAs e alertas técnicos de falhas."
+        summary={
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <MetricCard
+              title="Fluxos Ativos"
+              value={stats?.activeWorkflows ?? 0}
+              description={`${stats?.inactiveWorkflows ?? 0} rascunhos inativos`}
+              icon={<Activity className="h-4 w-4" />}
+              tone="blue"
+              href="/central-automacoes/fluxos"
+            />
+            <MetricCard
+              title="Execuções Ativas"
+              value={stats?.runningInstances ?? 0}
+              description={`${stats?.completedInstances ?? 0} concluídas com sucesso`}
+              icon={<PlayCircle className="h-4 w-4" />}
+              tone="green"
+              href="/central-automacoes/execucoes"
+            />
+            <MetricCard
+              title="Aprovações Pendentes"
+              value={stats?.pendingApprovals ?? 0}
+              description="Aguardando tomada de decisão"
+              icon={<FileCheck className="h-4 w-4" />}
+              tone="yellow"
+              href="/central-automacoes/aprovacoes"
+            />
+            <MetricCard
+              title="Falhas Técnicas"
+              value={stats?.failedInstances ?? 0}
+              description={`${stats?.failedTasks ?? 0} travadas na fila DLQ`}
+              icon={<AlertTriangle className="h-4 w-4" />}
+              tone="red"
+              href="/central-automacoes/falhas"
+            />
+          </div>
+        }
       />
 
       {/* Cards de Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Fluxos Ativos"
-          value={stats?.activeWorkflows ?? 0}
-          description={`${stats?.inactiveWorkflows ?? 0} rascunhos inativos`}
-          icon={<Activity className="h-4 w-4" />}
-          tone="blue"
-          href="/central-automacoes/fluxos"
-        />
-        <MetricCard
-          title="Execuções Ativas"
-          value={stats?.runningInstances ?? 0}
-          description={`${stats?.completedInstances ?? 0} concluídas com sucesso`}
-          icon={<PlayCircle className="h-4 w-4" />}
-          tone="green"
-          href="/central-automacoes/execucoes"
-        />
-        <MetricCard
-          title="Aprovações Pendentes"
-          value={stats?.pendingApprovals ?? 0}
-          description="Aguardando tomada de decisão"
-          icon={<FileCheck className="h-4 w-4" />}
-          tone="yellow"
-          href="/central-automacoes/aprovacoes"
-        />
-        <MetricCard
-          title="Falhas Técnicas"
-          value={stats?.failedInstances ?? 0}
-          description={`${stats?.failedTasks ?? 0} travadas na fila DLQ`}
-          icon={<AlertTriangle className="h-4 w-4" />}
-          tone="red"
-          href="/central-automacoes/falhas"
-        />
-      </div>
 
       {/* Seção de Gráficos e Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

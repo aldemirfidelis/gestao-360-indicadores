@@ -149,14 +149,15 @@ export default function StrategyPage() {
             </Button>
           ) : null
         }
+        summary={
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard compact title="Mapas" value={formatNumber(maps.length)} description="Ciclos cadastrados" icon={<Map className="h-4 w-4" />} tone="blue" />
+            <MetricCard compact title="Ativos" value={formatNumber(active)} description="Em acompanhamento" icon={<Map className="h-4 w-4" />} tone="green" />
+            <MetricCard compact title="Objetivos" value={formatNumber(objectives)} description="Conectados ao desempenho" icon={<CalendarDays className="h-4 w-4" />} tone="purple" />
+            <MetricCard compact title="Versões" value={formatNumber(versions)} description="Histórico publicado" icon={<CalendarDays className="h-4 w-4" />} tone="yellow" />
+          </div>
+        }
       />
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <MetricCard compact title="Mapas" value={formatNumber(maps.length)} description="Ciclos cadastrados" icon={<Map className="h-4 w-4" />} tone="blue" />
-        <MetricCard compact title="Ativos" value={formatNumber(active)} description="Em acompanhamento" icon={<Map className="h-4 w-4" />} tone="green" />
-        <MetricCard compact title="Objetivos" value={formatNumber(objectives)} description="Conectados ao desempenho" icon={<CalendarDays className="h-4 w-4" />} tone="purple" />
-        <MetricCard compact title="Versões" value={formatNumber(versions)} description="Histórico publicado" icon={<CalendarDays className="h-4 w-4" />} tone="yellow" />
-      </div>
 
       <SectionCard title="Mapas cadastrados" description="Abra um mapa para editar perspectivas, objetivos, ligações e vínculos com indicadores." contentClassName="space-y-3">
         {maps.map((m) => (
