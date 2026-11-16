@@ -1178,3 +1178,124 @@ português no projeto inteiro. Resumo e evidências: `docs/REVISAO_PORTUGUES.md`
 - Rollback: `g360-api:rollback-b120801-processes-20261116` e Web equivalente.
   Logs/scripts em `/tmp/g360-process-release-20261116`. Alterações/scripts
   anteriores da demonstração preservados e mantidos fora destes commits.
+
+## Projetos: gestão completa (2026-11-16, publicado)
+
+Pedido do usuário: o módulo Projetos restaurado "não tinha nada de funcional";
+aplicar todas as funcionalidades. Feito pelo Claude Code na máquina Windows,
+com outra IA trabalhando em paralelo. Publicado junto com Processos + PMO no
+commit `38bc965` (registro da publicação na seção "Processos com PMO integrado").
+
+- Diagnóstico: só era possível criar projeto, incluir tarefa/marco e digitar o
+  progresso. Não havia edição nem exclusão de projeto, tarefa ou marco pela
+  tela, nem troca de status, custos, riscos, equipe ou status report.
+- Migration nova e aditiva `20261116180000_project_management`: colunas novas em
+  `Project` (código `PRJ-0001` único por empresa, prioridade, categoria,
+  patrocinador, gerente, termo de abertura, lições aprendidas, datas reais),
+  `ProjectTask` (descrição, fase, responsável usuário, conclusão) e
+  `ProjectMilestone` (descrição, conclusão); tabelas `ProjectMember`,
+  `ProjectCost`, `ProjectRisk` e `ProjectUpdate`; cinco enums; CHECKs de valor.
+  Projetos existentes recebem código sequencial. **Backup antes de publicar.**
+- API (`/projects`): edição validada, exclusão lógica, duplicação com
+  deslocamento do cronograma, `GET /projects/options`, filtros de prioridade e
+  gerente, CRUD de marcos, tarefas (com reordenação), equipe, custos, riscos e
+  status report. Lista e portfólio trazem custo previsto/realizado, riscos e
+  última saúde. Área continua derivada do indicador vinculado.
+- Prazo que vence hoje não conta mais como vencido (fuso de São Paulo). Meu Dia
+  encontra tarefas pelo usuário responsável e mantém a busca por nome nas
+  tarefas antigas. Concluir pelo quadro de Tarefas grava a data de conclusão.
+- Web: `/projects/[id]` em abas (Visão geral, Cronograma, Custos, Riscos,
+  Equipe, Status report) com editar, duplicar, excluir e troca de status;
+  `/projects/cronograma` com cartões, lista e quadro por status, filtros novos
+  e estado vazio com atalho de criação. Componentes em
+  `apps/web/components/projects/`. Gantt mostra marcos e atrasos.
+- Validado localmente: `prisma validate`; as 157 migrations aplicaram do zero
+  num Postgres 17 embutido (pacote `embedded-postgres`, fora do repositório) e
+  `prisma migrate diff` não mostrou diferença em nenhuma tabela de projetos;
+  `scripts/check-projects.cjs` (ampliado) passou nesse banco, lendo os serviços
+  do código-fonte via `tsx`; suíte completa da API com 128 de 129 arquivos e
+  958 testes aprovados; web `tsc --noEmit`, lint dos arquivos alterados e 113
+  testes. `tsc` da API só nos arquivos alterados (tsconfig temporário), não no
+  projeto inteiro. **Sem teste em navegador e sem build Docker.**
+- Falha anterior a este trabalho: `prize.module.registration.spec.ts` não
+  carregava (`Cannot find module './modules/processes/processes.module'`), porque
+  desde `eead7ac` o `require` dinâmico de `parked-product-modules.ts` roda dentro
+  do vitest. Corrigida na rodada seguinte (Processos + PMO) só no teste, com mock.
+- O `prisma generate` foi executado nesta máquina: o client local já inclui os
+  modelos novos. A demonstração pública continua sem projetos cadastrados.
+
+## Processos com PMO integrado (2026-11-16, publicado)
+
+Pedido do usuário: verificar o módulo Processos ("nada de funcional") e aplicar
+portfólio, Gantt, curva S, tarefas, marcos e painel PMO. Perguntado o escopo, o
+usuário escolheu "Processos + PMO" e recusou dados fictícios na demonstração.
+Feito pelo Claude Code na máquina Windows, com a outra IA trabalhando em paralelo
+(carga da Pacto). Publicado com OK explícito do usuário, junto com a rodada de
+Projetos acima.
+
+- Diagnóstico: o back-end de Processos funcionava (`check-process-governance.cjs`,
+  seis grupos, aprovado em Postgres embutido). Falhas na tela: "Dados do processo
+  e etapas" usava `?id=` e a lista só lia `focus`; etapa excluída sem confirmação;
+  lista sem estado de erro; visão geral sem SIPOC, etapas e indicador. Na
+  demonstração pública não há processos nem projetos, por isso as telas parecem
+  vazias.
+- Projeto de melhoria = projeto do módulo Projetos ligado ao processo pelo vínculo
+  tipado já existente (`ProcessIntegration`, `PROJECT:<id>`). Sem migration nova e
+  sem cadastro paralelo; desvincular preserva o projeto.
+- API: `GET /projects` e `/projects/portfolio` aceitam `processId`; novo
+  `GET /projects/portfolio/execution` (curva S do portfólio e agenda de marcos e
+  tarefas, com os filtros da lista); `POST /processes/:id/projects` cria o projeto
+  já vinculado (exige editar o processo e a área dele, `projects:create` e módulo
+  Projetos ativo; se o vínculo falhar, o projeto é excluído logicamente);
+  `GET /processes/governance/pmo` consolida por processo. Arquivos novos
+  `process-pmo.service.ts`/`.controller.ts`; `ProcessesModule` importa
+  `ProjectsModule`. Rotas com dois segmentos para não colidir com `GET /processes/:id`.
+- `buildPortfolioCurve` no shared: média simples dos projetos com cronograma
+  (cancelados fora); cada projeto conta zero enquanto nada estava planejado e,
+  depois, só a partir da primeira medição; o realizado do portfólio só aparece nos
+  dias em que todos têm valor.
+- Web: aba "Melhoria (PMO)" no detalhe do processo (`?tab=pmo`) com indicadores,
+  portfólio, Gantt, curva S, agenda com conclusão direta, criar e vincular
+  projeto; painel PMO e resumo por card em `/processes`; correções acima. O
+  portfólio de Projetos ganhou curva S consolidada e agenda. Gantt de portfólio
+  compartilhado em `components/projects/portfolio-gantt.tsx`.
+- `prize.module.registration.spec.ts` corrigido com `vi.mock` de
+  `parked-product-modules` (só o teste; a API não mudou).
+- Validação: shared 42 testes; API 969 testes (130 de 131 arquivos; o restante é
+  o spec do prize, aprovado depois da correção) e registro do módulo; web `tsc`,
+  lint e 113 testes. Em Postgres 17 embutido com as 157 migrations:
+  `check-process-pmo.cjs` (novo, seis grupos), `check-process-governance.cjs` e
+  `check-projects.cjs` aprovados. `tsc` da API só nos arquivos alterados. **Sem
+  navegador e sem build Docker**; a injeção de dependências foi conferida por
+  leitura e pelo teste de registro, não subindo a API.
+- Publicado em 2026-11-16: commit `38bc965` (as duas rodadas), push em `main`,
+  versão `0.1.0+38bc9652`. Antes do push, build de revisão do commit numa cópia
+  isolada na Vultr (`g360-api:pmo-review-20261116` e Web equivalente; API 105 s,
+  web 151 s), que fez o typecheck completo da API e aqueceu o cache. `make deploy`
+  entre 17:28:08Z e 17:28:37Z (29 s).
+- A outra IA estava ensaiando no servidor uma mudança de indicadores da Pacto
+  (container `g360-pacto-metrics-postgres`, rede isolada). O usuário autorizou
+  publicar mesmo assim; nenhum container ou arquivo dela foi tocado.
+- Backup protegido: `db-backups/pre-pmo-20261116/g360-20261116-172805.dump`,
+  5.806.424 bytes, modo 600, `pg_restore --list` com 4.161 linhas. SHA-256
+  `55ccc22aed51875de1229a3b82506386eaea93d2aa2faf50a3da6288ce9101e9`.
+  Rollback: `g360-api:rollback-eead7ac-pmo-20261116` e Web equivalente.
+- Migration `20261116180000_project_management` aplicada: 157 em dia, tabelas
+  545 → 549. Contagens e hashes das colunas preexistentes idênticos em Project,
+  ProjectTask, ProjectMilestone, ProjectProgressSnapshot, Process,
+  ProcessIntegration, User e Company. Os seis projetos (todos da Pacto) receberam
+  código, sem duplicidade, com prioridade Média; tabelas novas vazias.
+- Pós-deploy: API/Web/Postgres saudáveis, zero erros de nível ≥ 50 no boot da
+  API e as três rotas novas mapeadas. Pela internet, 28 checagens aprovadas:
+  health, páginas, versão `0.1.0+38bc9652` no login, 401 sem token nas rotas
+  novas, leituras 200 e escritas 403 pela sessão pública da demonstração (que
+  continua sem processos e projetos).
+- Conferência SOMENTE LEITURA (transação `READ ONLY` dentro do container da API)
+  com os dados simulados da Pacto: PMO com seis processos, todos com projetos;
+  seis projetos ativos, avanço médio de 12%, um crítico; curva S com os seis;
+  agenda com 22 marcos em aberto (um vencido) e sete tarefas com prazo próximo;
+  detalhe com código PRJ, tarefas, marcos e curva. Script rodado por `node -`
+  a partir de `/app/apps/api` (em `/tmp` do container ele não acha as dependências).
+- Evidências e scripts em `/tmp/g360-pmo-release-20261116` na Vultr. Sem teste em
+  navegador. Alterações locais da demonstração corporativa e a seção da Pacto
+  (outra IA) preservadas e mantidas fora dos commits.
