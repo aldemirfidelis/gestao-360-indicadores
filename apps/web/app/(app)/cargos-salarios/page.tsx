@@ -4,26 +4,11 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  Activity,
-  AlertTriangle,
-  Briefcase,
-  Building2,
-  CheckCircle2,
-  DollarSign,
-  FileBarChart,
-  FileUp,
-  GitPullRequestArrow,
-  HelpCircle,
-  Network,
-  Plus,
-  Scale,
-  Users,
-  X,
-} from 'lucide-react';
+import { Activity, AlertTriangle, Briefcase, Building2, CheckCircle2, DollarSign, FileBarChart, FileUp, GitPullRequestArrow, HelpCircle, Plus, Scale, Users, X } from 'lucide-react';
 import { CompensationModuleNav } from '@/components/compensation/module-nav';
 import { LoadingState } from '@/components/platform/loading-state';
 import { EmptyState } from '@/components/platform/empty-state';
+import { MetricCard } from '@/components/platform/metric-card';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -32,7 +17,7 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
 import { downloadCsv, formatMoney } from '@/lib/compensation/format';
 import { formatDate, formatNumber } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+
 import { ReasonDialog, type ReasonDialogState } from '@/components/platform/reason-dialog';
 
 interface Overview {
@@ -211,16 +196,6 @@ export default function CargosSalariosPage() {
             <KpiCard title="Taxa de vacância" value={`${vacancyRate.toFixed(1)}%`} desc={`${vacancies} de ${planned} posições`} color={vacancies > 0 ? 'amber' : 'emerald'} icon={Briefcase} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-            <QuickActionBtn icon={Plus} title="Tabelas salariais" onClick={() => router.push('/cargos-salarios/tabelas-salariais')} />
-            <QuickActionBtn icon={Activity} title="Simular reajuste" onClick={() => setShowSimulateModal(true)} disabled={payrollBase == null} />
-            <QuickActionBtn icon={Briefcase} title="Descrições de cargo" onClick={() => router.push('/cargos-salarios/descricoes')} />
-            <QuickActionBtn icon={GitPullRequestArrow} title="Ciclos de mérito" onClick={() => router.push('/cargos-salarios/ciclos')} />
-            <QuickActionBtn icon={Network} title="Estrutura e carreira" onClick={() => router.push('/cargos-salarios/estrutura-quadro')} />
-            <QuickActionBtn icon={Users} title="Hierarquia por cargo" onClick={() => router.push('/cargos-salarios/hierarquia')} />
-            <QuickActionBtn icon={Scale} title="Equidade salarial (Lei 14.611)" onClick={() => router.push('/cargos-salarios/equidade')} />
-          </div>
-
           {allocated === 0 && planned === 0 && (
             <EmptyState title="Sem dados no escopo atual" description="Cadastre o quadro, os cargos e as faixas salariais para gerar os indicadores." />
           )}
@@ -377,36 +352,6 @@ function KpiCard({ title, value, desc, color, icon: Icon }: {
   color: 'emerald' | 'rose' | 'sky' | 'amber';
   icon: React.ComponentType<any>;
 }) {
-  const colors = {
-    emerald: 'bg-emerald-500/10 text-emerald-600',
-    rose: 'bg-rose-500/10 text-rose-600',
-    sky: 'bg-sky-500/10 text-sky-600',
-    amber: 'bg-amber-500/10 text-amber-600',
-  };
-  return (
-    <Card>
-      <CardContent className="flex items-center justify-between p-4">
-        <div className="min-w-0 space-y-1">
-          <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</span>
-          <div className="truncate text-xl font-extrabold">{value}</div>
-          <span className="block truncate text-[9px] text-muted-foreground">{desc}</span>
-        </div>
-        <div className={cn('ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full', colors[color])}><Icon className="h-4 w-4" /></div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function QuickActionBtn({ icon: Icon, title, onClick, disabled = false }: {
-  icon: React.ComponentType<any>;
-  title: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button type="button" disabled={disabled} onClick={onClick} className="flex flex-col items-center justify-center gap-1.5 rounded-lg border bg-card p-3 text-center transition hover:border-slate-300 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50">
-      <span className="flex h-8 w-8 items-center justify-center rounded-full border bg-muted/40 text-sky-500"><Icon className="h-4 w-4" /></span>
-      <span className="max-w-[120px] text-[10px] font-bold leading-snug">{title}</span>
-    </button>
-  );
+  const tones = {emerald:'green',rose:'red',sky:'blue',amber:'yellow'} as const;
+  return <MetricCard compact title={title} value={value} description={desc} tone={tones[color]} icon={<Icon className="h-4 w-4" />} />;
 }

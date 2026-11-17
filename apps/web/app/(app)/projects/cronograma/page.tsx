@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AlertTriangle, BarChart3, Clock3, Columns3, Filter, Flag, FolderKanban, LayoutGrid, List, Plus, ShieldAlert, Wallet, X } from 'lucide-react';
+import { AlertTriangle, Clock3, Columns3, Filter, Flag, FolderKanban, LayoutGrid, List, Plus, Wallet, X } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/platform/empty-state';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MetricCard } from '@/components/platform/metric-card';
 import { ProjectFormDialog } from '@/components/projects/project-form-dialog';
 import {
@@ -71,7 +72,8 @@ export default function ProjectsPage() {
   const [milestoneOpen, setMilestoneOpen] = useState(false);
   const [milestoneProjectId, setMilestoneProjectId] = useState('');
   const [view, setView] = useState<ViewMode>('cards');
-  const ganttRef = useRef<HTMLDivElement>(null);
+  const [section, setSection] = useState('projects');
+  const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     search: searchParams.get('search') ?? '',
     status: searchParams.get('status') ?? '',
@@ -151,97 +153,38 @@ export default function ProjectsPage() {
     ]);
   }
 
-  function scrollToGantt() {
-    ganttRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
   return (
     <div className="space-y-6">
       <PageHeader
         title="Projetos e Cronogramas"
-        description="Portfólio de projetos com cronograma, curva S, custos, riscos, equipe e status report."
+        description="Acompanhe entregas, prazos e custos."
         actions={canCreate ? <Button onClick={() => setOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"><Plus className="mr-1.5 h-4 w-4" />Novo projeto</Button> : null}
         summary={
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <KpiCard title="Projetos Ativos" value={formatNumber(pmo?.activeProjects)} change={`${formatNumber(pmo?.totalProjects)} no portfólio`} color="sky" icon={FolderKanban} />
             <KpiCard title="Progresso Médio" value={`${formatNumber(pmo?.avgProgress, { maximumFractionDigits: 0 })}%`} change={`${formatNumber(pmo?.behindSchedule)} abaixo do plano`} color="amber" icon={Clock3} />
-            <KpiCard title="Marcos Concluídos" value={`${formatNumber(pmo?.milestonesDone)}/${formatNumber(pmo?.milestonesTotal)}`} change={`${formatNumber(pmo?.milestonesOverdue)} vencidos`} color="emerald" icon={Flag} />
-            <KpiCard title="Tarefas Vencidas" value={formatNumber(pmo?.tasksOverdue)} change={`${formatNumber(pmo?.tasksTotal)} tarefas no total`} color="rose" icon={AlertTriangle} />
+            <KpiCard title="Tarefas Vencidas" value={formatNumber(pmo?.tasksOverdue)} change={`${formatNumber(pmo?.milestonesOverdue)} marcos vencidos · ${formatNumber((pmo?.openRisks ?? 0) + (pmo?.openIssues ?? 0))} riscos/impedimentos`} color="rose" icon={AlertTriangle} />
             <KpiCard title="Orçamento Ativo" value={formatMoney(pmo?.activeBudget ?? 0)} change={`Realizado ${formatMoney(pmo?.actualCost ?? 0)}`} color="purple" icon={Wallet} />
-            <KpiCard title="Riscos Abertos" value={formatNumber((pmo?.openRisks ?? 0) + (pmo?.openIssues ?? 0))} change={`${formatNumber(pmo?.openIssues)} impedimento(s)`} color="rose" icon={ShieldAlert} />
           </div>
         }
       />
 
-      {/* Ações Rápidas */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
-        {canCreate && <QuickActionBtn icon={Plus} title="Criar projeto" onClick={() => setOpen(true)} />}
-        {canEdit && <QuickActionBtn icon={Flag} title="Novo marco" onClick={openMilestone} />}
-        <QuickActionBtn icon={Wallet} title="Previsão financeira" onClick={() => setFinanceOpen(true)} />
-        <QuickActionBtn icon={FolderKanban} title="Exportar portfólio" onClick={exportPortfolio} disabled={projects.length === 0} />
-        <QuickActionBtn icon={BarChart3} title="Visão Gantt" onClick={scrollToGantt} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr,360px]">
-
-        {/* Painel PMO / Gantt do portfólio */}
-        <Card ref={ganttRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
-          <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
-            <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-855 dark:text-white">
-              <BarChart3 className="h-4 w-4 text-sky-500" />
-              Cronograma do portfólio (Gantt)
-            </h3>
-          </div>
-          <CardContent className="p-4 space-y-4">
-
-            <PortfolioGantt projects={projects} />
-
-            <div className="space-y-2">
-              {(pmo?.criticalProjects ?? []).length === 0 && (
-                <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground text-center">
-                  Nenhum projeto crítico no momento.
-                </div>
-              )}
-              {(pmo?.criticalProjects ?? []).slice(0, 5).map((project) => (
-                <Link key={project.id} href={`/projects/${project.id}`} className="flex items-start justify-between gap-3 rounded-xl border p-3 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-all text-xs">
-                  <div className="min-w-0">
-                    <div className="font-bold text-slate-800 dark:text-slate-200 truncate">{project.name}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">
-                      {project.responsible ?? 'Sem responsável'} - fim {formatDay(project.endsAt)}
-                      {project.tasksOverdue > 0 && ` - ${project.tasksOverdue} tarefa(s) vencida(s)`}
-                      {project.milestonesOverdue > 0 && ` - ${project.milestonesOverdue} marco(s) vencido(s)`}
-                    </div>
-                    {project.indicator && (
-                      <div className="mt-1 text-[10px] text-sky-500 font-semibold truncate">
-                        KPI {project.indicator.code ? `[${project.indicator.code}] ` : ''}{project.indicator.name}
-                      </div>
-                    )}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <span className={cn('pill text-[9px] scale-90', PMO_CLASS[project.pmoStatus])}>{PMO_LABEL[project.pmoStatus]}</span>
-                    <div className="mt-1 text-[10px] font-bold text-slate-500">{project.progressOverall}%</div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Filtros */}
         <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm h-fit">
-          <CardContent className="p-4">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-              <Filter className="h-4 w-4" />
-              Filtros de Portfólio
-            </div>
-            <div className="space-y-3">
+          <CardContent className="space-y-3 p-3">
+            <div className="flex items-center gap-2">
               <Input
                 aria-label="Buscar projeto"
                 value={filters.search}
                 onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-                placeholder="Buscar projeto, código, responsável ou KPI"
+                placeholder="Buscar projeto..."
                 className="text-xs"
               />
+              <Button variant="outline" aria-expanded={showFilters} aria-controls="portfolio-filters" onClick={() => setShowFilters((value) => !value)}><Filter className="mr-2 h-4 w-4" />Filtros{[filters.status, filters.priority, filters.managerId, filters.indicatorId].filter(Boolean).length > 0 ? ` (${[filters.status, filters.priority, filters.managerId, filters.indicatorId].filter(Boolean).length})` : ''}</Button>
+              {hasFilters && <Button size="icon" variant="ghost" aria-label="Limpar filtros" onClick={() => setFilters(EMPTY_FILTERS)}><X className="h-4 w-4" /></Button>}
+            </div>
+            <div id="portfolio-filters" hidden={!showFilters}>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <NativeSelect aria-label="Filtrar por status" value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))} className="text-xs">
                 <option value="">Todos os status</option>
                 {STATUS_ORDER.map((key) => <option key={key} value={key}>{STATUS_LABEL[key]}</option>)}
@@ -262,31 +205,23 @@ export default function ProjectsPage() {
                   </option>
                 ))}
               </NativeSelect>
-              {hasFilters && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={() => setFilters(EMPTY_FILTERS)}
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Limpar filtros
-                </Button>
-              )}
+            </div>
             </div>
           </CardContent>
         </Card>
+
+      <div className="flex flex-wrap gap-2">
+        {canEdit && <Button variant="outline" size="sm" onClick={openMilestone}><Flag className="mr-2 h-4 w-4" />Novo marco</Button>}
+        <Button variant="outline" size="sm" onClick={() => setFinanceOpen(true)}><Wallet className="mr-2 h-4 w-4" />Previsão financeira</Button>
+        <Button variant="outline" size="sm" onClick={exportPortfolio} disabled={projects.length === 0}><FolderKanban className="mr-2 h-4 w-4" />Exportar</Button>
       </div>
-
-      {/* Execução do portfólio: curva S consolidada e agenda de marcos e tarefas */}
-      {projects.length > 0 && execution.data && (
-        <section aria-label="Execução do portfólio">
-          <PortfolioCurveCard curve={execution.data.curve} />
-          <PortfolioAgenda data={execution.data} canEdit={canEdit} />
-        </section>
-      )}
-
-      {/* Projetos: cartões, lista ou quadro por status */}
+      <Tabs value={section} onValueChange={setSection}>
+        <TabsList aria-label="Visões do portfólio">
+          <TabsTrigger value="projects">Projetos</TabsTrigger>
+          <TabsTrigger value="schedule">Cronograma</TabsTrigger>
+          <TabsTrigger value="execution">Curva S e agenda</TabsTrigger>
+        </TabsList>
+        <TabsContent value="projects" className="space-y-4">      {/* Projetos: cartões, lista ou quadro por status */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">Projetos ({projects.length})</h2>
         <div className="inline-flex rounded-md border bg-muted/35 p-1" role="group" aria-label="Modo de exibição">
@@ -321,7 +256,7 @@ export default function ProjectsPage() {
             : 'Cadastre o primeiro projeto para montar o cronograma, acompanhar a curva S, os custos, os riscos e a equipe.'}
           action={hasFilters
             ? <Button variant="outline" size="sm" onClick={() => setFilters(EMPTY_FILTERS)}>Limpar filtros</Button>
-            : canCreate ? <Button size="sm" onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" /> Novo projeto</Button> : undefined}
+            : undefined}
         />
       )}
 
@@ -427,6 +362,25 @@ export default function ProjectsPage() {
           })}
         </div>
       )}
+
+</TabsContent>
+        <TabsContent value="schedule">
+          <Card><CardContent className="p-4"><PortfolioGantt projects={projects} /></CardContent></Card>
+        </TabsContent>
+        <TabsContent value="execution">
+          {execution.isLoading && <p className="text-sm text-muted-foreground">Carregando execução...</p>}
+          {execution.isError && <p role="alert" className="text-sm">Não foi possível carregar a execução: {execution.error.message}</p>}
+          {!execution.isLoading && !execution.isError && projects.length === 0 && <p className="p-4 text-sm text-muted-foreground">Nenhum projeto para acompanhar neste filtro.</p>}
+                {/* Execução do portfólio: curva S consolidada e agenda de marcos e tarefas */}
+      {projects.length > 0 && execution.data && (
+        <section aria-label="Execução do portfólio">
+          <PortfolioCurveCard curve={execution.data.curve} />
+          <PortfolioAgenda data={execution.data} canEdit={canEdit} />
+        </section>
+      )}
+
+        </TabsContent>
+      </Tabs>
 
       <ProjectFormDialog open={open} onOpenChange={setOpen} onSaved={(project) => router.push(`/projects/${project.id}`)} />
 
@@ -589,20 +543,4 @@ function toQueryString(filters: Partial<Filters>) {
 function KpiCard({ title, value, change, color, icon: Icon }: { title: string; value: any; change: string; color: 'emerald' | 'sky' | 'purple' | 'rose' | 'amber'; icon: any }) {
   const tones = { emerald: 'green', sky: 'blue', purple: 'purple', rose: 'red', amber: 'yellow' } as const;
   return <MetricCard compact title={title} value={value ?? '0'} description={change} tone={tones[color]} icon={<Icon className="h-4 w-4" />} />;
-}
-
-function QuickActionBtn({ icon: Icon, title, onClick, disabled = false }: { icon: any; title: string; onClick?: () => void; disabled?: boolean }) {
-  return (
-    <Button
-      variant="outline"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex items-center justify-start gap-3 bg-card border-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 text-slate-700 dark:text-slate-200 h-11 w-full rounded-xl transition-all duration-200 text-xs font-semibold shadow-sm hover:scale-[1.01]"
-    >
-      <div className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-        <Icon className="h-4 w-4" />
-      </div>
-      <span>{title}</span>
-    </Button>
-  );
 }

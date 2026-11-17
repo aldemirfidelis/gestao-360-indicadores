@@ -2302,26 +2302,10 @@ function ObjectiveDrawerContent({ objective }: { objective: Objective }) {
           <div className="text-muted-foreground">Atingimento</div>
           <div className="font-medium">{formatPercent(objective.aggregateAttainment)}</div>
         </div>
-        <div className="rounded-md border p-2">
-          <div className="text-muted-foreground">Ações abertas</div>
-          <div className="font-medium">{formatNumber(summary.openActions)}</div>
-        </div>
-        <div className="rounded-md border p-2">
-          <div className="text-muted-foreground">Ações atrasadas</div>
-          <div className={cn('font-medium', summary.lateActions > 0 && 'text-rose-600')}>
-            {formatNumber(summary.lateActions)}
-          </div>
-        </div>
-        <div className="rounded-md border p-2">
-          <div className="text-muted-foreground">Desvios</div>
-          <div className={cn('font-medium', objective.deviationCount > 0 && 'text-rose-600')}>
-            {formatNumber(objective.deviationCount)}
-          </div>
-        </div>
-        <div className="rounded-md border p-2">
-          <div className="text-muted-foreground">Projetos</div>
-          <div className="font-medium">{formatNumber(summary.projects)}</div>
-        </div>
+
+
+
+
       </div>
 
       <div>

@@ -39,14 +39,11 @@ export function PageHeader({
     <header
       data-page-header
       className={cn(
-        'relative isolate mb-5 min-w-0 rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card to-primary/[0.045] text-card-foreground shadow-sm',
-        compact ? 'p-4' : 'p-5 sm:p-6',
+        'mb-4 min-w-0 rounded-xl border border-border/70 bg-card text-card-foreground',
+        compact ? 'p-4' : 'p-4 sm:p-5',
         className,
       )}
     >
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-[inherit]">
-        <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
-      </div>
       {breadcrumbs && breadcrumbs.length > 0 && (
         <nav aria-label="Caminho da página" className="mb-4 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
           {breadcrumbs.map((b, index) => (
@@ -63,7 +60,7 @@ export function PageHeader({
           ))}
         </nav>
       )}
-      <div className="flex min-w-0 flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+      <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0 flex-1">
           {eyebrow && (
             <div className={cn('mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]', toneClass[tone])}>
@@ -71,13 +68,13 @@ export function PageHeader({
               {eyebrow}
             </div>
           )}
-          <h1 className="break-words text-2xl font-semibold tracking-tight md:text-3xl">{title}</h1>
-          {description && <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">{description}</p>}
+          <h1 className="break-words text-2xl font-semibold tracking-tight">{title}</h1>
+          {description && <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">{description}</p>}
         </div>
         {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 xl:max-w-[50%]">{actions}</div>}
       </div>
-      {children && <div className="mt-5 min-w-0">{children}</div>}
-      {summary && <div data-page-summary className="mt-5 min-w-0 border-t border-border/60 pt-5">{summary}</div>}
+      {children && <div className="mt-4 min-w-0">{children}</div>}
+      {summary && <div data-page-summary className="mt-4 min-w-0 border-t border-border/60 pt-3 [&_[data-metric]]:border-0 [&_[data-metric]]:bg-transparent [&_[data-metric]]:p-0 [&_[data-metric]]:shadow-none">{summary}</div>}
     </header>
   );
 }

@@ -33,6 +33,9 @@ Thumbs.db
 playwright-report
 test-results
 
+# Capturas, logs e scripts locais da revisão de simplicidade da interface
+output/ui-cleanup/
+
 # Prisma local sqlite (caso uso futuro)
 *.db
 *.sqlite

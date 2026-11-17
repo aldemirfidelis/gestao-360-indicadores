@@ -211,9 +211,9 @@ export function ProjectCosts({ project, canEdit, action }: { project: ProjectDet
 
 export function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: string }) {
   return (
-    <div className="flex min-w-0 flex-col rounded-xl border border-border/70 bg-card/90 p-3.5 shadow-sm">
-      <div className={cn('break-words font-semibold tracking-tight tabular-nums', value.length > 9 ? 'text-base sm:text-lg' : 'text-2xl', tone)}>{value}</div>
-      <div className="mt-3 text-xs font-medium text-muted-foreground">{label}</div>
+    <div data-metric className="flex min-w-0 flex-col rounded-lg border border-border/60 bg-card p-3">
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className={cn('mt-1 break-words font-semibold tracking-tight tabular-nums', value.length > 9 ? 'text-base sm:text-lg' : 'text-2xl', tone)}>{value}</div>
       {hint && <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{hint}</div>}
     </div>
   );

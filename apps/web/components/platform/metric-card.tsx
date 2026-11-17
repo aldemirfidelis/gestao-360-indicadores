@@ -14,15 +14,6 @@ const toneClass: Record<Tone, string> = {
   purple: 'text-status-purple',
 };
 
-const toneBackground: Record<Tone, string> = {
-  neutral: 'bg-muted',
-  green: 'bg-status-green/10',
-  yellow: 'bg-status-yellow/10',
-  red: 'bg-status-red/10',
-  blue: 'bg-status-blue/10',
-  purple: 'bg-status-purple/10',
-};
-
 export function MetricCard({
   title,
   value,
@@ -46,13 +37,13 @@ export function MetricCard({
 }) {
   const longValue = typeof value === 'string' && value.length > 9;
   const body = (
-    <div className={cn('group relative flex h-full min-w-0 flex-col rounded-xl border border-border/70 bg-card/90 shadow-sm', compact ? 'p-3.5' : 'p-4', href && 'transition-colors hover:border-primary/25 hover:bg-card', className)}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        {icon && <span aria-hidden="true" className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-xl', toneClass[tone], toneBackground[tone])}>{icon}</span>}
-        <div className={cn('min-w-0 max-w-full break-words font-semibold leading-tight tracking-tight tabular-nums', longValue ? 'shrink-0 text-base sm:text-lg' : compact ? 'text-2xl' : 'text-[28px]', icon && 'ml-auto text-right')}>{value}</div>
+    <div data-metric className={cn('group relative flex h-full min-w-0 flex-col rounded-lg border border-border/60 bg-card', compact ? 'p-3' : 'p-3.5', href && 'transition-colors hover:border-primary/25 hover:bg-muted/30', className)}>
+      <div className="flex items-start gap-1.5 text-xs font-medium leading-relaxed text-muted-foreground">
+        {icon && <span aria-hidden="true" className={cn('mt-0.5 shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5', toneClass[tone])}>{icon}</span>}
+        <p className="min-w-0 flex-1">{title}</p>
         {href && <ArrowUpRight aria-hidden="true" className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />}
       </div>
-      <p className="mt-3 text-xs font-medium leading-relaxed text-muted-foreground">{title}</p>
+      <div className={cn('mt-1 min-w-0 max-w-full break-words font-semibold leading-tight tracking-tight tabular-nums', longValue ? 'text-base sm:text-lg' : 'text-2xl')}>{value}</div>
       {(description || trend) && (
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1 text-[11px] leading-relaxed text-muted-foreground">
           <span>{description}</span>

@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { SecondarySection } from '@/components/platform/secondary-section';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -81,16 +82,13 @@ export default function PersonnelReportsPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric icon={Users} label="Headcount ativo" value={overview.data?.headcount ?? 0} loading={overview.isLoading} />
-            <Metric icon={ArrowUpRight} label="Admissões no mês" value={overview.data?.admissionsMonth ?? 0} loading={overview.isLoading} tone="green" />
-            <Metric icon={ArrowDownRight} label="Desligamentos no mês" value={overview.data?.terminationsMonth ?? 0} loading={overview.isLoading} tone="red" />
-            <Metric icon={TrendingUp} label="Turnover (12 meses)" value={`${overview.data?.turnoverRate12m ?? 0}%`} loading={overview.isLoading} tone="purple" />
-            <Metric icon={Stethoscope} label="Absenteísmo no mês" value={`${overview.data?.absenteeismRate ?? 0}%`} loading={overview.isLoading} tone="yellow" />
-            <Metric icon={CalendarClock} label="Dias de afastamento" value={overview.data?.leaveDaysMonth ?? 0} loading={overview.isLoading} />
-            <Metric icon={Clock} label="Horas extras no mês" value={`${overview.data?.overtimeHoursMonth ?? 0}h`} loading={overview.isLoading} tone="green" />
-            <Metric icon={CalendarClock} label="Faltas de ponto" value={overview.data?.pontoFaltasMonth ?? 0} loading={overview.isLoading} tone="red" />
-          </div>
+          <div className="space-y-3"><div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Metric icon={Users} label="Headcount ativo" value={overview.data?.headcount ?? 0} loading={overview.isLoading} />
+<Metric icon={ArrowUpRight} label="Admissões no mês" value={overview.data?.admissionsMonth ?? 0} loading={overview.isLoading} tone="green" />
+<Metric icon={ArrowDownRight} label="Desligamentos no mês" value={overview.data?.terminationsMonth ?? 0} loading={overview.isLoading} tone="red" />
+<Metric icon={TrendingUp} label="Turnover (12 meses)" value={`${overview.data?.turnoverRate12m ?? 0}%`} loading={overview.isLoading} tone="purple" /></div><SecondarySection title="Frequência e horas extras"><div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Metric icon={Stethoscope} label="Absenteísmo no mês" value={`${overview.data?.absenteeismRate ?? 0}%`} loading={overview.isLoading} tone="yellow" />
+<Metric icon={CalendarClock} label="Dias de afastamento" value={overview.data?.leaveDaysMonth ?? 0} loading={overview.isLoading} />
+<Metric icon={Clock} label="Horas extras no mês" value={`${overview.data?.overtimeHoursMonth ?? 0}h`} loading={overview.isLoading} tone="green" />
+<Metric icon={CalendarClock} label="Faltas de ponto" value={overview.data?.pontoFaltasMonth ?? 0} loading={overview.isLoading} tone="red" /></div></SecondarySection></div>
           <Card><CardContent className="p-4 text-sm text-muted-foreground">
             Os indicadores usam a competência selecionada no topo. O turnover é calculado sobre os últimos 12 meses;
             o absenteísmo considera os afastamentos registrados sobre a capacidade de dias úteis; as horas extras vêm do saldo positivo do espelho de ponto.

@@ -5,10 +5,11 @@ import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/auth/auth-provider';
 import { MetricCard } from '@/components/platform/metric-card';
+import { SecondarySection } from '@/components/platform/secondary-section';
 import { ChevronDown, Network } from 'lucide-react';
 import { api } from '@/lib/api';
 
-export function ProcessDashboard({ defaultCollapsed = false }: { defaultCollapsed?: boolean }) {
+export function ProcessDashboard({ defaultCollapsed = false, standalone = false }: { defaultCollapsed?: boolean; standalone?: boolean }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const contentId = useId();
   const { hasPermission } = useAuth();
@@ -18,22 +19,24 @@ export function ProcessDashboard({ defaultCollapsed = false }: { defaultCollapse
   if (query.isError) return <p className="text-xs text-muted-foreground">Resumo de processos indisponível para o acesso atual.</p>;
   if (!query.data) return null;
   const data = query.data;
+  if (data.total === 0) return <p className="p-4 text-sm text-muted-foreground">A governança ficará disponível quando houver processos cadastrados.</p>;
   const items = [
-    ['Processos', data.total],
     ['Com versão publicada', data.documented],
-    ['Sem proprietário', data.withoutOwner],
-    ['Em revisão', data.pendingReview],
+    ['Artefatos em revisão', data.pendingReview],
     ['Revisões vencidas', data.overdueReview],
+    ['Sem proprietário', data.withoutOwner],
+  ] as const;
+  const details = [
     ['Atividades sem responsável', data.activitiesWithoutOwner],
     ['Com indicador fora da meta', data.outsideTarget],
     ['Com desvio em aberto', data.openDeviations],
-    ['Com projeto de melhoria', data.improvementProjects],
   ] as const;
+  const attention = data.attention.map((item) => ({ ...item, reasons: item.reasons.filter((reason) => reason !== 'Projeto de melhoria') })).filter((item) => item.reasons.length > 0);
   return (
-    <section className="space-y-4 rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card to-primary/[0.045] p-4 shadow-sm sm:p-5">
+    <section className="space-y-4 rounded-xl border border-border/70 bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="min-w-0 font-semibold">
-          <button
+          {standalone ? 'Governança de processos' : <button
             type="button"
             className="flex items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             aria-label={`${collapsed ? 'Expandir' : 'Recolher'} Governança de processos`}
@@ -43,26 +46,31 @@ export function ProcessDashboard({ defaultCollapsed = false }: { defaultCollapse
           >
             <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none ${collapsed ? '-rotate-90' : ''}`} />
             Governança de processos
-          </button>
+          </button>}
         </h2>
-        <Link className="text-sm text-primary hover:underline" href="/processes">Abrir processos</Link>
+        {!standalone && <Link className="text-sm text-primary hover:underline" href="/processes">Abrir processos</Link>}
       </div>
-      <div id={contentId} hidden={collapsed} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+      <div id={contentId} hidden={!standalone && collapsed} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {items.map(([label, value]) => <MetricCard key={label} compact title={label} value={value} tone="blue" icon={<Network className="h-4 w-4" />} />)}
         </div>
-        {data.attention.length > 0 && (
-          <details>
-            <summary className="cursor-pointer text-sm font-medium">Consultar processos que precisam de atenção</summary>
+        <SecondarySection title="Outros dados de governança">
+          <dl className="grid gap-3 sm:grid-cols-3">
+            {details.map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="font-semibold tabular-nums">{value}</dd></div>)}
+          </dl>
+        </SecondarySection>
+        {attention.length > 0 && (
+          <div>
+            <h3 className="text-sm font-medium">Processos que precisam de atenção</h3>
             <div className="mt-2 max-h-64 divide-y overflow-y-auto">
-              {data.attention.map((item) => (
+              {attention.map((item) => (
                 <Link key={item.id} href={`/processes/${item.id}`} className="block py-2 text-sm hover:underline">
                   <span className="text-primary">{item.name}</span>
                   <span className="block text-xs text-muted-foreground">{item.reasons.join(' · ')}</span>
                 </Link>
               ))}
             </div>
-          </details>
+          </div>
         )}
       </div>
     </section>

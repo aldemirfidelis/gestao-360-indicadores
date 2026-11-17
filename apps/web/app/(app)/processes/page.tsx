@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Edit, Filter, FolderKanban, ListChecks, Network, Plus, Trash2, X } from 'lucide-react';
+import { ChevronDown, Edit, Filter, FolderKanban, ListChecks, Network, Plus, Trash2, X } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
 import { cn, formatNumber } from '@/lib/utils';
@@ -157,6 +158,8 @@ export default function ProcessesPage() {
   const canDelete = !user?.isDemo && hasPermission(['processes:delete']);
   const canViewProjects = hasPermission(['projects:view']);
   const [filters, setFilters] = useState({ search: '', status: '', type: '' });
+  const [view, setView] = useState('list');
+  const [showFilters, setShowFilters] = useState(false);
   const [processOpen, setProcessOpen] = useState(false);
   const [stepOpen, setStepOpen] = useState(false);
   const [editing, setEditing] = useState<ProcessItem | null>(null);
@@ -257,6 +260,7 @@ export default function ProcessesPage() {
     if (!focus || !processes.length) return;
     const found = processes.find((item) => item.id === focus);
     if (!found) return;
+    setView('list');
     setSelectedId(found.id);
     window.setTimeout(() => document.getElementById(`process-${found.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }, [processes, searchParams]);
@@ -377,42 +381,52 @@ export default function ProcessesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Processos"
-        description="Mapeie processos com SIPOC, BPMN e RACI, conectando responsáveis, indicadores e projetos."
+        description="Mapeie processos e acompanhe as melhorias."
         actions={canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Novo processo</Button> : null}
         summary={
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-            <MetricCard title="Processos" value={formatNumber(summary?.total)} description="Mapeamentos registrados" icon={<Network className="h-4 w-4" />} tone="blue" />
-            <MetricCard title="Ativos" value={formatNumber(summary?.active)} description="Processos vigentes" icon={<ListChecks className="h-4 w-4" />} tone="green" />
-            <MetricCard title="Em revisão" value={formatNumber(summary?.underReview)} description="Ajustes pendentes" icon={<Edit className="h-4 w-4" />} tone="yellow" />
-            <MetricCard title="Sem etapas" value={formatNumber(summary?.withoutSteps)} description={`${formatNumber(summary?.mappedSteps)} etapas mapeadas`} icon={<Filter className="h-4 w-4" />} tone="red" />
+          <div className="grid grid-cols-3 gap-3">
+            <MetricCard title="Processos" value={formatNumber(summary?.total)} description={summary ? formatQuantity(summary.active, 'ativo', 'ativos') : '—'} icon={<Network className="h-4 w-4" />} tone="blue" />
+            <MetricCard title="Etapas mapeadas" value={formatNumber(summary?.mappedSteps)} icon={<ListChecks className="h-4 w-4" />} tone="green" />
+            <MetricCard title="Status em revisão" value={formatNumber(summary?.underReview)} description={`${formatNumber(summary?.withoutSteps)} sem etapas`} icon={<Edit className="h-4 w-4" />} tone="yellow" />
           </div>
         }
       />
 
-      <ProcessDashboard />
-      <ProcessPmoPanel />
+      <Tabs value={view} onValueChange={setView}>
+        <TabsList aria-label="Visões de processos">
+          <TabsTrigger value="list">Processos</TabsTrigger>
+          <TabsTrigger value="governance">Governança</TabsTrigger>
+          {canViewProjects && <TabsTrigger value="pmo">Projetos de melhoria</TabsTrigger>}
+        </TabsList>
+        <TabsContent value="governance"><ProcessDashboard standalone /></TabsContent>
+        {canViewProjects && <TabsContent value="pmo"><ProcessPmoPanel /></TabsContent>}
+        <TabsContent value="list" className="space-y-4">
 
       <Card>
-        <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-end">
-          <div className="grid flex-1 gap-2">
-            <Label>Buscar</Label>
-            <Input value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} placeholder="Nome, código, objetivo ou etapa" />
+        <CardContent className="space-y-3 p-3">
+          <div className="flex items-center gap-2">
+            <Input aria-label="Buscar processo" value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} placeholder="Buscar processo..." />
+            <Button variant="outline" aria-expanded={showFilters} aria-controls="process-filters" onClick={() => setShowFilters((value) => !value)}><Filter className="mr-2 h-4 w-4" /> Filtros{filters.status || filters.type ? ` (${[filters.status, filters.type].filter(Boolean).length})` : ''}</Button>
+            {filters.search || filters.status || filters.type ? <Button variant="ghost" size="icon" aria-label="Limpar filtros" onClick={() => setFilters({ search: '', status: '', type: '' })}><X className="h-4 w-4" /></Button> : null}
           </div>
-          <div className="grid gap-2 md:w-44">
-            <Label>Status</Label>
-            <NativeSelect value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}>
+          <div id="process-filters" hidden={!showFilters}>
+          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-2">
+            <Label htmlFor="process-status">Status</Label>
+            <NativeSelect id="process-status" value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}>
               <option value="">Todos</option>
               {Object.entries(STATUS_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </NativeSelect>
           </div>
-          <div className="grid gap-2 md:w-44">
-            <Label>Tipo</Label>
-            <NativeSelect value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}>
+          <div className="grid gap-2">
+            <Label htmlFor="process-type">Tipo</Label>
+            <NativeSelect id="process-type" value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}>
               <option value="">Todos</option>
               {Object.entries(TYPE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </NativeSelect>
           </div>
-          <Button variant="outline" onClick={() => setFilters({ search: '', status: '', type: '' })}><X className="mr-2 h-4 w-4" /> Limpar</Button>
+          </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -434,7 +448,6 @@ export default function ProcessesPage() {
               ) : (
                 <p>Nenhum processo cadastrado. Cadastre o primeiro processo para mapear SIPOC, BPMN e RACI e acompanhar os projetos de melhoria.</p>
               )}
-              {canCreate && !(filters.search || filters.status || filters.type) ? <Button size="sm" onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Novo processo</Button> : null}
             </CardContent>
           </Card>
         ) : null}
@@ -445,9 +458,10 @@ export default function ProcessesPage() {
             <Card key={item.id} id={`process-${item.id}`} className={cn('scroll-mt-20 transition-colors', selected && 'border-primary/70 bg-primary/5')}>
               <CardContent className="space-y-4 p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <button type="button" onClick={() => setSelectedId(selected ? null : item.id)} className="min-w-0 text-left">
+                  <button type="button" aria-expanded={selected} aria-controls={`process-details-${item.id}`} onClick={() => setSelectedId(selected ? null : item.id)} className="min-w-0 flex-1 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold">#{item.number} {item.code ? `${item.code} - ` : ''}{item.name}</span>
+                      <ChevronDown aria-hidden="true" className={cn('h-4 w-4 shrink-0 transition-transform', !selected && '-rotate-90')} />
+                      <span className="font-semibold">{item.code ? `${item.code} - ` : `#${item.number} `}{item.name}</span>
                       <Badge variant="outline" className={STATUS_CLASS[item.status]}>{STATUS_LABEL[item.status]}</Badge>
                       <Badge variant="secondary">{TYPE_LABEL[item.type]}</Badge>
                       {item.version ? <Badge variant="outline">v{item.version}</Badge> : null}
@@ -459,17 +473,6 @@ export default function ProcessesPage() {
                   </button>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" asChild><Link href={`/processes/${item.id}`}>Abrir processo</Link></Button>
-                    {canViewProjects ? (
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={`/processes/${item.id}?tab=pmo`}><FolderKanban className="mr-2 h-4 w-4" /> Melhoria (PMO)</Link>
-                      </Button>
-                    ) : null}
-                    <Button size="sm" variant="outline" onClick={() => openVision360('PROCESS', item.id)} className="gap-1.5">
-                      <Network className="h-4 w-4 text-primary" /> 360°
-                    </Button>
-                    {canUpdate ? <Button size="sm" variant="outline" onClick={() => openStep(item.id)}><Plus className="mr-2 h-4 w-4" /> Etapa</Button> : null}
-                    {canUpdate ? <Button size="sm" variant="outline" onClick={() => openEdit(item)}><Edit className="mr-2 h-4 w-4" /> Editar</Button> : null}
-                    {canDelete ? <Button size="sm" variant="outline" className="text-status-red" onClick={() => handleDeleteTrigger(item.id, item.name)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</Button> : null}
                   </div>
                 </div>
 
@@ -485,6 +488,14 @@ export default function ProcessesPage() {
                   </Link>
                 ) : null}
 
+                <div id={`process-details-${item.id}`} hidden={!selected} className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => openVision360('PROCESS', item.id)}><Network className="mr-2 h-4 w-4" /> Visão 360°</Button>
+                  {canViewProjects && !pmo ? <Button size="sm" variant="outline" asChild><Link href={`/processes/${item.id}?tab=pmo`}>Projetos de melhoria</Link></Button> : null}
+                  {canUpdate ? <Button size="sm" variant="outline" onClick={() => openStep(item.id)}><Plus className="mr-2 h-4 w-4" /> Etapa</Button> : null}
+                  {canUpdate ? <Button size="sm" variant="outline" onClick={() => openEdit(item)}><Edit className="mr-2 h-4 w-4" /> Editar</Button> : null}
+                  {canDelete ? <Button size="sm" variant="outline" className="text-status-red" onClick={() => handleDeleteTrigger(item.id, item.name)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</Button> : null}
+                </div>
                 <div className="grid gap-3 md:grid-cols-4">
                   <SipocBlock title="Fornecedores" value={item.suppliers} />
                   <SipocBlock title="Entradas" value={item.inputs} />
@@ -518,11 +529,14 @@ export default function ProcessesPage() {
                     </div>
                   </div>
                 ) : null}
+                </div>
               </CardContent>
             </Card>
           );
         })}
       </div>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={processOpen} onOpenChange={setProcessOpen}>
         <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto">

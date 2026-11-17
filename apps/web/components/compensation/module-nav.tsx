@@ -21,6 +21,7 @@ const groups: Array<{ label: string; items: Array<{ label: string; href: string 
       { label: 'Estrutura e Quadro', href: '/cargos-salarios/estrutura-quadro' },
       { label: 'Catálogo de Cargos', href: '/cargos-salarios/catalogo' },
       { label: 'Descrições', href: '/cargos-salarios/descricoes' },
+      { label: 'Hierarquia', href: '/cargos-salarios/hierarquia' },
     ],
   },
   {

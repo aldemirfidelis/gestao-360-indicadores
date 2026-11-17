@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { FolderKanban } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { Stat } from '@/components/projects/project-costs';
+import { SecondarySection } from '@/components/platform/secondary-section';
 import { PMO_CLASS, PMO_LABEL, formatDay, formatMoney, type PmoStatus } from '@/components/projects/types';
 import { Progress } from '@/components/ui/progress';
 import { api } from '@/lib/api';
@@ -62,22 +63,22 @@ export function ProcessPmoPanel() {
   const data = query.data;
   if (!data.available) return null;
   const { totals } = data;
+  if (totals.projects === 0) return <p className="p-4 text-sm text-muted-foreground">Nenhum projeto de melhoria vinculado. Abra um processo para criar ou vincular um projeto.</p>;
   const pending = totals.tasksOverdue + totals.milestonesOverdue;
 
   return (
-    <section className="space-y-4 rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card to-primary/[0.045] p-4 shadow-sm sm:p-5">
+    <section className="space-y-4 rounded-xl border border-border/70 bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="flex items-center gap-2 font-semibold"><FolderKanban className="h-4 w-4" /> Melhoria de processos (PMO)</h2>
           <p className="text-xs text-muted-foreground">
-            Projetos vinculados aos processos: avanço, prazos, custos e riscos. Abra um processo para ver o Gantt, a curva S, os marcos e as tarefas.
+            Acompanhe os projetos vinculados a cada processo.
           </p>
         </div>
         <Link href="/projects/cronograma" className="text-sm text-primary hover:underline">Portfólio completo de projetos</Link>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Stat label="Processos com projetos" value={`${totals.withProjects}/${totals.processes}`} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Projetos ativos" value={String(totals.active)} hint={`${totals.projects} vinculado(s) · ${totals.done} concluído(s)`} />
         <Stat
           label="Avanço médio"
@@ -91,13 +92,14 @@ export function ProcessPmoPanel() {
           hint={`${totals.tasksOverdue} tarefa(s) · ${totals.milestonesOverdue} marco(s)`}
           tone={pending > 0 ? 'text-status-red' : undefined}
         />
-        <Stat
-          label="Orçamento"
-          value={formatMoney(totals.budget)}
-          hint={`Realizado ${formatMoney(totals.actualCost)}`}
-          tone={totals.actualCost > totals.budget && totals.budget > 0 ? 'text-status-red' : undefined}
-        />
       </div>
+
+      <SecondarySection title="Cobertura e orçamento">
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <div><dt className="text-xs text-muted-foreground">Processos com projetos</dt><dd>{totals.withProjects} de {totals.processes}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Orçamento · realizado</dt><dd className={cn('tabular-nums', totals.budget > 0 && totals.actualCost > totals.budget && 'text-status-red')}>{formatMoney(totals.budget)} · {formatMoney(totals.actualCost)}</dd></div>
+        </dl>
+      </SecondarySection>
 
       {data.processes.length === 0 ? (
         <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">

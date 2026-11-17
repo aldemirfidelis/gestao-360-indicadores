@@ -4,33 +4,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { 
-  Activity,
-  AlertTriangle, 
-  CalendarClock, 
-  CheckCircle2, 
-  ClipboardCheck, 
-  Clock, 
-  Edit, 
-  FileText, 
-  FileUp, 
-  FileWarning, 
-  Filter, 
-  HelpCircle, 
-  Layers, 
-  Network, 
-  Plus, 
-  Scale, 
-  Sparkles, 
-  Trash2, 
-  TrendingUp, 
-  Users, 
-  X 
-} from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
-import { SectionCard } from '@/components/platform/section-card';
+import { AlertTriangle, CalendarClock, CheckCircle2, FileWarning, HelpCircle, Layers, Network, Plus, Scale, X } from 'lucide-react';
+
 import { LoadingState } from '@/components/platform/loading-state';
 import { EmptyState } from '@/components/platform/empty-state';
+import { MetricCard } from '@/components/platform/metric-card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/components/auth/auth-provider';
 import { api } from '@/lib/api';
 import { downloadCsv } from '@/lib/compensation/format';
-import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 
 type NcStatus = 'OPEN' | 'TRIAGE' | 'ANALYSIS' | 'ACTION' | 'VERIFICATION' | 'CLOSED' | 'CANCELLED';
 type NcSource = 'INDICATOR' | 'AUDIT' | 'PROCESS' | 'CUSTOMER' | 'SUPPLIER' | 'PROJECT' | 'CHECKLIST' | 'INSPECTION' | 'DOCUMENT' | 'MANUAL' | 'OTHER';
@@ -334,7 +313,6 @@ export default function NonConformitiesPage() {
   const countOverdue = summary?.overdue ?? 0;
   const countEffective = summary?.effective ?? 0;
   const countClosed = Math.max(0, countTotal - countOpen);
-  const auditSummary = auditsQuery.data?.summary;
   const priorityMatrix = (['CRITICAL', 'MAJOR', 'MINOR'] as NcSeverity[]).map((severity) => ({
     severity,
     overdue: items.filter((item) => item.severity === severity && item.isOverdue).length,
@@ -382,7 +360,7 @@ export default function NonConformitiesPage() {
 
   return (
     <div className="space-y-6">
-      
+
       {/* A. Cabeçalho de Comando (Quality Command Center) */}
       <div className="flex flex-col gap-4 border-b border-slate-200 dark:border-slate-800/85 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -409,83 +387,142 @@ export default function NonConformitiesPage() {
       </div>
 
       {/* B. Cards de Indicadores do SGQ (KPIs) */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-        <KpiCard title="NCs em aberto" value={countOpen} change={`${countTotal} total registradas`} color="sky" icon={FileWarning} />
-        <KpiCard title="NCs encerradas" value={countClosed} change={`${countTotal} registros no total`} color="emerald" icon={Clock} />
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <KpiCard title="NCs em aberto" value={countOpen} change={`${countClosed} encerradas · ${countTotal} registradas`} color="sky" icon={FileWarning} />
         <KpiCard title="Taxa de Eficácia" value={`${((countEffective / (countClosed || 1)) * 100).toFixed(1)}%`} change={`${countEffective} encerradas como eficazes`} color="emerald" icon={CheckCircle2} />
         <KpiCard title="Desvios Críticos" value={countCritical} change="Severidade extrema" color="rose" icon={AlertTriangle} />
-        <KpiCard title="Auditorias concluídas" value={auditSummary?.completed ?? 0} change={`${auditSummary?.total ?? 0} auditorias cadastradas`} color="emerald" icon={ClipboardCheck} />
         <KpiCard title="Planos Atrasados" value={countOverdue} change="Exigindo intervenção imediata" color="rose" icon={CalendarClock} />
       </div>
 
-      {/* C. Faixa de Ações Rápidas */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-6">
-        <QuickActionBtn icon={Plus} title="Registrar RNC" onClick={openCreate} />
-        <QuickActionBtn icon={Network} title="Espinha de Ishikawa" onClick={() => ishikawaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
-        <QuickActionBtn icon={FileText} title="Novo Plano 5W2H" onClick={() => editSelected('plan')} />
-        <QuickActionBtn icon={Scale} title="Matriz de prioridade" onClick={() => riskRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
-        <QuickActionBtn icon={ClipboardCheck} title="Cronograma de Auditorias" onClick={() => router.push('/audits')} />
-        <QuickActionBtn icon={FileUp} title="Relatório de Qualidade" onClick={exportReport} />
-      </div>
+<div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => editSelected('plan')} disabled={!selectedNc || !canUpdate}>Plano corretivo</Button><Button variant="outline" size="sm" onClick={exportReport}>Exportar relatório</Button></div>
 
       {listQuery.isLoading && <LoadingState />}
 
-      {/* D. Grid Principal (3 Colunas) */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        
-        {/* Coluna Esquerda: NCs Críticas e Matriz de Risco 5x5 */}
-        <div className="space-y-6">
-          
-          {/* NCs Prioritárias */}
-          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[380px]">
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
-                <AlertTriangle className="h-4 w-4 text-rose-500" />
-                Não Conformidades Prioritárias
-                <span className="text-[10px] bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded-full font-bold">{summary?.topOpen?.length || 0}</span>
-              </h3>
+<Tabs defaultValue="records">
+        <TabsList aria-label="Visões de não conformidades">
+          <TabsTrigger value="records">Registros</TabsTrigger><TabsTrigger value="priority">Prioridade</TabsTrigger><TabsTrigger value="causes">Causas</TabsTrigger><TabsTrigger value="audits">Auditorias</TabsTrigger>
+        </TabsList>
+        <TabsContent value="records" className="space-y-4"><Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[380px]">
+            <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <FileWarning className="h-4 w-4 text-sky-500" />
+                <h3 className="font-semibold text-sm text-slate-850 dark:text-white">Não conformidades</h3>
+              </div>
+
+              {/* Filtro simples integrado */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Buscar..."
+                  value={filters.search}
+                  onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
+                  className="h-7 w-36 px-2 rounded-md border text-[11px] bg-card text-card-foreground"
+                />
+                {(filters.search || filters.status || filters.severity) && (
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setFilters({ search: '', status: '', severity: '' })}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
+
             <CardContent className="p-0 overflow-y-auto flex-1">
-              {(summary?.topOpen ?? []).length === 0 ? (
+              {items.length === 0 ? (
                 <div className="p-8 text-center text-xs text-muted-foreground h-full flex flex-col items-center justify-center">
-                  <CheckCircle2 className="h-8 w-8 text-emerald-500 mb-2" />
-                  Nenhuma NC prioritária no momento.
+                  <FileWarning className="h-8 w-8 text-slate-300 mb-2" />
+                  Nenhuma NC encontrada para os filtros atuais.
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 dark:divide-slate-850/40">
-                  {(summary?.topOpen ?? []).map((nc) => (
-                    <div 
-                      key={nc.id} 
-                      onClick={() => {
-                        const original = items.find(item => item.id === nc.id);
-                        if (original) setSelectedNc(original);
-                      }}
+                  {items.map((nc) => (
+                    <div
+                      key={nc.id}
+                      onClick={() => setSelectedNc(nc)}
                       className={cn(
                         'p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all cursor-pointer flex flex-col gap-1 text-xs border-l-2',
-                        selectedNc?.id === nc.id ? 'border-l-sky-500 bg-sky-50/20 dark:bg-sky-950/10' : 'border-l-transparent'
+                        selectedNc?.id === nc.id ? 'border-l-sky-500 bg-sky-50/15 dark:bg-sky-950/10' : 'border-l-transparent'
                       )}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-850 dark:text-slate-200">#{nc.number} {nc.title}</span>
-                        <Badge variant="outline" className={cn('text-[9px] scale-90', SEVERITY_CLASS[nc.severity])}>{SEVERITY_LABEL[nc.severity]}</Badge>
-                      </div>
-                      <div className="text-[10px] text-slate-500 truncate mt-0.5">
-                        {SOURCE_LABEL[nc.source]} - {nc.responsibleUser?.name ?? 'Sem responsável'}
-                      </div>
-                      {nc.indicator && (
-                        <div className="text-[9px] text-sky-500 font-semibold truncate mt-1">
-                          KPI {nc.indicator.code ? `[${nc.indicator.code}] ` : ''}{nc.indicator.name}
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-800 dark:text-slate-200">#{nc.number}</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[180px]">{nc.title}</span>
                         </div>
-                      )}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Badge variant="outline" className={cn('text-[9px] scale-90 px-1 py-0', SEVERITY_CLASS[nc.severity])}>{SEVERITY_LABEL[nc.severity]}</Badge>
+                          <Badge variant="outline" className={cn('text-[9px] scale-90 px-1 py-0', STATUS_CLASS[nc.status])}>{STATUS_LABEL[nc.status]}</Badge>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1">
+                        <span>Responsável: {nc.responsibleUser?.name ?? 'Sem responsável'}</span>
+                        <span className={cn(nc.isOverdue && 'text-rose-500 font-bold')}>Prazo: {formatDate(nc.dueDate)}</span>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-1 mt-1 shrink-0 border-t pt-2 border-slate-50/50">
+                        {canUpdate && (
+                          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-sky-500" onClick={(e) => { e.stopPropagation(); openEdit(nc); }}>
+                            Editar
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-[10px] px-2 text-rose-500"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm('Excluir esta não conformidade?')) remove.mutate(nc.id);
+                            }}
+                          >
+                            Excluir
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </CardContent>
-          </Card>
+          </Card>{selectedNc && (<Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[380px]">
+            <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
+              <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
+                <HelpCircle className="h-4 w-4 text-sky-500" />
+                Análise causal registrada
+              </h3>
+            </div>
 
-          {/* Matriz de Riscos 5x5 Heatmap */}
-          <Card ref={riskRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[300px]">
+            <CardContent className="p-4 flex-1 overflow-y-auto">
+              {selectedNc ? (
+                <div className="relative border-l border-sky-200 dark:border-sky-900 ml-2.5 pl-4 space-y-4 text-xs">
+                  {[
+                    { q: 'Problema registrado', a: selectedNc.title },
+                    { q: 'Descrição observada', a: selectedNc.description },
+                    { q: 'Contenção imediata', a: selectedNc.immediateAction },
+                    { q: 'Causa raiz identificada', a: selectedNc.rootCause },
+                    { q: 'Plano corretivo', a: selectedNc.correctivePlan },
+                  ].map((why, index) => (
+                    <div key={index} className="relative">
+                      {/* Marcador circular */}
+                      <span className="absolute -left-[21px] top-1 h-3.5 w-3.5 rounded-full border-2 border-sky-500 bg-white dark:bg-slate-900 flex items-center justify-center text-[7px] font-bold text-sky-500">
+                        {index + 1}
+                      </span>
+                      <div className="font-bold text-slate-500">{why.q}</div>
+                      <div className={cn('mt-0.5 font-semibold', why.a ? 'text-slate-800 dark:text-slate-200' : 'text-amber-600')}>
+                        {why.a || 'Ainda não informado'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-xs text-muted-foreground h-full flex flex-col items-center justify-center">
+                  <HelpCircle className="h-8 w-8 text-slate-350 dark:text-slate-700 mb-2" />
+                  Selecione uma RNC para visualizar sua análise causal.
+                </div>
+              )}
+            </CardContent>
+          </Card>)}</TabsContent>
+        <TabsContent value="priority"><Card ref={riskRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[300px]">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                 <Scale className="h-4 w-4 text-emerald-500" />
@@ -493,7 +530,7 @@ export default function NonConformitiesPage() {
               </h3>
             </div>
             <CardContent className="p-4 flex-1 flex flex-col justify-between">
-              
+
               <div className="grid grid-cols-[110px,repeat(3,1fr)] gap-2 text-center text-[10px]">
                 <div />
                 <div className="font-semibold text-muted-foreground">No prazo</div>
@@ -514,99 +551,8 @@ export default function NonConformitiesPage() {
                 <span className="font-bold text-red-500">Críticas: {countCritical}</span>
               </div>
             </CardContent>
-          </Card>
-        </div>
-
-        {/* Coluna Central: Tabela Geral e Ishikawa SVG */}
-        <div className="space-y-6">
-          
-          {/* Tabela de Não Conformidades */}
-          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[380px]">
-            <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
-              <div className="flex items-center gap-2">
-                <FileWarning className="h-4 w-4 text-sky-500" />
-                <h3 className="font-semibold text-sm text-slate-850 dark:text-white">Não Conformidades Ativas</h3>
-              </div>
-              
-              {/* Filtro simples integrado */}
-              <div className="flex items-center gap-2">
-                <input 
-                  type="text" 
-                  placeholder="Buscar..." 
-                  value={filters.search} 
-                  onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
-                  className="h-7 w-36 px-2 rounded-md border text-[11px] bg-card text-card-foreground"
-                />
-                {(filters.search || filters.status || filters.severity) && (
-                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setFilters({ search: '', status: '', severity: '' })}>
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-            </div>
-            
-            <CardContent className="p-0 overflow-y-auto flex-1">
-              {items.length === 0 ? (
-                <div className="p-8 text-center text-xs text-muted-foreground h-full flex flex-col items-center justify-center">
-                  <FileWarning className="h-8 w-8 text-slate-300 mb-2" />
-                  Nenhuma NC encontrada para os filtros atuais.
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100 dark:divide-slate-850/40">
-                  {items.map((nc) => (
-                    <div 
-                      key={nc.id} 
-                      onClick={() => setSelectedNc(nc)}
-                      className={cn(
-                        'p-3 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all cursor-pointer flex flex-col gap-1 text-xs border-l-2',
-                        selectedNc?.id === nc.id ? 'border-l-sky-500 bg-sky-50/15 dark:bg-sky-950/10' : 'border-l-transparent'
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-800 dark:text-slate-200">#{nc.number}</span>
-                          <span className="font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[180px]">{nc.title}</span>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Badge variant="outline" className={cn('text-[9px] scale-90 px-1 py-0', SEVERITY_CLASS[nc.severity])}>{SEVERITY_LABEL[nc.severity]}</Badge>
-                          <Badge variant="outline" className={cn('text-[9px] scale-90 px-1 py-0', STATUS_CLASS[nc.status])}>{STATUS_LABEL[nc.status]}</Badge>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1">
-                        <span>Responsável: {nc.responsibleUser?.name ?? 'Sem responsável'}</span>
-                        <span className={cn(nc.isOverdue && 'text-rose-500 font-bold')}>Prazo: {formatDate(nc.dueDate)}</span>
-                      </div>
-
-                      <div className="flex items-center justify-end gap-1 mt-1 shrink-0 border-t pt-2 border-slate-50/50">
-                        {canUpdate && (
-                          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-sky-500" onClick={(e) => { e.stopPropagation(); openEdit(nc); }}>
-                            Editar
-                          </Button>
-                        )}
-                        {canDelete && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-6 text-[10px] px-2 text-rose-500" 
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              if (window.confirm('Excluir esta não conformidade?')) remove.mutate(nc.id); 
-                            }}
-                          >
-                            Excluir
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Diagrama de Causa Raiz - Ishikawa SVG */}
-          <Card ref={ishikawaRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[300px]">
+          </Card></TabsContent>
+        <TabsContent value="causes"><Card ref={ishikawaRef} className="scroll-mt-20 border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[300px]">
             <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                 <Network className="h-4 w-4 text-violet-500" />
@@ -614,10 +560,10 @@ export default function NonConformitiesPage() {
               </h3>
               {selectedNc && <Badge variant="secondary">RNC #{selectedNc.number}</Badge>}
             </div>
-            
+
             <CardContent className="p-4 flex-1 flex flex-col justify-between">
               <div className="flex-1 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 flex items-center justify-center p-2 relative min-h-[180px]">
-                
+
                 <svg className="w-full h-full max-h-[160px] select-none" viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg">
                   {/* Linha Central / Espinha Principal */}
                   <line x1="20" y1="80" x2="270" y2="80" stroke="#0ea5e9" strokeWidth="3" />
@@ -635,7 +581,7 @@ export default function NonConformitiesPage() {
                   {/* Mão de Obra */}
                   <line x1="70" y1="25" x2="110" y2="80" stroke="#7c3aed" strokeWidth="1.5" />
                   <text x="50" y="20" fill="#7c3aed" fontSize="7" fontWeight="bold">Mão de Obra</text>
-                  
+
                   {/* Método */}
                   <line x1="140" y1="25" x2="180" y2="80" stroke="#7c3aed" strokeWidth="1.5" />
                   <text x="125" y="20" fill="#7c3aed" fontSize="7" fontWeight="bold">Método</text>
@@ -675,60 +621,15 @@ export default function NonConformitiesPage() {
                 </Button>
               </div>
             </CardContent>
-          </Card>
-        </div>
-
-        {/* Coluna Direita: Análise 5 Porquês e Auditorias */}
-        <div className="space-y-6">
-          {/* Análise de 5 Porquês */}
-          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[380px]">
-            <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
-              <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
-                <HelpCircle className="h-4 w-4 text-sky-500" />
-                Análise causal registrada
-              </h3>
-            </div>
-            
-            <CardContent className="p-4 flex-1 overflow-y-auto">
-              {selectedNc ? (
-                <div className="relative border-l border-sky-200 dark:border-sky-900 ml-2.5 pl-4 space-y-4 text-xs">
-                  {[
-                    { q: 'Problema registrado', a: selectedNc.title },
-                    { q: 'Descrição observada', a: selectedNc.description },
-                    { q: 'Contenção imediata', a: selectedNc.immediateAction },
-                    { q: 'Causa raiz identificada', a: selectedNc.rootCause },
-                    { q: 'Plano corretivo', a: selectedNc.correctivePlan },
-                  ].map((why, index) => (
-                    <div key={index} className="relative">
-                      {/* Marcador circular */}
-                      <span className="absolute -left-[21px] top-1 h-3.5 w-3.5 rounded-full border-2 border-sky-500 bg-white dark:bg-slate-900 flex items-center justify-center text-[7px] font-bold text-sky-500">
-                        {index + 1}
-                      </span>
-                      <div className="font-bold text-slate-500">{why.q}</div>
-                      <div className={cn('mt-0.5 font-semibold', why.a ? 'text-slate-800 dark:text-slate-200' : 'text-amber-600')}>
-                        {why.a || 'Ainda não informado'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-8 text-center text-xs text-muted-foreground h-full flex flex-col items-center justify-center">
-                  <HelpCircle className="h-8 w-8 text-slate-350 dark:text-slate-700 mb-2" />
-                  Selecione uma RNC para visualizar sua análise causal.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* SLA e Auditorias ISO */}
-          <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[300px]">
+          </Card></TabsContent>
+        <TabsContent value="audits"><Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm flex flex-col h-[300px]">
             <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-850 dark:text-white">
                 <CalendarClock className="h-4 w-4 text-purple-500" />
                 Próximas auditorias
               </h3>
             </div>
-            
+
             <CardContent className="p-3 flex-1 overflow-y-auto text-xs">
               <div className="space-y-3">
                 {auditsQuery.isLoading ? (
@@ -747,33 +648,8 @@ export default function NonConformitiesPage() {
                 ))}
               </div>
             </CardContent>
-          </Card>
-        </div>
-
-      </div>
-
-      {/* E. Rodapé de Governança */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 dark:border-slate-800/80 pt-4 mt-2 text-xs text-slate-500">
-        <div className="flex flex-wrap items-center gap-6">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-emerald-500" />
-            <span>Base do SGQ: <strong className="text-slate-700 dark:text-slate-350">{countTotal} RNCs registradas</strong></span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-sky-500" />
-            <span>Colaboradores disponíveis como responsáveis: <strong>{(options?.users ?? []).length} pessoas</strong></span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-slate-655 dark:text-slate-450 hover:text-slate-900" onClick={exportReport} disabled={items.length === 0}>
-            <FileUp className="h-3.5 w-3.5" />
-            Exportar Painel de RNCs
-          </Button>
-          <button type="button" onClick={() => router.push('/central-atendimento')} className="h-8 w-8 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all hover:scale-105" title="Central de Atendimento">
-            <HelpCircle className="h-4.5 w-4.5" />
-          </button>
-        </div>
-      </div>
+          </Card></TabsContent>
+      </Tabs>
 
       {/* Dialog Formulário Modal */}
       <Dialog open={open} onOpenChange={(v) => (v ? setOpen(true) : closeDialog())}>
@@ -898,41 +774,8 @@ interface KpiCardProps {
 }
 
 function KpiCard({ title, value, change, color, icon: Icon }: KpiCardProps) {
-  const colorMaps = {
-    emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 dark:bg-emerald-500/20 border-emerald-500/10',
-    rose: 'bg-rose-500/10 text-rose-600 dark:text-rose-455 dark:bg-rose-500/20 border-rose-500/10',
-    sky: 'bg-sky-500/10 text-sky-600 dark:text-sky-455 dark:bg-sky-500/20 border-sky-500/10',
-  };
-
-  return (
-    <Card className="border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm transition-all hover:shadow-md">
-      <CardContent className="p-4 flex items-center justify-between">
-        <div className="space-y-1 min-w-0">
-          <span className="text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wider block truncate">{title}</span>
-          <div className="text-xl font-extrabold text-slate-900 dark:text-white leading-none">{value}</div>
-          <div className="text-[9px] text-slate-500 dark:text-slate-400 font-medium block truncate mt-0.5">{change}</div>
-        </div>
-        <div className={cn('h-9 w-9 rounded-full flex items-center justify-center shrink-0 border ml-2', colorMaps[color])}>
-          <Icon className="h-4.5 w-4.5" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function QuickActionBtn({ icon: Icon, title, onClick }: { icon: React.ComponentType<any>; title: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-3 flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md hover:border-slate-200/50 dark:hover:border-slate-800"
-    >
-      <div className="h-8 w-8 rounded-full flex items-center justify-center border bg-slate-50/50 dark:bg-slate-950/20 border-slate-200/40 text-sky-500">
-        <Icon className="h-4.5 w-4.5" />
-      </div>
-      <div className="text-[10px] font-bold text-slate-850 dark:text-slate-200 leading-snug max-w-[120px]">{title}</div>
-    </button>
-  );
+  const tones = {emerald:'green',rose:'red',sky:'blue'} as const;
+  return <MetricCard compact title={title} value={value} description={change} tone={tones[color]} icon={<Icon className="h-4 w-4" />} />;
 }
 
 function toQueryString(filters: Record<string, string>) {

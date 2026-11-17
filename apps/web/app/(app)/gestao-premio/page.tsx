@@ -2,8 +2,9 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Trophy, FileSignature, CalendarDays, Target, CheckCircle2, AlertTriangle, Users, Calculator } from 'lucide-react';
+import { Trophy, FileSignature, CalendarDays, Target, CheckCircle2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { SecondarySection } from '@/components/platform/secondary-section';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
@@ -78,29 +79,15 @@ export default function PrizeOverviewPage() {
         <div className="space-y-6">
           <div>
             <h2 className="mb-2 text-sm font-medium text-muted-foreground">Governança e ciclo</h2>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-              <StatCard icon={Trophy} label="Programas ativos" value={c?.programsActive ?? 0} tone="bg-amber-100 text-amber-700" href="/gestao-premio/programas" />
-              <StatCard icon={FileSignature} label="Anexos aguardando aprovação" value={c?.annexesPendingApproval ?? 0} tone="bg-orange-100 text-orange-700" href="/gestao-premio/anexos" />
-              <StatCard icon={CheckCircle2} label="Anexos vigentes" value={c?.annexesEffective ?? 0} tone="bg-emerald-100 text-emerald-700" href="/gestao-premio/anexos" />
-              <StatCard icon={Target} label="Indicadores" value={c?.indicators ?? 0} tone="bg-sky-100 text-sky-700" href="/gestao-premio/indicadores" />
-              <StatCard icon={CalendarDays} label="Competências em preenchimento" value={c?.competencesFilling ?? 0} tone="bg-blue-100 text-blue-700" href="/gestao-premio/competencias" />
-              <StatCard icon={CalendarDays} label="Competências em validação" value={c?.competencesValidation ?? 0} tone="bg-indigo-100 text-indigo-700" href="/gestao-premio/competencias" />
-              <StatCard icon={CalendarDays} label="Competências fechadas" value={c?.competencesClosed ?? 0} tone="bg-slate-100 text-slate-700" href="/gestao-premio/competencias" />
-            </div>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><StatCard icon={Trophy} label="Programas ativos" value={c?.programsActive ?? 0} tone="bg-amber-100 text-amber-700" href="/gestao-premio/programas" />
+<StatCard icon={FileSignature} label="Anexos aguardando aprovação" value={c?.annexesPendingApproval ?? 0} tone="bg-orange-100 text-orange-700" href="/gestao-premio/anexos" />
+<StatCard icon={CalendarDays} label="Competências em preenchimento" value={c?.competencesFilling ?? 0} tone="bg-blue-100 text-blue-700" href="/gestao-premio/competencias" />
+<StatCard icon={CalendarDays} label="Competências em validação" value={c?.competencesValidation ?? 0} tone="bg-indigo-100 text-indigo-700" href="/gestao-premio/competencias" /></div><SecondarySection title="Cadastros e histórico"><div className="grid grid-cols-2 gap-3 lg:grid-cols-3"><StatCard icon={CheckCircle2} label="Anexos vigentes" value={c?.annexesEffective ?? 0} tone="bg-emerald-100 text-emerald-700" href="/gestao-premio/anexos" />
+<StatCard icon={Target} label="Indicadores" value={c?.indicators ?? 0} tone="bg-sky-100 text-sky-700" href="/gestao-premio/indicadores" />
+<StatCard icon={CalendarDays} label="Competências fechadas" value={c?.competencesClosed ?? 0} tone="bg-slate-100 text-slate-700" href="/gestao-premio/competencias" /></div></SecondarySection>
           </div>
 
-          <div>
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-              Apuração e folha <span className="ml-1 text-xs font-normal text-muted-foreground/70">(disponível nas próximas fases)</span>
-            </h2>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-              <StatCard icon={Users} label="Colaboradores elegíveis" value={c?.eligibleEmployees ?? 0} tone="bg-muted text-muted-foreground" />
-              <StatCard icon={AlertTriangle} label="Divergências" value={c?.divergences ?? 0} tone="bg-muted text-muted-foreground" />
-              <StatCard icon={Calculator} label="Cálculos processados" value={c?.calculationsProcessed ?? 0} tone="bg-muted text-muted-foreground" />
-              <StatCard icon={Users} label="Lotes para folha" value={c?.payrollBatches ?? 0} tone="bg-muted text-muted-foreground" />
-              <StatCard icon={FileSignature} label="Espelhos publicados" value={c?.payslipsPublished ?? 0} tone="bg-muted text-muted-foreground" />
-            </div>
-          </div>
+
 
           <Card>
             <CardContent className="p-4">

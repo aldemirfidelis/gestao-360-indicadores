@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Download, FileSpreadsheet, FileText, Printer, Save, SlidersHorizontal } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Printer, SlidersHorizontal } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { FilterBar } from '@/components/platform/filter-bar';
 import { MetricCard } from '@/components/platform/metric-card';
@@ -153,62 +153,40 @@ export default function ReportsPage() {
           </>
         }
         summary={
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <MetricCard title="Indicadores" value={formatNumber(overview.data?.totalIndicators)} description="Base do relatório" icon={<FileSpreadsheet className="h-4 w-4" />} tone="blue" href="/indicators" />
             <MetricCard title="Atingimento geral" value={formatPercent(overview.data?.generalAttainment)} description="Resumo executivo" icon={<FileText className="h-4 w-4" />} tone="green" href="/visualization" />
             <MetricCard title="Ações em aberto" value={formatNumber(overview.data?.openActions)} description={`${formatNumber(overview.data?.overdueActions)} atrasadas`} icon={<SlidersHorizontal className="h-4 w-4" />} tone="yellow" href="/actions" />
-            <MetricCard title="Exportações" value={formatNumber(CSV_REPORTS.length + 1)} description="PDF e CSV" icon={<Download className="h-4 w-4" />} tone="purple" />
           </div>
         }
       />
 
-      <FilterBar
-        actions={
-          <Button variant="outline" size="sm" disabled title="Filtros salvos serão ativados quando houver persistência configurada.">
-            <Save className="mr-2 h-4 w-4" />
-            Salvar filtro
-          </Button>
-        }
-      >
+      <FilterBar>
         <div>
-          <NativeSelect value={scope} onChange={(e) => setScope(e.target.value)}>
+          <NativeSelect aria-label="Filtrar relatório" value={scope} onChange={(e) => setScope(e.target.value)}>
             <option value="ALL">Todos os setores</option>
             <option value="CRITICAL">Apenas críticos</option>
             <option value="ACTIONS">Com plano de ação</option>
           </NativeSelect>
         </div>
         <div>
-          <Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
+          <Input aria-label="Mês do relatório" type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
         </div>
       </FilterBar>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Relatório executivo" description="Sumário em PDF para reuniões, com indicadores, faróis e prioridades.">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="grid h-12 w-12 place-items-center rounded-lg bg-primary text-primary-foreground">
-              <FileText className="h-6 w-6" />
-            </div>
-            <Button onClick={generateExecutivePdf} className="sm:ml-auto">
-              <FileText className="mr-2 h-4 w-4" />
-              Gerar PDF
-            </Button>
-          </div>
-        </SectionCard>
-
+      <SectionCard title="Exportar dados" description="Escolha o conteúdo para baixar em CSV.">
+        <div className="divide-y">
         {CSV_REPORTS.map((r) => (
-          <SectionCard key={r.key} title={r.label} description={r.description}>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="grid h-12 w-12 place-items-center rounded-lg bg-muted text-muted-foreground">
-                <FileSpreadsheet className="h-6 w-6" />
-              </div>
-              <Button variant="outline" onClick={() => downloadCsv(r.url, `${r.key}.csv`)} className="sm:ml-auto">
+            <div key={r.key} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div className="min-w-0"><p className="text-sm font-medium">{r.label}</p><p className="text-xs text-muted-foreground">{r.description}</p></div>
+              <Button size="sm" variant="outline" aria-label={`Baixar ${r.label} em CSV`} onClick={() => downloadCsv(r.url, `${r.key}.csv`)}>
                 <Download className="mr-2 h-4 w-4" />
                 Baixar CSV
               </Button>
             </div>
-          </SectionCard>
         ))}
-      </div>
+        </div>
+      </SectionCard>
     </div>
   );
 }

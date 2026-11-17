@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { BarChart3, FolderKanban, Link2, Plus } from 'lucide-react';
+import { FolderKanban, Link2, Plus } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { ConfirmDialog } from '@/components/platform/confirm-dialog';
+import { SecondarySection } from '@/components/platform/secondary-section';
 import { EmptyState } from '@/components/platform/empty-state';
 import { Stat } from '@/components/projects/project-costs';
 import { ProjectFormDialog } from '@/components/projects/project-form-dialog';
@@ -133,7 +134,7 @@ export function ProcessImprovement({
           <h2 className="font-semibold">Projetos de melhoria (PMO)</h2>
           <p className="text-sm text-muted-foreground">
             Portfólio dos projetos que melhoram este processo, com cronograma Gantt, curva S de avanço, marcos e tarefas.
-            Os projetos ficam no módulo Projetos; aqui você acompanha e cria já vinculado.
+
           </p>
         </div>
         {actions}
@@ -154,39 +155,35 @@ export function ProcessImprovement({
           description={canEditProcess
             ? 'Crie um projeto já vinculado a este processo ou vincule um projeto que já existe no portfólio.'
             : 'Quando houver projetos vinculados a este processo, o portfólio, o Gantt e a curva S aparecem aqui.'}
-          action={canEditProcess ? actions : undefined}
         />
       )}
 
       {projects.length > 0 && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <Stat label="Projetos ativos" value={String(summary?.activeProjects ?? 0)} hint={`${projects.length} vinculado(s) · ${done} concluído(s)`} />
-            <Stat
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Stat label="Projetos ativos" value={String(summary?.activeProjects ?? 0)} hint={`${projects.length} vinculado(s) · ${done} concluído(s)`} />
+<Stat
               label="Avanço médio"
               value={`${summary?.avgProgress ?? 0}%`}
               hint={execution.data?.curve.expectedProgress != null ? `Planejado até hoje: ${execution.data.curve.expectedProgress}%` : undefined}
             />
-            <Stat label="Críticos" value={String(critical)} hint={`${atRisk} em risco`} tone={critical > 0 ? 'text-status-red' : undefined} />
-            <Stat
+<Stat label="Críticos" value={String(critical)} hint={`${atRisk} em risco`} tone={critical > 0 ? 'text-status-red' : undefined} />
+<Stat
               label="Pendências vencidas"
               value={String((summary?.tasksOverdue ?? 0) + (summary?.milestonesOverdue ?? 0))}
               hint={`${summary?.tasksOverdue ?? 0} tarefa(s) · ${summary?.milestonesOverdue ?? 0} marco(s)`}
               tone={(summary?.tasksOverdue ?? 0) + (summary?.milestonesOverdue ?? 0) > 0 ? 'text-status-red' : undefined}
-            />
-            <Stat
+            /></div><SecondarySection title="Custos e riscos"><div className="grid gap-3 sm:grid-cols-2"><Stat
               label="Orçamento"
               value={formatMoney(summary?.budgetTotal ?? 0)}
               hint={`Realizado ${formatMoney(summary?.actualCost ?? 0)}`}
               tone={(summary?.overBudget ?? 0) > 0 ? 'text-status-red' : undefined}
             />
-            <Stat
+<Stat
               label="Riscos abertos"
               value={String((summary?.openRisks ?? 0) + (summary?.openIssues ?? 0))}
               hint={`${summary?.openIssues ?? 0} impedimento(s)`}
               tone={(summary?.openIssues ?? 0) > 0 ? 'text-status-red' : undefined}
-            />
-          </div>
+            /></div></SecondarySection>
 
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><FolderKanban className="h-4 w-4" /> Portfólio do processo</CardTitle></CardHeader>
@@ -265,21 +262,16 @@ export function ProcessImprovement({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Cronograma dos projetos (Gantt)</CardTitle></CardHeader>
-            <CardContent>
-              <PortfolioGantt projects={projects} />
-            </CardContent>
-          </Card>
+          <SecondarySection title="Cronograma dos projetos (Gantt)"><PortfolioGantt projects={projects} /></SecondarySection>
 
           {execution.isError && (
             <p role="alert" className="text-sm text-muted-foreground">Não foi possível carregar a curva S e a agenda: {execution.error.message}</p>
           )}
           {execution.data && (
-            <>
+            <SecondarySection title="Curva S e agenda">
               <PortfolioCurveCard curve={execution.data.curve} title="Curva S da melhoria do processo" fileName="curva-s-melhoria-processo.csv" />
               <PortfolioAgenda data={execution.data} canEdit={canEditProjects} />
-            </>
+            </SecondarySection>
           )}
         </>
       )}

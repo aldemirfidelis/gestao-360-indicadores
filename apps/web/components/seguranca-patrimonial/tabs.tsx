@@ -1,84 +1,35 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { SecondarySection } from '@/components/platform/secondary-section';
+import { useMemo, useState, type ChangeEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  AlertCircle,
-  AlertTriangle,
-  ArrowRightLeft,
-  CalendarDays,
-  CarFront,
-  CheckCircle2,
-  Clock,
-  Compass,
-  DoorClosed,
-  DoorOpen,
-  Download,
-  FileCheck,
-  FileClock,
-  FileText,
-  FileUp,
-  FileWarning,
-  HelpCircle,
-  Key,
-  KeyRound,
-  Laptop,
-  LayoutDashboard,
-  Maximize2,
-  Minimize2,
-  Monitor,
-  PackageCheck,
-  Plus,
-  QrCode,
-  RadioTower,
-  RotateCcw,
-  Search,
-  Shield,
-  Upload,
-  UserPlus,
-  Users,
-  Workflow,
-} from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowRightLeft, CalendarDays, CarFront, CheckCircle2, Clock, Compass, DoorClosed, DoorOpen, FileCheck, FileClock, FileText, FileUp, FileWarning, HelpCircle, Key, KeyRound, LayoutDashboard, Maximize2, Minimize2, Monitor, PackageCheck, Plus, QrCode, RadioTower, Search, Shield, Upload, UserPlus, Users, Workflow } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
+
 import { MetricCard } from '@/components/platform/metric-card';
 import { SectionCard } from '@/components/platform/section-card';
 import { EmptyState } from '@/components/platform/empty-state';
 import { StatusBadge } from '@/components/platform/status-badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+
 import { NativeSelect } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+
 import { useAuth } from '@/components/auth/auth-provider';
 import { SecurityQrGeneratorSection } from '@/components/asset-security/qr-generator-section';
 import { api } from '@/lib/api';
 import { cn, formatNumber } from '@/lib/utils';
-import { useAssetSecurityDashboard } from '@/hooks/asset-security/use-asset-security-dashboard';
-import {
-  AUTH_STATUS_LABELS,
-  CUSTODY_STATUS_LABELS,
-  CUSTODY_TYPE_LABELS,
-  DOCUMENT_STATUS_LABELS,
-  INCIDENT_SEVERITY_LABELS,
-  MOVEMENT_STATUS_LABELS,
-  MOVEMENT_TYPE_LABELS,
-  PACKAGE_STATUS_LABELS,
-  PERSON_TYPE_LABELS,
-  RECORD_STATUS_LABELS,
-  labelFor,
-  statusTone,
-  toOptions,
-} from '@/lib/asset-security/labels';
-import { dwellMinutes, formatDateTime, formatDuration } from '@/lib/asset-security/format';
+
+import { AUTH_STATUS_LABELS, CUSTODY_STATUS_LABELS, CUSTODY_TYPE_LABELS, DOCUMENT_STATUS_LABELS, INCIDENT_SEVERITY_LABELS, MOVEMENT_STATUS_LABELS, PACKAGE_STATUS_LABELS, PERSON_TYPE_LABELS, RECORD_STATUS_LABELS, labelFor, statusTone } from '@/lib/asset-security/labels';
+import { formatDateTime, formatDuration } from '@/lib/asset-security/format';
 import { averageDwellMinutes, documentCompliance, roundsCompliance } from '@/lib/asset-security/analytics';
 import { MovementFlowChart } from '@/components/asset-security/movement-flow-chart';
 import { IncidentBreakdownChart } from '@/components/asset-security/incident-breakdown-chart';
-import { MovementDetailDialog } from '@/components/asset-security/movement-detail-dialog';
+
 import { AuthorizationDetailDialog } from '@/components/asset-security/authorization-detail-dialog';
 import { IncidentsSection } from '@/components/asset-security/incidents-section';
 import { RoundsSection } from '@/components/asset-security/rounds-section';
@@ -88,30 +39,10 @@ import { DocumentRequirementsSection } from '@/components/asset-security/documen
 import { BlocklistSection } from '@/components/asset-security/blocklist-section';
 import { AuditLogSection } from '@/components/asset-security/audit-log-section';
 import { OfflineSyncSection } from '@/components/asset-security/offline-sync-section';
-import type {
-  AnyRecord,
-  AssistantInsightsResponse,
-  SecurityMovement,
-  SecurityOptions,
-  SecuritySummary,
-} from '@/lib/asset-security/types';
-import type { TabKey, DialogField, EntityDialogState } from './types';
+import type { AnyRecord, AssistantInsightsResponse, SecurityMovement, SecuritySummary } from '@/lib/asset-security/types';
+import type { TabKey, EntityDialogState } from './types';
 
-import {
-  buildOptions,
-  personDialog,
-  vehicleDialog,
-  contractorDialog,
-  authorizationDialog,
-  incidentDialog,
-  custodyDialog,
-  loanDialog,
-  materialDialog,
-  gateDialog,
-  postDialog,
-  packageDialog,
-  type Options,
-} from './dialog-configs';
+import { buildOptions, personDialog, vehicleDialog, contractorDialog, authorizationDialog, incidentDialog, custodyDialog, loanDialog, materialDialog, gateDialog, postDialog, packageDialog } from './dialog-configs';
 
 export const TABS: Array<{ key: TabKey; label: string; icon: LucideIcon }> = [
   { key: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
@@ -151,16 +82,13 @@ export function OverviewTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Pessoas presentes" value={loading ? '…' : formatNumber(s?.peoplePresent ?? 0)} description="Dentro das unidades agora" icon={<Users className="h-4 w-4" />} tone="blue" href="/seguranca-patrimonial?tab=operation" />
-        <MetricCard title="Veículos presentes" value={loading ? '…' : formatNumber(s?.vehiclesPresent ?? 0)} description="Com entrada em aberto" icon={<CarFront className="h-4 w-4" />} tone="purple" href="/seguranca-patrimonial?tab=operation" />
-        <MetricCard title="Pendências de saída" value={loading ? '…' : formatNumber(s?.pendingExits ?? 0)} description={`${s?.overduePresence ?? 0} com permanência excedida`} icon={<AlertTriangle className="h-4 w-4" />} tone={(s?.overduePresence ?? 0) > 0 ? 'red' : 'yellow'} href="/seguranca-patrimonial?tab=operation" />
-        <MetricCard title="Ocorrências abertas" value={loading ? '…' : formatNumber(s?.openIncidents ?? 0)} description={`${s?.criticalIncidents ?? 0} críticas`} icon={<FileWarning className="h-4 w-4" />} tone={(s?.criticalIncidents ?? 0) > 0 ? 'red' : 'neutral'} href="/seguranca-patrimonial?tab=rounds" />
-        <MetricCard title="Entradas hoje" value={loading ? '…' : formatNumber(s?.todayEntries ?? 0)} description={`${s?.todayExits ?? 0} saídas no dia`} icon={<DoorOpen className="h-4 w-4" />} tone="green" />
-        <MetricCard title="Permanência média" value={loading ? '…' : formatDuration(avgDwell)} description="Movimentações encerradas" icon={<DoorOpen className="h-4 w-4" />} tone="neutral" />
-        <MetricCard title="Documentos inválidos" value={loading ? '…' : formatNumber(s?.expiredOrInvalidDocuments ?? 0)} description="Pessoas, empresas ou veículos" icon={<FileWarning className="h-4 w-4" />} tone={(s?.expiredOrInvalidDocuments ?? 0) > 0 ? 'red' : 'neutral'} />
-        <MetricCard title="Rondas atrasadas" value={loading ? '…' : formatNumber(s?.lateRounds ?? 0)} description="Atrasadas ou incompletas" icon={<RadioTower className="h-4 w-4" />} tone={(s?.lateRounds ?? 0) > 0 ? 'yellow' : 'neutral'} href="/seguranca-patrimonial?tab=rounds" />
-      </div>
+      <div className="space-y-3"><div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><MetricCard title="Pessoas presentes" value={loading ? '…' : formatNumber(s?.peoplePresent ?? 0)} description="Dentro das unidades agora" icon={<Users className="h-4 w-4" />} tone="blue" href="/seguranca-patrimonial?tab=operation" />
+<MetricCard title="Veículos presentes" value={loading ? '…' : formatNumber(s?.vehiclesPresent ?? 0)} description="Com entrada em aberto" icon={<CarFront className="h-4 w-4" />} tone="purple" href="/seguranca-patrimonial?tab=operation" />
+<MetricCard title="Pendências de saída" value={loading ? '…' : formatNumber(s?.pendingExits ?? 0)} description={`${s?.overduePresence ?? 0} com permanência excedida`} icon={<AlertTriangle className="h-4 w-4" />} tone={(s?.overduePresence ?? 0) > 0 ? 'red' : 'yellow'} href="/seguranca-patrimonial?tab=operation" />
+<MetricCard title="Ocorrências abertas" value={loading ? '…' : formatNumber(s?.openIncidents ?? 0)} description={`${s?.criticalIncidents ?? 0} críticas`} icon={<FileWarning className="h-4 w-4" />} tone={(s?.criticalIncidents ?? 0) > 0 ? 'red' : 'neutral'} href="/seguranca-patrimonial?tab=rounds" /></div><SecondarySection title="Movimentação e conformidade"><div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><MetricCard title="Entradas hoje" value={loading ? '…' : formatNumber(s?.todayEntries ?? 0)} description={`${s?.todayExits ?? 0} saídas no dia`} icon={<DoorOpen className="h-4 w-4" />} tone="green" />
+<MetricCard title="Permanência média" value={loading ? '…' : formatDuration(avgDwell)} description="Movimentações encerradas" icon={<DoorOpen className="h-4 w-4" />} tone="neutral" />
+<MetricCard title="Documentos inválidos" value={loading ? '…' : formatNumber(s?.expiredOrInvalidDocuments ?? 0)} description="Pessoas, empresas ou veículos" icon={<FileWarning className="h-4 w-4" />} tone={(s?.expiredOrInvalidDocuments ?? 0) > 0 ? 'red' : 'neutral'} />
+<MetricCard title="Rondas atrasadas" value={loading ? '…' : formatNumber(s?.lateRounds ?? 0)} description="Atrasadas ou incompletas" icon={<RadioTower className="h-4 w-4" />} tone={(s?.lateRounds ?? 0) > 0 ? 'yellow' : 'neutral'} href="/seguranca-patrimonial?tab=rounds" /></div></SecondarySection></div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <SectionCard title="Fluxo de acessos (14 dias)" description="Entradas e saídas registradas por dia.">
@@ -282,7 +210,7 @@ export function OperationTab({
   const [showAllPending, setShowAllPending] = useState(false);
   const [showAllIncidents, setShowAllIncidents] = useState(false);
   const filterByGate = (rows: SecurityMovement[]) => (gateId ? rows.filter((r) => r.gate?.id === gateId) : rows);
-  
+
   const presentRows = filterByGate(present);
   const pendingRows = filterByGate(pending);
   const filteredMovements = filterByGate(movements);
@@ -300,7 +228,7 @@ export function OperationTab({
 
   return (
     <Root className={cn('space-y-6', focusMode && 'fixed inset-0 z-50 overflow-y-auto bg-[#030712] p-6 lg:p-8 text-slate-100')}>
-      
+
       {/* A. Cabeçalho Dinâmico */}
       <div className="flex flex-col gap-4 border-b border-slate-200 dark:border-slate-800/85 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -430,7 +358,7 @@ export function OperationTab({
 
       {/* D. Grid Principal de Conteúdo */}
       <div className="grid gap-6 lg:grid-cols-3">
-        
+
         {/* Coluna Esquerda: Acessos e Saídas Pendentes */}
         <div className="space-y-6">
           {/* Acessos em tempo real */}
@@ -459,8 +387,8 @@ export function OperationTab({
                         <div className="flex items-center gap-3 min-w-0">
                           <span className={cn(
                             'text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 tracking-wider',
-                            isEntry 
-                              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
+                            isEntry
+                              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                               : 'bg-orange-500/10 border-orange-500/20 text-orange-600 dark:text-orange-400'
                           )}>
                             {isEntry ? 'ENTRADA' : 'SAÍDA'}
@@ -533,9 +461,9 @@ export function OperationTab({
                             </div>
                           </div>
                         </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="h-7 text-[10px] px-2 text-sky-500 hover:text-sky-655 hover:bg-sky-50/50 dark:hover:bg-sky-950/20 rounded-md border border-sky-100 dark:border-sky-900/40"
                           onClick={() => onExit()}
                         >
@@ -674,10 +602,10 @@ export function OperationTab({
                         <div className="flex items-center justify-between gap-3">
                           <span className={cn(
                             'text-[8px] font-bold px-1.5 py-0.5 rounded-full border shrink-0',
-                            isHigh 
-                              ? 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400' 
-                              : isMedium 
-                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400' 
+                            isHigh
+                              ? 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'
+                              : isMedium
+                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400'
                                 : 'bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400'
                           )}>
                             {isHigh ? 'ALTA' : isMedium ? 'MÉDIA' : 'BAIXA'}
@@ -1227,7 +1155,6 @@ function ActionButton({ icon: Icon, title, text, disabled, onClick }: { icon: Lu
 }
 
 /* ----------------------------- Validar QR Code ---------------------------- */
-
 
 export function isTab(value: string | null): value is TabKey {
   return Boolean(value && TABS.some((tab) => tab.key === value));

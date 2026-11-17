@@ -6,9 +6,10 @@ import { toast } from 'sonner';
 import { Download, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { exportNodeToPng } from '@/lib/export-image';
+import { SecondarySection } from '@/components/platform/secondary-section';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
@@ -264,21 +265,14 @@ export default function VisualizationPage() {
           )}
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr),minmax(320px,0.82fr)] lg:items-start">
-          <Card>
-            <CardContent className="p-5">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-foreground">Leitura executiva</h2>
-              <div className="mt-4 grid gap-3 text-sm leading-relaxed text-muted-foreground sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                <ExecutiveReadItem color="bg-status-green" title="Dentro da meta" text="Manter rotina, registrar aprendizado e padronizar boas práticas." />
-                <ExecutiveReadItem color="bg-status-yellow" title="Atenção" text="Checar tendência, risco de virada e contramedidas preventivas." />
-                <ExecutiveReadItem color="bg-status-red status-red-pulse" title="Crítico" text="Exigir causa, responsável, prazo e decisão do fórum executivo." />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Mesma mensagem que a apresentação da Reunião Mensal exibe. */}
-          <KeyMessageCard message={conclusion} onEdit={openConclusionEditor} editDisabled={!selectedNodeId} />
-        </div>
+        <KeyMessageCard message={conclusion} onEdit={openConclusionEditor} editDisabled={!selectedNodeId} />
+        <SecondarySection title="Entender os faróis">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <ExecutiveReadItem color="bg-status-green" title="Dentro da meta" text="Manter rotina, registrar aprendizado e padronizar boas práticas." />
+            <ExecutiveReadItem color="bg-status-yellow" title="Atenção" text="Checar tendência, risco de virada e contramedidas preventivas." />
+            <ExecutiveReadItem color="bg-status-red" title="Crítico" text="Exigir causa, responsável, prazo e decisão do fórum executivo." />
+          </div>
+        </SecondarySection>
       </section>
 
       <Dialog open={conclusionOpen} onOpenChange={setConclusionOpen}>

@@ -5,6 +5,9 @@ const apiBaseURL = process.env.E2E_API_URL ?? 'http://127.0.0.1:3333/api';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // O Playwright limpa a saída a cada execução. Evidências de outras revisões
+  // também ficam em test-results e precisam ser preservadas.
+  outputDir: './test-results/playwright',
   timeout: 30_000,
   expect: { timeout: 7_500 },
   fullyParallel: true,

@@ -1,13 +1,11 @@
 'use client';
 
+import { SecondarySection } from '@/components/platform/secondary-section';
 import { useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  AlertTriangle, ArrowLeftRight, Boxes, Check, ClipboardList, Download, FileCheck2, PackageCheck,
-  Plus, ReceiptText, Send, Settings, ShoppingCart, Store, Truck, Upload, Warehouse as WarehouseIcon, X,
-} from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, Boxes, Check, ClipboardList, Download, FileCheck2, PackageCheck, Plus, ReceiptText, Send, ShoppingCart, Store, Truck, Upload, Warehouse as WarehouseIcon, X } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { DataTable, type ColumnDef } from '@/components/platform/data-table';
 import { PageHeader } from '@/components/shell/page-header';
@@ -146,8 +144,14 @@ export function SuppliesWorkspace() {
     <PageHeader title="Suprimentos" eyebrow="Compras & Estoque" tone="admin" description="Da requisição ao recebimento, com alçadas, saldo transacional e kardex completo por almoxarifado." actions={<div className="flex flex-wrap gap-2">{canProcurement && <Button onClick={() => setRequisitionOpen(true)}><Plus className="mr-2 h-4 w-4" />Nova requisição</Button>}{canStock && <Button variant="outline" onClick={() => setWithdrawalOpen(true)}><Download className="mr-2 h-4 w-4" />Solicitar retirada</Button>}</div>} />
     <Tabs value={tab} onValueChange={setTab}><TabsList className="flex h-auto flex-wrap justify-start"><TabsTrigger value="dashboard">Painel</TabsTrigger>{canProcurement && <TabsTrigger value="requisitions">Requisições</TabsTrigger>}{canProcurementOverview && <TabsTrigger value="orders">Pedidos</TabsTrigger>}{canStock && <TabsTrigger value="stock">Estoque</TabsTrigger>}{canStock && <TabsTrigger value="warehouse">Almoxarifado</TabsTrigger>}{(canStock || canProcurementOverview) && <TabsTrigger value="advanced">Serviços & Inventário</TabsTrigger>}<TabsTrigger value="registrations">Cadastros</TabsTrigger></TabsList>
 
-      <TabsContent value="dashboard" className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric icon={ClipboardList} label="Requisições abertas" value={procurementDashboard.data?.openRequisitions ?? 0} loading={dashboardLoading} /><Metric icon={ShoppingCart} label="Fila do comprador" value={procurementDashboard.data?.buyerQueue ?? 0} loading={dashboardLoading} tone="yellow" /><Metric icon={FileCheck2} label="Aprovações pendentes" value={procurementDashboard.data?.pendingApprovals ?? 0} loading={dashboardLoading} tone="purple" /><Metric icon={Truck} label="Pedidos em curso" value={procurementDashboard.data?.openOrders ?? 0} loading={dashboardLoading} /><Metric icon={Boxes} label="Itens abaixo do mínimo" value={inventoryDashboard.data?.belowMinimum ?? 0} loading={dashboardLoading} tone="red" /><Metric icon={WarehouseIcon} label="Almoxarifados" value={inventoryDashboard.data?.warehouses ?? 0} loading={dashboardLoading} /><Metric icon={ReceiptText} label="Recebimentos no mês" value={procurementDashboard.data?.receiptsThisMonth ?? 0} loading={dashboardLoading} tone="green" /><Metric icon={Store} label="Valor em estoque" value={money(inventoryDashboard.data?.inventoryValue ?? 0)} loading={dashboardLoading} tone="green" /></div>
-        {(procurementDashboard.data?.overdueOrders ?? 0) > 0 && <Card className="border-status-red/40"><CardContent className="flex items-center gap-3 p-4"><AlertTriangle className="h-5 w-5 text-status-red" /><div><div className="font-semibold">{procurementDashboard.data?.overdueOrders} pedido(s) com entrega vencida</div><div className="text-sm text-muted-foreground">O comprador responsável recebe alerta automático pelo MaintenanceScheduler.</div></div></CardContent></Card>}
+      <TabsContent value="dashboard" className="space-y-4"><div className="space-y-3"><div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Metric icon={ClipboardList} label="Requisições abertas" value={procurementDashboard.data?.openRequisitions ?? 0} loading={dashboardLoading} />
+<Metric icon={ShoppingCart} label="Fila do comprador" value={procurementDashboard.data?.buyerQueue ?? 0} loading={dashboardLoading} tone="yellow" />
+<Metric icon={FileCheck2} label="Aprovações pendentes" value={procurementDashboard.data?.pendingApprovals ?? 0} loading={dashboardLoading} tone="purple" />
+<Metric icon={Truck} label="Pedidos em curso" value={procurementDashboard.data?.openOrders ?? 0} loading={dashboardLoading} /></div><SecondarySection title="Estoque e recebimentos"><div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Metric icon={Boxes} label="Itens abaixo do mínimo" value={inventoryDashboard.data?.belowMinimum ?? 0} loading={dashboardLoading} tone="red" />
+<Metric icon={WarehouseIcon} label="Almoxarifados" value={inventoryDashboard.data?.warehouses ?? 0} loading={dashboardLoading} />
+<Metric icon={ReceiptText} label="Recebimentos no mês" value={procurementDashboard.data?.receiptsThisMonth ?? 0} loading={dashboardLoading} tone="green" />
+<Metric icon={Store} label="Valor em estoque" value={money(inventoryDashboard.data?.inventoryValue ?? 0)} loading={dashboardLoading} tone="green" /></div></SecondarySection></div>
+        {(procurementDashboard.data?.overdueOrders ?? 0) > 0 && <Card className="border-status-red/40"><CardContent className="flex items-center gap-3 p-4"><AlertTriangle className="h-5 w-5 text-status-red" /><div><div className="font-semibold">{procurementDashboard.data?.overdueOrders} pedido(s) com entrega vencida</div><div className="text-sm text-muted-foreground">O comprador responsável recebe um alerta automático.</div></div></CardContent></Card>}
         <Card><CardContent className="p-4"><div className="mb-3 font-semibold">Últimas movimentações</div><DataTable data={inventoryDashboard.data?.recentMovements ?? []} columns={movementColumns} loading={inventoryDashboard.isLoading} searchable={false} pageSize={0} emptyTitle="Nenhuma movimentação registrada" /></CardContent></Card>
       </TabsContent>
 

@@ -6,6 +6,7 @@ import { CartesianGrid, ComposedChart, Legend, Line, ReferenceDot, ReferenceLine
 import { Download, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { SecondarySection } from '@/components/platform/secondary-section';
 import { downloadCsv } from '@/lib/compensation/format';
 import { cn, formatNumber } from '@/lib/utils';
 
@@ -46,7 +47,7 @@ export function ProjectCurve({
         ])}><Download className="mr-2 h-4 w-4" /> Exportar curva</Button>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-3">
           <Metric label="Realizado" value={`${formatNumber(progress)}%`} />
           <Metric label="Planejado até hoje" value={expectedProgress === null ? 'Sem cronograma' : `${formatNumber(expectedProgress)}%`} />
           <Metric label="Diferença" value={delta === null ? '—' : `${delta > 0 ? '+' : ''}${formatNumber(delta)} p.p.`} tone={delta === null ? undefined : delta < 0 ? 'text-status-red' : 'text-status-green'} />
@@ -83,6 +84,7 @@ export function ProjectCurve({
             {' '}As medições dos próximos dias formarão a linha de evolução do Realizado.
           </p>
         )}
+        <SecondarySection title="Como o avanço é calculado">
         {note ?? <p className="text-xs text-muted-foreground">
           Planejado pelos prazos das tarefas e dos marcos; quando ambos existem, cada grupo representa metade do avanço.
           Sem tarefas nem marcos, o planejado segue as datas do projeto.
@@ -90,6 +92,7 @@ export function ProjectCurve({
           {curve.historyStartsOn ? ` Histórico disponível desde ${dateLabel(curve.historyStartsOn)}.` : ' O histórico começa com a primeira atualização.'}
           {' '}Alterar o cronograma recalcula o planejado; medições passadas do realizado são preservadas.
         </p>}
+        </SecondarySection>
         {!curve.hasSchedule && <p className="text-sm text-muted-foreground">Preencha as datas do projeto ou de todas as tarefas para comparar o avanço com o planejado.</p>}
       </CardContent>
     </Card>
@@ -97,5 +100,5 @@ export function ProjectCurve({
 }
 
 function Metric({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return <div className="rounded-md border p-3"><div className="text-[11px] uppercase text-muted-foreground">{label}</div><div className={cn('mt-1 font-semibold tabular-nums', tone)}>{value}</div></div>;
+  return <div className="min-w-0"><div className="text-xs text-muted-foreground">{label}</div><div className={cn('mt-1 font-semibold tabular-nums', tone)}>{value}</div></div>;
 }

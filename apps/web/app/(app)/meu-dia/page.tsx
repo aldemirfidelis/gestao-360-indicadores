@@ -5,11 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  AlertTriangle, AtSign, Bookmark, CalendarDays, CheckCircle2, CheckSquare, Clock3, Columns3, EyeOff, FileText, FileWarning,
-  Inbox, LayoutList, Megaphone, MessageSquare, Pin, Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Sparkles, Table2, Target, Stamp, ThumbsDown, ThumbsUp, UserPlus, Users, Workflow,
-  Star, Sun, BarChart3, Clock,
-} from 'lucide-react';
+import { AlertTriangle, AtSign, Bookmark, CalendarDays, CheckCircle2, CheckSquare, Clock3, Columns3, EyeOff, FileText, FileWarning, Inbox, LayoutList, Megaphone, MessageSquare, Pin, Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Sparkles, Table2, Target, Stamp, ThumbsDown, ThumbsUp, UserPlus, Users, Workflow, Star, BarChart3, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -332,18 +328,6 @@ export default function MeuDiaPage() {
   const s = overview.data?.summary;
   const isManager = overview.data?.isManager;
   const priorities = overview.data?.items ?? [];
-  // Indice "no prazo": % dos itens pendentes que NAO estao vencidos (calculado do resumo real).
-  const dayIndex = s ? (s.pending > 0 ? Math.max(0, Math.min(100, Math.round(((s.pending - s.overdue) / s.pending) * 100))) : 100) : 100;
-  const digestHeadline = !s
-    ? 'Carregando seu dia…'
-    : s.overdue > 0
-      ? formatQuantity(s.overdue, 'item vencido exige atenção', 'itens vencidos exigem atenção')
-      : s.dueToday > 0
-        ? formatQuantity(s.dueToday, 'item vencendo hoje', 'itens vencendo hoje')
-        : s.pending > 0
-          ? 'Nenhum item vencido — mantenha o ritmo'
-          : 'Tudo em dia! Nenhuma pendência atribuída a você.';
-  const digestMessage = assistant.data?.summary ?? 'Mantenha o foco e a disciplina para seguir gerando resultados.';
   const cards = useMemo(() => ([
     { key: 'pending', label: 'Pendentes', value: s?.pending ?? 0, cls: 'text-slate-700' },
     { key: 'overdue', label: 'Vencidos', value: s?.overdue ?? 0, cls: 'text-rose-600' },
@@ -363,7 +347,7 @@ export default function MeuDiaPage() {
         eyebrow="Meu Dia"
         title={greeting() + ', ' + (user?.name?.split(' ')[0] ?? 'bem-vindo') + '!'}
         description={tab === 'overview'
-          ? 'Vamos transformar planos em resultados extraordinários hoje.'
+          ? 'Acompanhe suas pendências, prioridades e compromissos.'
           : (s?.pending ?? 0) > 0
             ? 'Você possui ' + formatQuantity(s?.pending ?? 0, 'item', 'itens') + ' para tratar — ' + formatQuantity(s?.overdue ?? 0, 'item vencido', 'itens vencidos') + '.'
             : 'Tudo em dia! Nenhuma pendência atribuída a você.'}
@@ -424,7 +408,7 @@ export default function MeuDiaPage() {
         <div className="flex items-center gap-2 flex-wrap">
           {onOverview ? (
             <span className="text-xs font-medium text-slate-500">
-              Painel consolidado — abra <strong>Prioridades</strong> ou <strong>Hoje</strong> para alternar entre Lista, Tabela, Kanban, Calendário e Linha do tempo.
+              Suas prioridades e compromissos.
             </span>
           ) : (
             <>
@@ -462,7 +446,7 @@ export default function MeuDiaPage() {
         </Button>
       </div>
 
-      {!onOverview && (
+      {(
         <AssistantPanel
           data={assistant.data}
           loading={assistant.isPending}
@@ -475,96 +459,6 @@ export default function MeuDiaPage() {
       {/* Lista de itens ou Painel Visão Geral */}
       {tab === 'overview' ? (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Resumo do seu dia — indice "no prazo" e contadores reais do resumo */}
-          <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-[#0c1938] to-[#12224d] p-6 text-white shadow-md border border-[#1b2b54]/40 flex flex-col justify-between min-h-[220px]">
-            <div className="flex items-start justify-between w-full gap-4">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 mt-1">
-                  <Sun className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold tracking-tight text-white">Resumo do seu dia</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Visão consolidada do que mais importa agora.</p>
-                </div>
-              </div>
-              <div className="relative flex items-center justify-center h-20 w-20 shrink-0">
-                <svg className="w-20 h-20 transform -rotate-90">
-                  <circle cx="40" cy="40" r="30" className="stroke-slate-800 fill-none" strokeWidth="6" />
-                  <circle cx="40" cy="40" r="30" className={cn('fill-none', dayIndex >= 80 ? 'stroke-cyan-400' : dayIndex >= 50 ? 'stroke-amber-400' : 'stroke-rose-400')} strokeWidth="6"
-                    strokeDasharray={`${2 * Math.PI * 30}`}
-                    strokeDashoffset={`${2 * Math.PI * 30 * (1 - dayIndex / 100)}`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-sm font-bold text-white leading-none">{dayIndex}%</span>
-                  <span className="text-[9px] text-cyan-400 font-semibold mt-0.5">No prazo</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="my-4">
-              <h4 className="text-md font-semibold text-white tracking-tight">{digestHeadline}</h4>
-              <p className="text-xs text-slate-300 mt-1 leading-relaxed">{digestMessage}</p>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 pt-4 border-t border-white/[0.06] text-center">
-              {[
-                { dot: 'bg-blue-500', label: 'A tratar', value: s?.pending ?? 0 },
-                { dot: 'bg-rose-500', label: 'Vencidos', value: s?.overdue ?? 0 },
-                { dot: 'bg-amber-500', label: 'Vencendo hoje', value: s?.dueToday ?? 0 },
-                { dot: 'bg-purple-500', label: 'Aprovações', value: s?.approvals ?? 0 },
-              ].map((st) => (
-                <div key={st.label} className="flex flex-col items-center">
-                  <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
-                    <span className={cn('h-2 w-2 rounded-full', st.dot)}></span> {st.label}
-                  </div>
-                  <div className="text-lg font-bold text-white mt-1">{st.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Insights com IA — recomendacoes reais do assistente (/my-day/assistant) */}
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm flex flex-col justify-between min-h-[220px]">
-            <div className="flex items-start justify-between w-full">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 mt-1">
-                  <Sparkles className="h-4 w-4" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="font-bold text-slate-800 tracking-tight text-sm">Insights com IA</h3>
-                    {assistant.data?.enabled === false && <span className="bg-slate-100 text-slate-500 text-[9px] font-bold px-1.5 py-0.5 rounded-full">Desativado</span>}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">Análises inteligentes para apoiar suas decisões.</p>
-                </div>
-              </div>
-            </div>
-
-            {assistant.isPending ? (
-              <div className="h-20 animate-pulse rounded-xl bg-muted/30 my-3" />
-            ) : assistant.data?.recommendations?.[0] ? (
-              <div className="bg-[#fcfaff] border border-indigo-50/50 rounded-xl p-4 my-3 flex items-start gap-2.5">
-                <div className="p-1 rounded-full bg-indigo-100 text-indigo-500 shrink-0 mt-0.5">
-                  <Sparkles className="h-3 w-3" />
-                </div>
-                <div className="text-xs leading-relaxed text-indigo-950 font-medium">
-                  <strong className="text-indigo-900 block font-bold mb-0.5">{assistant.data.recommendations[0].title}</strong>
-                  {assistant.data.recommendations[0].suggestion}
-                </div>
-              </div>
-            ) : (
-              <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-4 my-3 text-xs leading-relaxed text-emerald-900 font-medium">
-                {assistant.data?.summary ?? 'Nenhuma criticidade relevante identificada no momento.'}
-              </div>
-            )}
-
-            <button type="button" onClick={() => setTab('priorities')} className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
-              Ver mais insights <span className="text-[14px] font-bold">&rarr;</span>
-            </button>
-          </div>
-
           {/* Prioridades do dia — itens reais priorizados (overview.items) */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
@@ -587,7 +481,7 @@ export default function MeuDiaPage() {
           </div>
 
           {/* Aprovações pendentes — itens reais (itemType APPROVAL) */}
-          {isProductModuleActive('automations') && (<div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+          {isProductModuleActive('automations') && (panelApprovals.data?.rows ?? []).length > 0 && (<div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <Stamp className="h-4.5 w-4.5 text-purple-600" />
@@ -643,7 +537,7 @@ export default function MeuDiaPage() {
           </div>
 
           {/* Riscos críticos — itens reais (itemType RISK_CRITICAL) */}
-          {isProductModuleActive('risks') && (<div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+          {isProductModuleActive('risks') && (panelRisks.data?.rows ?? []).length > 0 && (<div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4.5 w-4.5 text-red-500" />
@@ -663,7 +557,7 @@ export default function MeuDiaPage() {
           </div>)}
 
           {/* Documentos — itens reais (revisão, aprovação, edição e leitura obrigatória) */}
-          {isProductModuleActive('documents') && (<div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+          {isProductModuleActive('documents') && (panelDocs.data?.rows ?? []).length > 0 && (<div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <FileText className="h-4.5 w-4.5 text-blue-500" />
@@ -683,7 +577,7 @@ export default function MeuDiaPage() {
           </div>)}
 
           {/* Indicadores fora da meta — itens reais (INDICATOR_OFF_TARGET) */}
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+          {(panelIndicators.data?.rows ?? []).length > 0 && <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-4.5 w-4.5 text-cyan-600" />
@@ -700,10 +594,10 @@ export default function MeuDiaPage() {
                 (panelIndicators.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => openVision(it)} />)
               )}
             </div>
-          </div>
+          </div>}
 
           {/* Acompanhamentos — itens reais que você segue (tab following) */}
-          <div className="lg:col-span-3 rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+          {(panelFollowing.data?.rows ?? []).length > 0 && <div className="lg:col-span-3 rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <Bookmark className="h-4.5 w-4.5 text-emerald-600" />
@@ -720,7 +614,7 @@ export default function MeuDiaPage() {
                 (panelFollowing.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => inspectItem(it)} />)
               )}
             </div>
-          </div>
+          </div>}
         </div>
       ) : (
         <div className="space-y-2">

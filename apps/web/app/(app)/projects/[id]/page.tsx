@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, Clock3, Copy, Pencil, Target, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Copy, Pencil, Target, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { useAuth } from '@/components/auth/auth-provider';
 import { ConfirmDialog } from '@/components/platform/confirm-dialog';
@@ -17,23 +17,7 @@ import { ProjectRisks } from '@/components/projects/project-risks';
 import { ProjectSchedule } from '@/components/projects/project-schedule';
 import { ProjectTeam } from '@/components/projects/project-team';
 import { ProjectUpdates } from '@/components/projects/project-updates';
-import {
-  HEALTH_LABEL,
-  HEALTH_PILL,
-  PMO_CLASS,
-  PMO_LABEL,
-  PRIORITY_LABEL,
-  PRIORITY_PILL,
-  STATUS_LABEL,
-  STATUS_ORDER,
-  STATUS_PILL,
-  formatDay,
-  formatMoney,
-  toDateInput,
-  type LinkedIndicator,
-  type ProjectDetail,
-  type ProjectStatus,
-} from '@/components/projects/types';
+import { HEALTH_LABEL, HEALTH_PILL, PMO_CLASS, PMO_LABEL, PRIORITY_LABEL, PRIORITY_PILL, STATUS_LABEL, STATUS_ORDER, STATUS_PILL, formatDay, formatMoney, toDateInput, type LinkedIndicator, type ProjectDetail } from '@/components/projects/types';
 import { useProjectAction, useProjectOptions } from '@/components/projects/use-project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -102,7 +86,6 @@ export default function ProjectDetailPage() {
   const p = query.data;
   const people = options.data?.people ?? [];
   const indicators = options.data?.indicators ?? [];
-  const varianceLabel = p.scheduleVariance === null ? '—' : `${p.scheduleVariance > 0 ? '+' : ''}${p.scheduleVariance} p.p.`;
   const latestUpdate = p.updates[0] ?? null;
   const charter: Array<[string, string | null]> = [
     ['Objetivo', p.objective],
@@ -176,11 +159,21 @@ export default function ProjectDetailPage() {
         {p.finance.overBudget && <span className="pill pill-red">Orçamento estourado</span>}
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Summary label="Progresso">
-          <div className="font-semibold">{p.progressOverall}%</div>
-          <Progress value={p.progressOverall} className="mt-1" />
-        </Summary>
+
+
+      <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)}>
+        <TabsList>
+          <TabsTrigger value="overview">Visão geral</TabsTrigger>
+          <TabsTrigger value="schedule">Cronograma ({p.tasks.length + p.milestones.length})</TabsTrigger>
+          <TabsTrigger value="costs">Custos</TabsTrigger>
+          <TabsTrigger value="risks">Riscos ({p.openRisks + p.openIssues})</TabsTrigger>
+          <TabsTrigger value="team">Equipe ({p.members.length})</TabsTrigger>
+          <TabsTrigger value="updates">Status report ({p.updates.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+<div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+
         <Summary label="Prazo previsto">
           <div className="font-semibold">{formatDay(p.startsAt)} a {formatDay(p.endsAt)}</div>
           {(p.actualStartAt || p.actualEndAt) && (
@@ -202,53 +195,9 @@ export default function ProjectDetailPage() {
           <div className="text-xs text-muted-foreground">{p.openRisks} risco(s) · {p.openIssues} impedimento(s)</div>
         </Summary>
       </div>
-
-      <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)}>
-        <TabsList>
-          <TabsTrigger value="overview">Visão geral</TabsTrigger>
-          <TabsTrigger value="schedule">Cronograma ({p.tasks.length + p.milestones.length})</TabsTrigger>
-          <TabsTrigger value="costs">Custos</TabsTrigger>
-          <TabsTrigger value="risks">Riscos ({p.openRisks + p.openIssues})</TabsTrigger>
-          <TabsTrigger value="team">Equipe ({p.members.length})</TabsTrigger>
-          <TabsTrigger value="updates">Status report ({p.updates.length})</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview">
           <ProcessReferences type="PROJECT" targetId={p.id} />
 
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock3 className="h-4 w-4" /> Status PMO
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <span className={cn('pill', PMO_CLASS[p.pmoStatus])}>{PMO_LABEL[p.pmoStatus]}</span>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Status calculado por prazo, progresso planejado, marcos e tarefas vencidas.
-                  </p>
-                </div>
-                {(p.milestonesOverdue > 0 || p.tasksOverdue > 0) && (
-                  <button
-                    type="button"
-                    onClick={() => setTab('schedule')}
-                    className="inline-flex items-center gap-2 rounded-md border border-status-red/30 bg-status-red/10 px-3 py-2 text-sm text-status-red"
-                  >
-                    <AlertTriangle className="h-4 w-4" />
-                    Pendências vencidas: ver cronograma
-                  </button>
-                )}
-              </div>
-              <div className="grid gap-3 sm:grid-cols-4">
-                <Fact label="Planejado até hoje" value={p.expectedProgress === null ? 'Sem cronograma' : `${p.expectedProgress}%`} />
-                <Fact label="Variação" value={varianceLabel} tone={(p.scheduleVariance ?? 0) < -15 ? 'text-status-red' : undefined} />
-                <Fact label="Marcos vencidos" value={String(p.milestonesOverdue)} tone={p.milestonesOverdue > 0 ? 'text-status-red' : undefined} />
-                <Fact label="Tarefas vencidas" value={String(p.tasksOverdue)} tone={p.tasksOverdue > 0 ? 'text-status-red' : undefined} />
-              </div>
-            </CardContent>
-          </Card>
+          {(p.milestonesOverdue > 0 || p.tasksOverdue > 0) && <Button className="mb-4" variant="outline" onClick={() => setTab('schedule')}><AlertTriangle className="mr-2 h-4 w-4" />{p.tasksOverdue} tarefas e {p.milestonesOverdue} marcos vencidos</Button>}
 
           <ProjectCurve curve={p.curve} progress={p.progressOverall} expectedProgress={p.expectedProgress} />
 
@@ -383,15 +332,6 @@ function Summary({ label, children }: { label: string; children: ReactNode }) {
         {children}
       </CardContent>
     </Card>
-  );
-}
-
-function Fact({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <div className="rounded-md border p-3">
-      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
-      <div className={cn('font-semibold', tone)}>{value}</div>
-    </div>
   );
 }
 

@@ -1771,3 +1771,37 @@ Projetos acima.
 - O SSH para a Vultr foi negado pelo modo automático antes do OK do usuário e
   funcionou depois de "pode publicar". Alterações locais da demonstração
   corporativa (outra IA) preservadas fora dos commits.
+
+## Simplificação da interface (2026-11-17, trabalho local)
+
+- Pedido: eliminar repetição de cards e excesso de informação em todo o projeto,
+  a partir de Processos. Revisão de 208 páginas e componentes compartilhados;
+  relatório em `docs/REVISAO_SIMPLICIDADE_INTERFACE.md`.
+- Processos abre na lista, com governança e projetos de melhoria em abas.
+  SIPOC, etapas e ações secundárias aparecem ao expandir o processo. Distintos
+  status cadastral em revisão e artefatos em revisão. PMO detalhado sob demanda.
+- Consolidados resumos e navegação de Projetos, Meu Dia, Tarefas, Reunião Mensal,
+  Painel Executivo, Mapa Estratégico, Relatórios e módulos suspensos com o mesmo
+  problema. Cabeçalho/MetricCard/Stat menores; componente SecondarySection usa
+  details/summary e monta o conteúdo na primeira abertura. Busca fica direta;
+  filtros adicionais de Processos/Projetos são expansíveis e preservam seleção.
+- Sem alterações de API, schema, migrations ou banco. Nenhum commit, push ou
+  deploy. Preservados documento/scripts e trecho anterior da memória referentes
+  à demonstração corporativa, já existentes antes desta tarefa.
+- Atenção operacional: a primeira execução do Playwright usou sua saída padrão
+  `test-results` e limpou scripts/capturas/logs locais de revisões anteriores.
+  Não foram recuperados; código, dados e builds de ensaio preservados. Ocorrência
+  informada ao usuário. A configuração foi corrigida para saída exclusiva
+  `test-results/playwright`. Sempre manter logs e evidências de outras revisões
+  fora do diretório que o runner limpa; preferir `--output` explícito.
+- Evidências desta revisão regeneradas em `output/ui-cleanup/`. Validação final:
+  Web 121 testes, oito E2E novos, 24 visões em 18 rotas a 1440/768/390 pixels,
+  zero erros JS, zero fixture ausente e sem rolagem horizontal. Conferidos teclado,
+  leitura/demo, filtros expansíveis e preferências. Lint de 26 arquivos sem erros
+  ou avisos; build final com tipos aprovado, 99 páginas; 21 fontes do bundle
+  focado idênticas ao checkout. Spec/configuração E2E tipados. Sem build Docker
+  nesta etapa local. Scripts e capturas em output/ui-cleanup (ignorado no Git).
+- Build local em `apps/.focused-web-ui-cleanup-NDN9F2`, com junction node_modules
+  para apps/web, saída Next normal (sem standalone no Windows), sem arquivos .env.
+  Não remover recursivamente uma cópia com essa junction. Produção permanece
+  inalterada e publicação exige autorização explícita conforme a regra acima.

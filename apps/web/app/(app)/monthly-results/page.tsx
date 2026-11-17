@@ -3,24 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  AlertTriangle,
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  Gauge,
-  MessageSquareText,
-  Network,
-  Plus,
-  Presentation,
-  RefreshCw,
-  Sparkles,
-  Trash2,
-} from 'lucide-react';
+import { ArrowRight, CalendarDays, Clock3, Gauge, MessageSquareText, Network, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { PageHeader } from '@/components/shell/page-header';
 import { MetricCard } from '@/components/platform/metric-card';
@@ -34,19 +20,8 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
-import { cn, formatDate, formatNumber, formatPercent, periodRefLabel } from '@/lib/utils';
-import {
-  LIGHT_COLORS,
-  LIGHT_LABEL,
-  LIGHT_STYLES,
-  STATUS_STYLES,
-  type Light,
-  type MonthlyDashboard,
-  type MonthlyOptions,
-  defaultPeriodRef,
-  formatValue,
-  normalize,
-} from './shared';
+import { cn, formatDate, periodRefLabel } from '@/lib/utils';
+import { LIGHT_COLORS, STATUS_STYLES, type Light, type MonthlyDashboard, type MonthlyOptions, defaultPeriodRef, normalize } from './shared';
 
 export default function MonthlyResultsHome() {
   const qc = useQueryClient();
@@ -150,13 +125,11 @@ function MetricGrid({ dashboard, loading }: { dashboard?: MonthlyDashboard; load
   const items = [
     { title: 'Reuniões no mês', value: m?.meetingsInPeriod ?? 0, detail: `${m?.areasReady ?? 0} área(s) prontas`, icon: CalendarDays, tone: 'blue' },
     { title: 'Áreas participantes', value: m?.participantAreas ?? 0, detail: `${m?.areasWithoutUpdate ?? 0} sem atualização`, icon: Network, tone: 'neutral' },
-    { title: 'Dentro da meta', value: m?.indicatorsGreen ?? 0, detail: 'Verde ou azul', icon: CheckCircle2, tone: 'green' },
-    { title: 'Fora da meta', value: m?.indicatorsRed ?? 0, detail: `${m?.indicatorsYellow ?? 0} em atenção`, icon: AlertTriangle, tone: 'red' },
     { title: 'Ações atrasadas', value: m?.overdueActions ?? 0, detail: `${m?.doneActions ?? 0} concluídas`, icon: Clock3, tone: 'yellow' },
     { title: 'Decisões pendentes', value: m?.pendingDecisions ?? 0, detail: `${m?.openEscalations ?? 0} escalonamentos`, icon: MessageSquareText, tone: 'purple' },
   ] as const;
   return (
-    <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {items.map((item) => (
         <MetricCard key={item.title} compact title={item.title} value={loading ? '-' : item.value} description={loading ? 'Carregando...' : item.detail} icon={<item.icon className="h-4 w-4" />} tone={item.tone} />
       ))}

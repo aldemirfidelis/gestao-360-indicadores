@@ -1,5 +1,6 @@
 'use client';
 
+import { SecondarySection } from '@/components/platform/secondary-section';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarPlus, GraduationCap, Plus } from 'lucide-react';
@@ -87,7 +88,7 @@ export default function TreinamentoPage() {
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SecondarySection title="Resultados e programação"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Realizados no mês"
               value={data?.metrics.completedThisMonth ?? 0}
@@ -106,7 +107,7 @@ export default function TreinamentoPage() {
               href="/treinamento/pendencias?aba=certificados"
               tone={data?.metrics.certificatesPending ? 'amber' : undefined}
             />
-          </div>
+          </div></SecondarySection>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
