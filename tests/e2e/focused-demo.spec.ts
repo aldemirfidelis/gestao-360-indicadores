@@ -16,7 +16,7 @@ test.describe('produto focado e demonstração pública', () => {
     await expect(page.getByRole('link', { name: 'Acesso aos Candidatos', exact: true })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Acessar Plataforma', exact: true })).toHaveCount(0);
     await page.evaluate(() => localStorage.setItem('g360.refreshToken', 'stale-admin-refresh'));
-    await page.getByRole('link', { name: /Acesse a Demonstração/ }).first().click();
+    await page.getByRole('link', { name: 'Conhecer a demonstração' }).first().click();
     await expect(page).toHaveURL(/\/meu-dia$/, { timeout: 30_000 });
     await expect(page.getByText('Empresa Demonstração · Dados fictícios · Acesso somente para consulta')).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('g360.refreshToken'))).toBeNull();

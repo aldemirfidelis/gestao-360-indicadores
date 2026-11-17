@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: [...privateRoutePrefixes, '/staging', '/homologacao', '/dev', '/_next/static/chunks/', '/*?token=', '/*?session='],
+        disallow: [...privateRoutePrefixes, '/staging', '/homologacao', '/dev', '/*?token=', '/*?session='],
       },
       {
         userAgent: 'OAI-SearchBot',

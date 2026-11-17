@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { currentVisitId, track } from '@/lib/site-analytics';
 
@@ -48,9 +48,14 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
+  const pending = useRef(false);
   const content = modeContent[mode];
 
-  async function submit(formData: FormData) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending.current) return;
+    pending.current = true;
+    const formData = new FormData(event.currentTarget);
     setStatus('loading');
     setMessage('');
     const payload = Object.fromEntries(formData.entries());
@@ -83,14 +88,17 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
     } catch (err) {
       setStatus('error');
       setMessage(err instanceof Error ? err.message : 'Não foi possível enviar o formulário.');
+    } finally {
+      pending.current = false;
     }
   }
 
   return (
     <form
       ref={formRef}
-      action={submit}
-      className="grid gap-4"
+      onSubmit={submit}
+      className="marketing-form grid gap-4"
+      aria-busy={status === 'loading'}
       aria-label={
         mode === 'support'
           ? 'Formulário de suporte do Gestão 360'
@@ -105,14 +113,12 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
       <div className={compact ? 'grid gap-4' : 'grid gap-4 md:grid-cols-2'}>
         <Field label="Nome" name="name" required />
         <Field label="Empresa" name="company" required />
-        <Field label="Cargo" name="role" />
         <Field label="E-mail corporativo" name="email" type="email" required />
-        <Field label="Telefone" name="phone" type="tel" />
         {fixedRequestType[mode] ? (
           <input type="hidden" name="requestType" value={fixedRequestType[mode]} />
         ) : (
           <label className="grid gap-1.5 text-sm font-medium text-slate-800">
-            Tipo de solicitação
+            Tipo de solicitação *
             <select name="requestType" required className="h-11 border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950">
               <option value="">Selecione</option>
               {(mode === 'support' ? supportRequestTypes : generalRequestTypes).map((type) => <option key={type} value={type}>{type}</option>)}
@@ -120,12 +126,14 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
           </label>
         )}
       </div>
+      <details><summary>Adicionar cargo e telefone (opcional)</summary><div className={compact ? 'grid gap-4' : 'grid gap-4 md:grid-cols-2'}><Field label="Cargo" name="role" /><Field label="Telefone" name="phone" type="tel" /></div></details>
       <label className="grid gap-1.5 text-sm font-medium text-slate-800">
-        {content.messageLabel}
+        {content.messageLabel} *
         <textarea
           name="message"
           required
           minLength={10}
+          maxLength={5000}
           rows={compact ? 4 : 5}
           className="border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-950"
           placeholder={content.placeholder}
@@ -135,7 +143,7 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
         <input name="privacy" value="accepted" type="checkbox" required className="mt-1 h-4 w-4 border-slate-300" />
         <span>
           Li e aceito a{' '}
-          <Link href="/politica-de-privacidade" target="_blank" className="font-semibold text-emerald-700 hover:underline">
+          <Link href="/politica-de-privacidade" target="_blank" rel="noopener noreferrer" className="font-semibold text-emerald-700 hover:underline">
             Política de Privacidade
           </Link>
           . Os dados serão usados para atender esta solicitação.
@@ -147,11 +155,11 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
         className="inline-flex h-11 items-center justify-center gap-2 bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {status === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        {content.label}
+        {status === 'loading' ? 'Enviando…' : content.label}
       </button>
       {message && (
         <div
-          role="status"
+          role={status === 'error' ? 'alert' : 'status'}
           className={status === 'success' ? 'flex items-center gap-2 border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800' : 'border border-red-200 bg-red-50 p-3 text-sm text-red-800'}
         >
           {status === 'success' ? <CheckCircle2 className="h-4 w-4" /> : null}
@@ -165,11 +173,14 @@ export function ContactForm({ compact = false, mode = 'general' }: ContactFormPr
 function Field({ label, name, type = 'text', required = false }: { label: string; name: string; type?: string; required?: boolean }) {
   return (
     <label className="grid gap-1.5 text-sm font-medium text-slate-800">
-      {label}
+      {label}{required ? ' *' : ''}
       <input
         name={name}
         type={type}
         required={required}
+        minLength={required && type !== 'email' ? 2 : undefined}
+        maxLength={name === 'company' || name === 'email' ? 180 : name === 'phone' ? 40 : 120}
+        autoComplete={({ name: 'name', company: 'organization', email: 'email', phone: 'tel', role: 'organization-title' } as Record<string, string>)[name]}
         className="h-11 border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950"
       />
     </label>

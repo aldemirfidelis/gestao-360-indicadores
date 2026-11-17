@@ -1,6 +1,6 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
-import type { FaqItem, PublicPage } from '@/lib/public-site';
+import type { ArticlePage, FaqItem, PublicPage } from '@/lib/public-site';
 import { DemoLink } from './demo-link';
 
 export function PageHero({
@@ -12,21 +12,27 @@ export function PageHero({
   eyebrow: string;
   title: string;
   description: string;
-  /** Desligue em páginas que já são o próprio destino do CTA (ex.: /demonstracao),
-   *  senão sobra um bloco vazio com margem no lugar do botão. */
   showDemoCta?: boolean;
 }) {
   return (
-    <section className="border-b border-slate-200 bg-slate-950 py-16 text-white">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">{eyebrow}</p>
-        <h1 className="mt-4 max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-200">{description}</p>
+    <section className="public-page-hero">
+      <div className="public-container">
+        <span className="public-eyebrow">{eyebrow}</span>
+        <h1>{title}</h1>
+        <p>{description}</p>
         {showDemoCta && (
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <DemoLink source="public_page_hero" className="inline-flex h-11 items-center justify-center gap-2 bg-emerald-400 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
-              Acesse a Demonstração <ArrowRight className="h-4 w-4" />
+          <div className="public-actions">
+            <DemoLink source="public_page_hero" className="public-button public-button-cyan">
+              Conhecer a demonstração <ArrowRight size={16} aria-hidden="true" />
             </DemoLink>
+            <Link
+              href="/teste-gratis"
+              data-track="trial_click"
+              data-track-label="public_page_hero"
+              className="public-button public-button-outline"
+            >
+              Experimente o Gestão 360
+            </Link>
           </div>
         )}
       </div>
@@ -36,14 +42,42 @@ export function PageHero({
 
 export function ListingGrid({ pages }: { pages: PublicPage[] }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="public-listing">
       {pages.map((page) => (
-        <Link key={page.path} href={page.path} className="group border border-slate-200 bg-white p-5 hover:border-slate-950">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{page.eyebrow}</div>
-          <h2 className="mt-3 text-xl font-semibold text-slate-950">{page.title}</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">{page.summary}</p>
-          <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-950">
-            Ler mais <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+        <Link key={page.path} href={page.path}>
+          <span className="public-eyebrow">{page.eyebrow}</span>
+          <h2>{page.title}</h2>
+          <p>{page.summary}</p>
+          <span className="public-text-link">
+            Explorar solução <ArrowRight size={15} aria-hidden="true" />
+          </span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+export function ArticleListing({ articles }: { articles: ArticlePage[] }) {
+  return (
+    <div className="public-listing">
+      {articles.map((article) => (
+        <Link key={article.path} href={article.path}>
+          <span className="public-eyebrow">{article.category}</span>
+          <h2>{article.title}</h2>
+          <p>{article.description}</p>
+          <div className="public-article-meta">
+            {article.readingTime} · Revisado em{' '}
+            <time dateTime={article.updatedAt}>
+              {new Intl.DateTimeFormat('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                timeZone: 'UTC',
+              }).format(new Date(article.updatedAt))}
+            </time>
+          </div>
+          <span className="public-text-link">
+            Ler artigo <ArrowRight size={15} aria-hidden="true" />
           </span>
         </Link>
       ))}
@@ -54,47 +88,52 @@ export function ListingGrid({ pages }: { pages: PublicPage[] }) {
 export function PublicPageBody({ page, related }: { page: PublicPage; related?: PublicPage[] }) {
   return (
     <>
-      <section className="bg-white py-16">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.85fr,1.15fr] lg:px-8">
+      <section className="public-section">
+        <div className="public-container public-body-grid">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-700">Problema resolvido</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Por que isso importa</h2>
-            <p className="mt-5 text-base leading-7 text-slate-600">{page.problem}</p>
+            <span className="public-eyebrow">O desafio da gestão</span>
+            <h2>Por que isso importa</h2>
+            <p>{page.problem}</p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="public-benefit-lines">
             {page.benefits.map((benefit) => (
-              <div key={benefit} className="flex gap-3 border border-slate-200 bg-slate-50 p-4">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                <p className="text-sm leading-6 text-slate-700">{benefit}</p>
+              <div key={benefit}>
+                <CheckCircle2 size={18} aria-hidden="true" />
+                <p>{benefit}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
-      <section className="border-y border-slate-200 bg-slate-50 py-16">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+      <section className="public-section public-detail-band">
+        <div className="public-container public-body-grid">
           <div>
-            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">Funcionalidades relacionadas</h2>
-            <div className="mt-6 flex flex-wrap gap-2">
-              {page.features.map((feature) => <span key={feature} className="border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">{feature}</span>)}
+            <h2>Recursos para o trabalho</h2>
+            <div className="public-tags">
+              {page.features.map((feature) => (
+                <span key={feature}>{feature}</span>
+              ))}
             </div>
           </div>
           <div>
-            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">Exemplos de uso</h2>
-            <ul className="mt-6 grid gap-3">
-              {page.useCases.map((useCase) => <li key={useCase} className="border border-slate-200 bg-white p-4 text-sm text-slate-700">{useCase}</li>)}
+            <h2>Onde usar</h2>
+            <ul className="public-use-cases">
+              {page.useCases.map((useCase) => (
+                <li key={useCase}>{useCase}</li>
+              ))}
             </ul>
           </div>
         </div>
       </section>
       <FaqBlock faq={page.faq} />
       {related && related.length > 0 && (
-        <section className="bg-slate-50 py-16">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">Também pode ajudar</h2>
-            <div className="mt-8">
-              <ListingGrid pages={related} />
+        <section className="public-section">
+          <div className="public-container">
+            <div className="public-section-heading">
+              <span className="public-eyebrow">Continue explorando</span>
+              <h2>Conexões que fazem sentido</h2>
             </div>
+            <ListingGrid pages={related} />
           </div>
         </section>
       )}
@@ -104,15 +143,28 @@ export function PublicPageBody({ page, related }: { page: PublicPage; related?: 
 
 export function FaqBlock({ faq }: { faq: FaqItem[] }) {
   return (
-    <section className="bg-white py-16">
-      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-semibold tracking-tight text-slate-950">Perguntas frequentes</h2>
-        <div className="mt-8 divide-y divide-slate-200 border-y border-slate-200">
+    <section className="public-faq">
+      <div className="public-container public-faq-grid">
+        <div className="public-faq-intro">
+          <span className="public-eyebrow">Respostas para começar</span>
+          <h2>Perguntas frequentes</h2>
+          <p>
+            Entenda o acesso, a avaliação e como a plataforma pode participar da gestão da sua
+            empresa.
+          </p>
+          <Link href="/contato" className="public-text-link">
+            Converse com a equipe <ArrowRight size={16} aria-hidden="true" />
+          </Link>
+        </div>
+        <div>
           {faq.map((item) => (
-            <div key={item.question} className="py-5">
-              <h3 className="font-semibold text-slate-950">{item.question}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{item.answer}</p>
-            </div>
+            <details key={item.question}>
+              <summary>
+                {item.question}
+                <span aria-hidden="true">+</span>
+              </summary>
+              <p>{item.answer}</p>
+            </details>
           ))}
         </div>
       </div>

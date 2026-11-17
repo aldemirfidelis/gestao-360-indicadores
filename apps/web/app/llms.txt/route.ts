@@ -5,7 +5,7 @@ export function GET() {
   const lines = [
     `# ${SITE_NAME}`,
     '',
-    'Plataforma SaaS B2B para gestão corporativa integrada, indicadores, planejamento estratégico, planos de ação, documentos, auditorias, riscos, segurança dos alimentos e melhoria contínua.',
+    'Plataforma SaaS B2B que conecta estratégia, BSC, OKRs, processos com SIPOC/BPMN/RACI, indicadores, análise de causa, planos de ação, projetos, documentos e reuniões de resultados.',
     '',
     'Este arquivo é complementar e experimental. Ele não substitui sitemap.xml, robots.txt, dados estruturados, conteúdo HTML nem políticas de acesso.',
     '',

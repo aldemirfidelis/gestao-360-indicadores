@@ -15,10 +15,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} | BSC, indicadores e resultados`,
+    default: `${SITE_NAME} | Estratégia, processos e execução`,
     template: `%s | ${SITE_NAME}`,
   },
-  description: 'Conecte BSC, indicadores, metas, resultados, tarefas, planos de ação e gestão de prêmio.',
+  description: 'Conecte estratégia, processos, indicadores, planos de ação, projetos e documentos em uma plataforma de gestão corporativa.',
   alternates: { canonical: absoluteUrl('/') },
   icons: {
     icon: [
@@ -40,15 +40,15 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'pt_BR',
     siteName: SITE_NAME,
-    title: `${SITE_NAME} | BSC, indicadores e resultados`,
-    description: 'Conecte estratégia, indicadores, execução e gestão de prêmio em um único ambiente.',
+    title: `${SITE_NAME} | Estratégia, processos e execução`,
+    description: 'Conecte estratégia, processos, indicadores, planos de ação, projetos e documentos.',
     url: absoluteUrl('/'),
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630, alt: `${SITE_NAME} - plataforma de gestão corporativa` }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${SITE_NAME} | BSC, indicadores e resultados`,
-    description: 'Conecte estratégia, indicadores, execução e gestão de prêmio em um único ambiente.',
+    title: `${SITE_NAME} | Estratégia, processos e execução`,
+    description: 'Conecte estratégia, processos, indicadores, planos de ação, projetos e documentos.',
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };

@@ -6,17 +6,34 @@ import { breadcrumbJsonLd, publicMetadata, segmentPages, webPageJsonLd } from '@
 
 export const metadata: Metadata = publicMetadata({
   title: 'Segmentos atendidos pelo Gestão 360',
-  description: 'Veja como o Gestão 360 pode apoiar indústria, agronegócio, alimentos e bebidas, serviços e gestão corporativa.',
+  description:
+    'Veja como o Gestão 360 pode apoiar indústria, agronegócio, alimentos e bebidas, serviços e gestão corporativa.',
   path: '/segmentos',
 });
 
 export default function SegmentosPage() {
   return (
     <PublicShell>
-      <JsonLd data={[webPageJsonLd({ title: 'Segmentos', description: metadata.description as string, path: '/segmentos' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Segmentos', path: '/segmentos' }])]} />
-      <PageHero eyebrow="Segmentos" title="Gestão corporativa integrada para diferentes operações." description="Conteúdo organizado por contexto de uso, sem prometer resultados sem diagnóstico do processo da empresa." />
-      <section className="bg-slate-50 py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <JsonLd
+        data={[
+          webPageJsonLd({
+            title: 'Segmentos',
+            description: metadata.description as string,
+            path: '/segmentos',
+          }),
+          breadcrumbJsonLd([
+            { name: 'Início', path: '/' },
+            { name: 'Segmentos', path: '/segmentos' },
+          ]),
+        ]}
+      />
+      <PageHero
+        eyebrow="Segmentos"
+        title="O contexto muda. A gestão continua conectada."
+        description="Explore como processos, indicadores e planos podem apoiar a rotina da indústria, dos serviços e das áreas corporativas."
+      />
+      <section className="public-section">
+        <div className="public-container">
           <ListingGrid pages={segmentPages} />
         </div>
       </section>

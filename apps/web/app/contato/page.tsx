@@ -1,43 +1,69 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
+import Link from 'next/link';
+import { ArrowRight, MessageCircle } from 'lucide-react';
 import { PublicShell } from '@/components/marketing/public-shell';
 import { ContactForm } from '@/components/marketing/contact-form';
 import { JsonLd } from '@/components/marketing/json-ld';
 import { PageHero } from '@/components/marketing/content-blocks';
 import { WHATSAPP_URL, breadcrumbJsonLd, publicMetadata, webPageJsonLd } from '@/lib/public-site';
-
 export const metadata: Metadata = publicMetadata({
-  title: 'Contato e demonstração do Gestão 360',
-  description: 'Solicite uma demonstração do Gestão 360 ou fale pelo WhatsApp para conhecer os módulos de gestão corporativa integrada.',
+  title: 'Converse com a equipe | Gestão 360',
+  description:
+    'Fale sobre seus desafios, solicite uma apresentação ou converse sobre os módulos, a avaliação e a implantação do Gestão 360.',
   path: '/contato',
 });
-
 export default function ContatoPage() {
   return (
     <PublicShell>
-      <JsonLd data={[webPageJsonLd({ title: 'Contato', description: metadata.description as string, path: '/contato' }), breadcrumbJsonLd([{ name: 'Início', path: '/' }, { name: 'Contato', path: '/contato' }])]} />
-      <PageHero eyebrow="Contato" title="Fale com a equipe do Gestão 360." description="Use o formulário para solicitar uma demonstração ou converse pelo WhatsApp com uma mensagem profissional já preenchida." />
-      <section className="bg-slate-50 py-16">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr,0.8fr] lg:px-8">
-          <div className="border border-slate-200 bg-white p-6">
+      <JsonLd
+        data={[
+          webPageJsonLd({
+            title: 'Contato',
+            description: metadata.description as string,
+            path: '/contato',
+          }),
+          breadcrumbJsonLd([
+            { name: 'Início', path: '/' },
+            { name: 'Contato', path: '/contato' },
+          ]),
+        ]}
+      />
+      <PageHero
+        eyebrow="Vamos conversar"
+        title="Conte o que a sua empresa precisa conectar."
+        description="Converse sobre os desafios da operação, os módulos e os próximos passos para conhecer o Gestão 360."
+        showDemoCta={false}
+      />
+      <section className="public-section public-detail-band">
+        <div className="public-container public-trial-grid">
+          <aside>
+            <span className="public-eyebrow">Contato comercial</span>
+            <h2>Comece por uma boa conversa.</h2>
+            <p>
+              Conte quais áreas e resultados você quer acompanhar. A equipe ajuda a entender a
+              aderência da plataforma e o escopo da avaliação.
+            </p>
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-track="whatsapp_click"
+              data-track-label="contact"
+              className="public-button public-button-navy"
+              style={{ marginTop: 26 }}
+            >
+              <MessageCircle size={17} /> Abrir WhatsApp
+            </a>
+            <p>Já utiliza a plataforma e precisa de ajuda?</p>
+            <Link href="/suporte#formulario" className="public-text-link" style={{ marginTop: 14 }}>
+              Fale com o suporte <ArrowRight size={16} />
+            </Link>
+          </aside>
+          <div className="public-trial-form">
+            <h2>Envie sua mensagem</h2>
+            <p>Os campos com * são obrigatórios. Retornaremos pelo canal informado.</p>
             <ContactForm />
           </div>
-          <aside className="space-y-4">
-            <div className="border border-slate-200 bg-white p-6">
-              <h2 className="text-xl font-semibold text-slate-950">WhatsApp comercial</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                O botão usa o número 5564981009108 e registra apenas evento de clique, página de origem e parâmetros de campanha quando existirem.
-              </p>
-              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
-                Abrir WhatsApp
-              </a>
-            </div>
-            <div className="border border-slate-200 bg-white p-6">
-              <h2 className="text-xl font-semibold text-slate-950">Privacidade</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                O formulário foi preparado para retorno comercial. Dados internos, painéis e registros de clientes continuam protegidos no portal autenticado.
-              </p>
-            </div>
-          </aside>
         </div>
       </section>
     </PublicShell>

@@ -37,7 +37,7 @@ test.describe('login, documentos legais e contatos públicos', () => {
 
   test('landing leva ao formulário de trial de 30 dias', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: 'Solicitar meu trial' }).click();
+    await page.getByRole('link', { name: 'Experimente o Gestão 360' }).first().click();
     await expect(page).toHaveURL(/\/teste-gratis/, { timeout: 30_000 });
     await expect(page.getByRole('form', { name: 'Formulário de solicitação de trial do Gestão 360' })).toBeVisible({ timeout: 30_000 });
   });

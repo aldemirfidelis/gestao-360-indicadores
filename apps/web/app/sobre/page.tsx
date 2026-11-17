@@ -18,9 +18,9 @@ export default function SobrePage() {
       <section className="bg-white py-16">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           <div className="space-y-6 text-base leading-8 text-slate-700">
-            <p>O Gestão 360 é uma plataforma corporativa modular para gestão empresarial integrada. Ela conecta empresas, filiais, áreas, processos, indicadores, metas, reuniões, planos de ação, documentos, auditorias, riscos e evidências.</p>
-            <p>O objetivo público do site e explicar a plataforma de forma clara, sem prometer resultados que dependem de implantação, maturidade de processo ou contexto da empresa.</p>
-            <p>Dados de clientes, painéis, documentos e telas administrativas permanecem no portal autenticado e não fazem parte da arquitetura pública indexável.</p>
+            <p>O Gestão 360 conecta planejamento estratégico, processos, indicadores, tarefas, reuniões, planos de ação, projetos e documentos. A estrutura de empresas e áreas mantém as responsabilidades e o acesso associados ao trabalho.</p>
+            <p>A proposta é aproximar a direção definida pela liderança da execução acompanhada pelas equipes. Os vínculos entre registros ajudam a recuperar o contexto das decisões, investigar desvios e verificar as melhorias.</p>
+            <p>Conheça a plataforma na demonstração com dados fictícios ou converse com a equipe para definir o escopo de uma avaliação na sua empresa.</p>
           </div>
         </div>
       </section>

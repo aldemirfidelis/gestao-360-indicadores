@@ -8,7 +8,7 @@ import { breadcrumbJsonLd, publicMetadata, webPageJsonLd } from '@/lib/public-si
 export const metadata: Metadata = publicMetadata({
   title: 'Acesse a Demonstração',
   description:
-    'Explore o BSC, indicadores, resultados e gestão de prêmio com dados fictícios na Empresa Demonstração.',
+    'Explore estratégia, indicadores, processos, projetos e planos em uma empresa fictícia. Demonstração de consulta com acesso limitado e sem cadastro.',
   path: '/demonstracao',
 });
 
