@@ -1699,3 +1699,75 @@ Projetos acima.
   encerramento por terem sido abertos pela outra IA. Ao remover uma cópia,
   apagar antes a junction `node_modules` (aponta para `apps/web/node_modules`)
   com `rmdir`, nunca com remoção recursiva.
+
+## Documentos em todas as empresas e na demonstração (2026-11-17, publicado)
+
+- Pedido do usuário: Documentos aparecia na Pacto, mas não na Empresa
+  Demonstração; deixar o item em todas as empresas. Feito pelo Claude Code na
+  máquina Windows e publicado com OK do usuário (registro ao fim desta seção).
+- Diagnóstico pela sessão pública da demo (somente leitura; o SSH para consultar
+  o banco da Vultr foi bloqueado pelo modo automático do Claude Code): o plano
+  ENTERPRISE da demo libera `documents` (`HERDADO_DO_PLANO`). Bloqueavam três
+  coisas: `/documents` fora de `demoWebRoutes`/`demoApiRoutes` (o commit do GED
+  `49eab3a` deixou a demo de fora e testava isso), perfil `DEMO_PUBLIC` sem
+  nenhuma `doc:*` (40 permissões efetivas; criado quando a família `doc` estava
+  suspensa) e `GET /api/documents/overview` respondendo 403 à demo. Na Pacto
+  funciona porque não é demo, o plano é CORPORATIVO e o ADMIN foi reconciliado.
+- Lacuna geral: a reconciliação aditiva dos perfis de sistema só rodava em
+  `/users/access-context` (tela de Usuários). Empresa antiga ficava sem `doc:*`
+  nos perfis padrão até alguém abrir essa tela.
+- Alterações: `/documents` nas duas listas da demo em `product-scope.json`;
+  migration `20261117120000_demo_documents_access` (garante as quatro linhas do
+  catálogo e concede `doc:view`, `doc:audit`, `doc:download_pdf` e
+  `doc:download_docx` ao `DEMO_PUBLIC` da empresa `demonstracao`; idempotente);
+  `DocumentAccessService.isManager` devolve `false` ao visitante da demo (antes
+  todo COMPANY_ADMIN era gestor: aba Configurações com 403, controle de acesso e
+  documentos restritos); `UsersService.onApplicationBootstrap` reconcilia no boot
+  os perfis de sistema existentes de todas as empresas (só acrescenta, não cria
+  perfis, não toca perfis personalizados; `COMPANY_PROFILES_BOOTSTRAP_DISABLED=1`
+  desliga; erro só vai ao log); rótulos Processos/Documentos nas áreas da demo
+  em Visitantes; e2e `focused-demo.spec.ts` e `docs/GED_DOCUMENTOS.md` ajustados.
+- Efeito conhecido: permissão padrão retirada de um perfil de sistema volta a
+  cada boot (já voltava ao abrir Usuários). Restrição duradoura exige perfil
+  personalizado. Planos Essencial e Personalizado sem o módulo continuam sem
+  Documentos (e sem Processos/Projetos): decisão comercial, não alterada.
+- A demo não tem documentos cadastrados: o acervo aparece vazio. A primeira
+  consulta a `/documents/options` cria os tipos padrão na empresa, como no GED
+  de qualquer empresa.
+- Validação local com 0,6 GB de RAM livres (só testes direcionados): shared
+  compilado e 4 testes; web 16 (navegação e visitantes); API 5 arquivos/107
+  testes e GED/Meu Dia 6/81; lint sem erros (um aviso antigo em `getById`). As
+  159 migrations aplicaram do zero num Postgres 17.10 descartável (binários do
+  `embedded-postgres` em `E:\Projetos\ZapF-cil\node_modules`). Ensaio sintético
+  da migration (efeito, `ON CONFLICT`, isolamento por slug e código, segunda
+  execução sem mudança) e da reconciliação real (136 concessões a um ADMIN vazio,
+  segunda passada 0, `DEMO_PUBLIC` intocado). Banco e dados apagados depois.
+  **Sem tsc completo de API/web e sem navegador**: o build Docker checa os tipos.
+- Publicado: commits `7bd1e98` (correção) e `c5a1a85` (tipagem do spec novo; o
+  `nest build` checa os specs e o primeiro build antecipado falhou com TS2345,
+  sem tocar a produção), push em `main`, versão `0.1.0+c5a1a85a`. Builds
+  antecipados com o portal no ar (API 78 s, web 170 s); `make deploy` de
+  13:20:51Z a 13:21:18Z (27 s). A API aplicou a migration ao subir: 159 em dia.
+- Backup protegido antes: `db-backups/pre-demo-docs-20261117/g360-20261117-132049.dump`,
+  5.899.212 bytes, modo 600, `pg_restore --list` com 4.216 linhas. SHA-256
+  `5e3e818088380cc065b421c821b0ee9c440409c3d97512cb6033035c46e35d75`.
+  Rollback: `g360-api:rollback-850cf3b-demodocs-20261117` e Web equivalente.
+- Pós-deploy: containers saudáveis, zero erro no boot da API e o log
+  "Perfis de sistema reconciliados: 134 permissões adicionadas em 3 empresas".
+  Vínculos perfil-permissão 1.373 → 1.511 (+138, nenhum removido); hashes de
+  AccessProfile, User e UserPermission idênticos. `DEMO_PUBLIC` +4 `doc:*`
+  (migration); perfis de sistema da Gestão 360 e da Demonstração +86 `doc:*` e
+  +48 `processes:*` (Processos faltava nelas pela mesma causa); Pacto sem
+  mudança. Os 63 usuários fictícios da demo não têm perfil; na Gestão 360 o
+  único usuário é Super Admin.
+- Pela internet: 23 checagens na API pública da demo (GED legível; gestão,
+  publicação e criação falsas; rotas `doc:manage` e escrita com 403; WOPI fora
+  da demo; sem sessão 401); páginas públicas 200, `www` 301, versão no login.
+  Chromium na demo real, com eventos de visita descartados no navegador:
+  Documentos no menu entre Projetos e Ata da Reunião, abas Acervo, Minha caixa
+  e Lista mestra, sem Configurações nem "Novo documento", zero erro JS, zero
+  leitura com falha, sem rolagem lateral a 390 px; cartões em zero (a demo não
+  tem documentos). Logs e scripts em `/tmp/g360-demo-docs-release-20261117`.
+- O SSH para a Vultr foi negado pelo modo automático antes do OK do usuário e
+  funcionou depois de "pode publicar". Alterações locais da demonstração
+  corporativa (outra IA) preservadas fora dos commits.
