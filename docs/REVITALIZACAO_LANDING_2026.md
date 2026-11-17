@@ -107,3 +107,8 @@ tudo faça commit, push e deploy").
   marcados com `aria-hidden` (o leitor de tela anunciava ícones como imagens e o
   e2e tinha seletor ambíguo).
 - Evidências temporárias em `test-results/landing-revitalization/` (ignorado).
+- Publicado em 17/11/2026: commit `850cf3b`, versão `0.1.0+850cf3bc`, sem
+  migration. No site publicado (chamadas de API, formulário e demonstração
+  interceptados no navegador): e2e 4/4, 5.848 textos sem falha de contraste,
+  sem rolagem horizontal de 360 a 1440 px, sem erros de JavaScript e os 37
+  endereços do sitemap com HTTP 200. Detalhes em `docs/CODEX_MEMORIA_OPERACIONAL.md`.

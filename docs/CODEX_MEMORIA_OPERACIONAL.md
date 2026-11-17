@@ -1660,3 +1660,42 @@ Projetos acima.
   registros remotos e backup em `db-backups/pre-ged-20261117/`. O commit posterior
   de documentação não exige novo build: a versão servida continua vinculada ao
   commit de código `49eab3a`, mesmo com HEAD posterior contendo só este registro.
+
+## Landing page revitalizada (2026-11-17, publicada)
+
+- Pedido do usuário: o prompt mestre de revitalização da landing (anexo Texto
+  colado.txt) foi executado pelo Codex, que parou na validação final. O usuário
+  pediu ao Claude Code para continuar e, ao terminar, fazer commit, push, deploy
+  e migration se houvesse. Relatório completo: `docs/REVITALIZACAO_LANDING_2026.md`.
+- Encontrado: implementação completa, build de ensaio e ponte de conversão
+  aprovados. Pendentes: e2e `public-marketing.spec.ts` falhando por seletor
+  ambíguo (ícone lucide sem `aria-hidden` lido como imagem) e auditoria com cerca
+  de 40 textos pequenos das telas ilustrativas abaixo de 4,5:1 de contraste.
+- Correções: 19 cores do `public-site.css` escurecidas (≥ 4,6:1), 47 ícones
+  decorativos com `aria-hidden`, seletor do e2e restrito ao diagrama BPMN.
+  Validação local: lint e `tsc` das páginas públicas, web 120/120, e2e 4/4
+  contra o bundle de produção de ensaio.
+- Commit `850cf3b` (35 arquivos da landing), push em `main`. Preservados fora
+  do commit: documento e scripts da demonstração corporativa e o trecho
+  correspondente desta memória (outra IA).
+- Preflight Vultr: `main` limpo, serviços saudáveis, URLs do banco em
+  `postgres:5432/g360` (mascaradas), 158 migrations e schema em dia. Sem
+  migration nova nesta etapa, portanto sem backup/migration. Imagens de retorno:
+  `g360-api:rollback-49eab3a-landing-20261117` e Web equivalente.
+- `make deploy` iniciado às 03:41:41Z, containers novos às ~03:51Z (a imagem da
+  API veio inteira do cache, sem mudança). Versão `0.1.0+850cf3bc`. API, Web e
+  Postgres saudáveis, zero eventos de nível ≥ 50 na API, schema em dia. Log em
+  `/tmp/g360-landing-release-20261117/deploy.log` na Vultr.
+- Pela internet: health ok; 21 páginas públicas, sitemap, robots, `llms.txt` e as
+  duas imagens novas com HTTP 200; os 37 endereços do sitemap com 200; versão no
+  login; CSS servido com as cores novas; home sem Prêmio nem Pareto.
+- Chromium contra produção com `/api`, envio do formulário e demonstração
+  interceptados no navegador (nenhum contato, e-mail ou login real): e2e 4/4;
+  5.848 textos sem falha de contraste; sem rolagem horizontal em 1440, 768, 390
+  e 360 px; sem erros de JavaScript.
+- Pendência local: servidores de ensaio do Codex (`next start` na porta 3141 e
+  API sintética na 3341) e as cópias `apps/.focused-web-*` (duas do GED, duas da
+  landing, ignoradas pelo git) seguem na máquina Windows; o ambiente bloqueou o
+  encerramento por terem sido abertos pela outra IA. Ao remover uma cópia,
+  apagar antes a junction `node_modules` (aponta para `apps/web/node_modules`)
+  com `rmdir`, nunca com remoção recursiva.
