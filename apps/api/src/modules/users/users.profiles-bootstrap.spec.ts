@@ -8,7 +8,7 @@ const defaultsOf = (code: string) => [...(DEFAULT_PROFILES.find((profile) => pro
 
 function makeService(companies: string[], profiles: ProfileRow[]) {
   const permissions = PERMISSION_CATALOG.map(([key], index) => ({ id: `perm-${index}`, key }));
-  const idByKey = new Map(permissions.map((permission) => [permission.key, permission.id]));
+  const idByKey = new Map<string, string>(permissions.map((permission) => [permission.key, permission.id]));
   const prisma: any = {
     permission: {
       findMany: vi.fn(async (args?: any) => {
