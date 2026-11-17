@@ -1,6 +1,6 @@
 # Revisão de simplicidade da interface
 
-Data: 17/11/2026. Publicação autorizada pelo usuário; preparação em andamento.
+Data: 17/11/2026. Publicada na versão `0.1.0+8d1447f0`.
 
 ## Abrangência
 
@@ -77,7 +77,7 @@ demonstração corporativa e da memória operacional foram preservadas.
 - As 21 fontes alteradas presentes no build focado conferem byte a byte com o
   checkout. As páginas suspensas permanecem fora do bundle publicado pelo
   mecanismo de escopo do projeto.
-- `git diff --check` aprovado. Sem commit, push, deploy ou acesso ao banco.
+- `git diff --check` aprovado. O ensaio local não alterou dados do sistema.
 
 O ensaio do navegador usa exclusivamente respostas sintéticas. As alterações
 dos módulos suspensos são verificadas por código, tipos e lint; a revisão não
@@ -88,6 +88,40 @@ Git). Testes permanentes de interface: `tests/e2e/ui-simplicity.spec.ts`.
 
 Prévia de Processos: `output/ui-cleanup/browser/processos-1440.png` e
 `output/ui-cleanup/browser/processos-390.png`.
+
+## Publicação
+
+Autorizada explicitamente pelo usuário em 17/11/2026. Commit de código
+`8d1447f`, enviado a `origin/main`, com os 31 arquivos desta revisão. Os cinco
+arquivos anteriores da demonstração e seu trecho da memória ficaram fora do
+commit, preservados localmente.
+
+- Builds antecipados Linux/Docker de API e Web aprovados, com o portal no ar.
+  Runtime standalone da Web conferido em seis rotas dentro de container isolado,
+  sem acesso à rede nem ao banco.
+- Deploy na Vultr por `make deploy`, de 14:48:52Z a 14:49:19Z
+  (11:48:52 a 11:49:19 em São Paulo), duração de 27 segundos.
+- API, Web e Postgres saudáveis; imagens em execução conferidas com as tags
+  finais; nenhum erro de nível 50 ou superior no boot da API. As 159 migrations
+  continuam em dia, sem migration nova nesta publicação.
+- Backup protegido e validado com `pg_restore --list` em
+  `db-backups/pre-ui-cleanup-20261117/g360-20261117-144526.dump`, 5.901.054 bytes,
+  modo 600. SHA-256:
+  `ddb1d7d2fcbddd918606e5866197d3d056590fcd3568440ca42791aca21e5392`.
+  Imagens de retorno: `g360-api:rollback-c5a1a85-ui-cleanup-20261117` e Web
+  equivalente.
+- Pela internet: 17 verificações HTTP aprovadas, incluindo versão no login e
+  bloqueio sem sessão. A sessão pública da demonstração passou em 24 consultas
+  reais de módulos ativos, incluindo Processos, PMO, Projetos e Documentos.
+- Chromium nos assets publicados: 24 visões em 18 rotas, em 1440, 768 e 390
+  pixels e tema escuro. APIs inteiramente sintéticas nesse ensaio de interface;
+  zero erro JavaScript, zero fixture ausente e nenhuma rolagem horizontal.
+- Evidências locais em `output/ui-cleanup/release/`, ignoradas pelo Git. Logs,
+  backup, IDs de imagens e horários preservados no diretório protegido acima.
+  Containers de smoke encerrados. Nenhum seed nem alteração de dados de negócio.
+
+O registro posterior de documentação não exige outra compilação: a versão
+publicada permanece vinculada ao commit de código `8d1447f`.
 
 ## Ocorrência nas evidências locais
 

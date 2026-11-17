@@ -1805,3 +1805,32 @@ Projetos acima.
   para apps/web, saída Next normal (sem standalone no Windows), sem arquivos .env.
   Não remover recursivamente uma cópia com essa junction. Produção permanece
   inalterada e publicação exige autorização explícita conforme a regra acima.
+
+## Publicação da simplificação da interface (2026-11-17, concluída)
+
+- Usuário autorizou commit, push e deploy nesta conversa. Código `8d1447f`,
+  enviado a origin/main, com 31 arquivos da revisão. Documento, quatro scripts e
+  trecho anterior da memória da demonstração corporativa preservados fora do
+  commit; os cinco arquivos conferidos por SHA-256, sem alteração.
+- Preflight confirmou main limpa no servidor, banco postgres:5432/g360 com
+  credenciais consistentes sem exibição, serviços saudáveis e 159 migrations em
+  dia. Não houve alteração de API, schema, migration ou configurações do banco.
+- Backup protegido antes da virada:
+  `db-backups/pre-ui-cleanup-20261117/g360-20261117-144526.dump`, 5.901.054 bytes,
+  modo 600, pg_restore --list aprovado. SHA-256
+  `ddb1d7d2fcbddd918606e5866197d3d056590fcd3568440ca42791aca21e5392`.
+  Tags de retorno: g360-api:rollback-c5a1a85-ui-cleanup-20261117 e Web equivalente.
+- Builds Linux/Docker antecipados de API/Web aprovados com o portal no ar,
+  de 14:45:46Z a 14:48:23Z. Standalone da imagem final testado em seis rotas
+  num container sem rede, sem banco, encerrado ao concluir.
+- make deploy de 14:48:52Z a 14:49:19Z (27 s). Versão 0.1.0+8d1447f0. API,
+  Web e Postgres saudáveis; IDs em execução conferem com as tags finais; boot da
+  API sem erros de nível >= 50. Prisma confirmou as 159 migrations em dia.
+- Pós-publicação: 17 verificações HTTP e 24 consultas reais da API da demo
+  aprovadas. Chromium nos assets publicados: 24 visões / 18 rotas em desktop,
+  tablet e celular, tema escuro, sem erros JS, fixture ausente ou rolagem lateral.
+  APIs do ensaio de navegador inteiramente sintéticas, sem escrita à produção.
+- Registros locais em output/ui-cleanup/release (ignorado); logs, backup, IDs
+  e horários no diretório protegido pre-ui-cleanup-20261117. Nenhum seed.
+  Registro documental posterior não exige outro build: versão servida continua
+  vinculada ao commit de código 8d1447f.
