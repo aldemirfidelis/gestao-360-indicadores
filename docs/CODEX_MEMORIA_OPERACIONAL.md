@@ -1546,7 +1546,7 @@ Projetos acima.
   contendo somente o registro operacional.
 
 
-## Documentos / GED (2026-11-16, concluído localmente; não publicado)
+## Documentos / GED (2026-11-16, validação local anterior à publicação)
 
 - Continuação do trabalho da Ultra IA descrito no anexo Texto colado.txt. Pedido:
   reativar como Documentos no menu, sem ligação com Treinamento, editor sem
@@ -1606,3 +1606,57 @@ Projetos acima.
   esta nova evolução antes de commit/push/deploy/migration, conforme regra
   operacional e o fluxo local informado no anexo.
 - Serviços temporários Web/API/Postgres encerrados e portas de ensaio conferidas.
+
+## Publicação de Documentos / GED (2026-11-16, concluída)
+
+- Usuário autorizou explicitamente commit, push, deploy e migrations nesta
+  conversa. Commit de código `49eab3a`, enviado a `origin/main`, com 80 arquivos
+  do GED. As alterações locais da demonstração corporativa (documento, scripts
+  e trecho da memória) foram preservadas fora dos commits desta publicação.
+- Preflight confirmou `main`, checkout remoto limpo, serviços saudáveis e banco
+  local `postgres:5432/g360`; usuário/senha das duas URLs conferidos sem exibição.
+  Havia 157 migrations aplicadas e zero documentos no cadastro GED. A Pacto
+  está no plano CORPORATIVO, com Documentos herdado do plano.
+- Backup anterior à migration/deploy, protegido e validado com pg_restore:
+  `db-backups/pre-ged-20261117/g360-20261117-014608.dump`, 5.885.942 bytes,
+  modo 600. SHA-256
+  `f3eb1e4338400f2428d75820424f9f0fa33739309d5d40de4c2a00de28caee48`.
+  Cópia protegida do ambiente anterior em `env.before`, modo 600; nunca exibir.
+  Imagens de retorno `g360-api:rollback-05b3da5-ged-20261117` e Web equivalente.
+- API e Web compiladas antes com o portal no ar. Build Linux/Docker passou,
+  incluindo tipos, pacote focado da API (366 arquivos) e runtime standalone
+  da Web. Os 14 cenários do GED passaram na imagem final da API contra Postgres
+  17.11 descartável em tmpfs, isolado sem rede externa e sem dados reais.
+  Login da imagem Web exibiu a versão esperada e as três rotas GED responderam.
+  Containers temporários próprios foram encerrados; nenhum volume de produção
+  foi removido. Logs de build/ensaio preservados no diretório do backup.
+- Ambiente atualizado somente nas opções do GED: storage DATABASE, editor
+  online de DOCX manual e segredo dedicado forte de assinatura criado e mantido
+  no .env protegido. Editor visual Tiptap é o padrão e gera PDF sem Collabora.
+  URLs/segredos opcionais antigos foram preservados e o volume legado continua
+  montado para compatibilidade. Banco/provedor e demais opções não mudaram.
+- Aplicada a migration aditiva `20261116200000_documents_modernization` em
+  container dedicado antes da virada. Depois, `make deploy` de 02:00:42Z a
+  02:01:13Z de 17/11/2026 (31 segundos; 16/11 no horário local). O boot e a
+  conferência final repetiram migrate deploy sem pendências: 158 migrations.
+  Versão publicada `0.1.0+49eab3a6`. API, Web e Postgres saudáveis; imagens em
+  execução conferem com as tags finais. API iniciou sem eventos de nível >= 50.
+- Pós-publicação autenticado na Pacto: 17 verificações do GED aprovadas,
+  incluindo catálogo/tipos POP e Norma, busca, resumo, caixa, matriz, configuração,
+  storage DATABASE, editor manual de DOCX e bloqueios sem sessão. O perfil ADMIN
+  antigo não possuía permissões documentais; o endpoint normal
+  `/users/access-context` reconciliou aditivamente os perfis de sistema da Pacto.
+  Admin passou a ter 13 permissões `doc:*`, sem remover grants ou alterar
+  perfis personalizados. Nenhum plano/bloqueio manual foi contornado.
+- Passaram também os 77 controles anteriores da Pacto: seis indicadores,
+  projetos/Curva S, processos/artefatos/PMO, 19 planos, cinco tratativas,
+  reuniões/atas, BSC/OKR, tarefas e isolamento entre empresas. Cadastro GED
+  permaneceu com zero documentos: nenhum exemplo foi inserido em produção.
+- Chromium nos assets publicados: quatro cenários aprovados, acervo e assistente
+  completo em 1440 e 390 pixels, sem erros JS ou respostas de fixture ausentes.
+  APIs desse ensaio inteiramente sintéticas, com escritas à produção bloqueadas.
+  Evidências locais em `test-results/documents-release/published/` (ignorado).
+- Relatórios sanitizados e scripts locais em `test-results/documents-release/`;
+  registros remotos e backup em `db-backups/pre-ged-20261117/`. O commit posterior
+  de documentação não exige novo build: a versão servida continua vinculada ao
+  commit de código `49eab3a`, mesmo com HEAD posterior contendo só este registro.

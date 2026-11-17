@@ -1,6 +1,6 @@
 # Documentos — GED do Gestão 360
 
-Guia da implementação de 16/11/2026. Publicação autorizada pelo usuário; o resultado do deploy é registrado na memória operacional.
+Guia da implementação de 16/11/2026, publicada na versão `0.1.0+49eab3a6`. O registro do deploy está na memória operacional.
 
 ## Escopo
 
@@ -183,5 +183,7 @@ A publicação deve seguir `docs/CODEX_MEMORIA_OPERACIONAL.md`: apresentar o res
 - Lint dos 54 arquivos alterados de API/Web: zero erros e zero avisos.
 - Migração do zero em Postgres 17.5 descartável: 158 migrations aplicadas. Integração: 14 cenários aprovados, incluindo concorrência, falha de PDF, isolamento e descarte.
 - Build focado da Web: 94 páginas; Chromium no bundle com API/Postgres sintéticos: nove cenários aprovados em desktop/celular, sem erros JavaScript. Confirmados criação pelo assistente, salvamento com falha/repetição, espera ao trocar de aba, revisão/aprovação, publicação/download de PDF, leitura obrigatória móvel e busca.
-- O ensaio Windows usa uma cópia com junction e `next start`, sem empacotar standalone. O build Linux/Docker e a conferência do ambiente publicado fazem parte do pré-deploy após autorização. API focada empacotada com 366 arquivos.
-- Evidências em `test-results/documents-resume/` (ignorado no Git). Dados exclusivamente fictícios; serviços temporários encerrados e produção não modificada.
+- O ensaio Windows usa uma cópia com junction e `next start`. Após a autorização, API e Web foram compiladas em Linux/Docker, incluindo o standalone da Web e 366 arquivos no pacote da API. Os 14 cenários passaram novamente na imagem final da API, com Postgres 17.11 isolado em tmpfs e dados fictícios.
+- Publicação concluída com backup validado e uma migration aplicada. API, Web e Postgres saudáveis; 17 verificações do GED e 77 dos dados anteriores da Pacto aprovadas. O perfil Admin da Pacto recebeu as 13 permissões documentais pelo fluxo padrão de reconciliação aditiva dos perfis da aplicação.
+- Chromium nos assets publicados: acervo e assistente completos em 1440 e 390 pixels, quatro cenários aprovados, sem erros JavaScript. Todas as respostas de dados desse ensaio foram sintéticas e nenhuma escrita foi enviada à produção.
+- Evidências locais em `test-results/documents-resume/` e `test-results/documents-release/` (ignorados no Git); registros e backup de publicação em `db-backups/pre-ged-20261117/` no servidor. Serviços temporários encerrados.
