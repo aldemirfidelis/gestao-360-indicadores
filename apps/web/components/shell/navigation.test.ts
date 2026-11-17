@@ -23,15 +23,27 @@ describe('granular navigation', () => {
       'Plano de Ação',
       'Processos',
       'Projetos',
+      'Documentos',
       'Ata da Reunião',
       'Reuniões',
       'Reunião Mensal',
       'OKRs',
     ]);
     expect(sections.every(section => section.flat && section.items.length === 1)).toBe(true);
-    expect(canAccessRoute(user, '/documents')).toBe(false);
+    expect(canAccessRoute(user, '/documents')).toBe(true);
+    expect(canAccessRoute(user, '/risks')).toBe(false);
     expect(canAccessRoute(user, '/servico-pessoal')).toBe(false);
     expect(canAccessRoute(user, '/gestao-premio')).toBe(false);
+  });
+  it('mostra Documentos no menu só para quem tem doc:view', () => {
+    const reader = { role: 'VIEWER', permissions: ['doc:view'] };
+    const hrefs = visibleNavSections(reader).flatMap((section) => section.items.map((item) => item.href));
+    expect(hrefs).toContain('/documents');
+    expect(canAccessRoute(reader, '/documents/abc/leitor')).toBe(true);
+    const other = { role: 'VIEWER', permissions: ['indicators:view'] };
+    expect(visibleNavSections(other).flatMap((section) => section.items.map((item) => item.href))).not.toContain('/documents');
+    expect(canAccessRoute(other, '/documents/abc')).toBe(false);
+    expect(canAccessRoute({ ...reader, isDemo: true }, '/documents')).toBe(false);
   });
   it('visitante demo só encontra os módulos apresentados', () => {
     const user = { role: 'COMPANY_ADMIN', isDemo: true, permissions: ['myday:view', 'indicators:view', 'prize:view', 'settings:manage'] };

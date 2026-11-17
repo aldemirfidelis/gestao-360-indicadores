@@ -45,6 +45,15 @@ describe('DEFAULT_PROFILES — autoatendimento do colaborador', () => {
     expect(p.has('recruit:requisition:approve')).toBe(isProductPermissionActive('recruit:requisition:approve'));
   });
 
+  it('GED reativado: Gestor administra, Usuário elabora e Visualizador lê documentos', () => {
+    expect(perms('GESTOR').has('doc:manage')).toBe(true);
+    expect(perms('GESTOR').has('doc:approve')).toBe(true);
+    expect(perms('USUARIO').has('doc:create')).toBe(true);
+    expect(perms('USUARIO').has('doc:manage')).toBe(false);
+    expect(perms('VISUALIZADOR').has('doc:view')).toBe(true);
+    expect(perms('VISUALIZADOR').has('doc:update')).toBe(false);
+  });
+
   it('todas as permissões dos perfis existem no catálogo (sem chave órfã)', () => {
     const catalog = new Set(PERMISSION_CATALOG.map(([key]) => key));
     for (const profile of DEFAULT_PROFILES) {

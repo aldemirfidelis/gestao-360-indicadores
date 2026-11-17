@@ -15,7 +15,7 @@ export const PROCESS_TARGETS: Record<ProcessIntegrationType, Policy> = {
   TASK: { model: 'workspaceTask', field: 'workspaceTaskId', module: 'tasks', permissions: ['myday:view'], title: 'title', route: '/tarefas?task=', area: 'areaId', noDelete: true },
   ACTION: { model: 'actionPlan', field: 'actionPlanId', module: 'actions', permissions: ['actions:view'], title: 'title', route: '/actions/', area: 'ownerNodeId', select: { status: true } },
   DEVIATION: { model: 'deviation', field: 'deviationId', module: 'deviations', permissions: ['deviations:view'], title: 'title', route: '/deviations/', area: 'indicator.ownerNodeId', select: { status: true, ...indicatorArea } },
-  DOCUMENT: { model: 'document', field: 'documentId', module: 'documents', permissions: ['doc:view'], title: 'title', route: '/documents?id=', area: 'orgNodeId', select: { status: true } },
+  DOCUMENT: { model: 'document', field: 'documentId', module: 'documents', permissions: ['doc:view'], title: 'title', route: '/documents/', area: 'orgNodeId', select: { status: true } },
   FORM: { model: 'formTemplate', field: 'formTemplateId', module: 'forms', permissions: ['forms:view'], title: 'title', route: '/forms?id=', area: 'orgNodeId', select: { status: true } },
   RISK: { model: 'riskRegister', field: 'riskId', module: 'risks', permissions: ['risks:view'], title: 'title', route: '/risks?id=', area: 'orgNodeId', select: { status: true } },
   AUDIT: { model: 'audit', field: 'auditId', module: 'audits', permissions: ['audits:view'], title: 'title', route: '/audits/', area: 'orgNodeId', select: { status: true } },
@@ -61,6 +61,8 @@ export class ProcessLinksService {
       if (!['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(me.role)) where.OR = [{ assigneeId: me.sub }, { createdById: me.sub }];
     }
     if (type === 'AREA') where.active = true;
+    // Documentos restritos/confidenciais não aparecem (nem pelo título) no seletor de vínculos.
+    if (type === 'DOCUMENT') where.confidentiality = 'INTERNAL';
     if (areas && p.area) {
       const nested = (value: any) => p.area!.split('.').reduceRight<any>((result, key) => ({ [key]: result }), value);
       const missingRelations = p.area.split('.').slice(0, -1).map((_, index, parts) => parts.slice(0, index + 1).reduceRight<any>((value, key) => ({ [key]: value }), null));

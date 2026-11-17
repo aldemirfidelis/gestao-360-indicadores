@@ -70,10 +70,10 @@ function getEntityRoute(type: string, id: string): { url: string; hasDetail: boo
     MEETING: `/meetings/${id}`,
     PROJECT: `/projects/${id}`,
     DEVIATION: `/deviations/${id}`,
+    DOCUMENT: `/documents/${id}`,
   };
   const list: Record<string, string> = {
     PROCESS: '/processes',
-    DOCUMENT: '/documents',
     RISK: '/risks',
     RISK_REGISTER: '/risks',
     NON_CONFORMITY: '/nonconformities',

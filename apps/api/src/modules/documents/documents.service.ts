@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import {
   DocumentApprovalDecision,
+  DocumentConfidentiality,
+  DocumentContentFormat,
   DocumentFileKind,
   DocumentStatus,
   DocumentType,
@@ -16,6 +18,13 @@ import {
   TraceEntityType,
   TraceEventType,
 } from '@prisma/client';
+import {
+  applyDocPlaceholders,
+  docToPlainText,
+  isDocNode,
+  markdownToDoc,
+  type DocNode,
+} from '@g360/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TraceabilityService } from '../traceability/traceability.service';
 import { AccessService } from '../access/access.service';
@@ -28,7 +37,9 @@ import {
   applyDocxPlaceholders,
   applyTextPlaceholders,
   buildDocx,
+  buildDocxFromDoc,
   detectPlaceholders,
+  docxHasMacros,
   extractDocxText,
   isDocxBuffer,
 } from './docx.util';
@@ -37,13 +48,25 @@ import { TEMPLATE_LIBRARY, findLibraryTemplate } from './template-library';
 import { WorkItemEventBus } from '../my-day/work-item-event-bus';
 import { listTake } from '../../common/http/list-take';
 import { NotificationsService } from '../notifications/notifications.service';
-import { TrainingDocumentService } from '../training/training-document.service';
+import { DocumentAccessService } from './document-access.service';
+import { DocumentContentService, PUBLISHED_LIKE, summarize } from './document-content.service';
+import { DocumentRenderService, DOCUMENT_STATUS_LABEL, formatDateTimeBr } from './document-render.service';
+import { APPROVAL_ROLE, DocumentWorkflowService, EDITABLE_STATUSES, authorOf, label } from './document-workflow.service';
+import { DocumentDistributionService } from './document-distribution.service';
+import { DocumentChangeRequestService } from './document-change-request.service';
+import { DocumentGovernanceService } from './document-governance.service';
+import { DocumentAiService } from './document-ai.service';
+import { docxToHtml, docxToText } from './document-text';
+import { assertDocumentUnchanged } from './document-lock';
 
 const MODULE = 'documents';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const PDF_MIME = 'application/pdf';
-// Uploads chegam em base64 no JSON (limite do body: 10mb); ~8MB decodificados.
-const MAX_FILE_BYTES = 8 * 1024 * 1024;
+// Upload legado em base64 no JSON (limite do body: 10 MB) ~8 MB decodificados.
+const MAX_BASE64_BYTES = 8 * 1024 * 1024;
+// Upload por arquivo (multipart): guardado no Postgres.
+export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+const MAX_CONTENT_JSON_BYTES = 20 * 1024 * 1024;
 
 type Tx = Prisma.TransactionClient;
 
@@ -66,54 +89,43 @@ type LinkInput = {
   approverUserId?: string | null;
 };
 
-const DIRECT_STATUS_MESSAGE = 'Use as ações de workflow para alterar o status do documento.';
+export type UploadInput = {
+  purpose?: string;
+  kind?: string;
+  fileName: string;
+  mimeType?: string | null;
+  buffer: Buffer;
+  reason?: string | null;
+};
 
-const EDITABLE_STATUSES = new Set<DocumentStatus>([
-  DocumentStatus.DRAFT,
-  DocumentStatus.IN_DEVELOPMENT,
-  DocumentStatus.ADJUSTMENTS_REQUESTED,
-  DocumentStatus.REJECTED,
-]);
+const DIRECT_STATUS_MESSAGE = 'Use as ações do fluxo para alterar o status do documento.';
 
 const ACTIVE_EDIT_REQUEST_STATUSES = ['REQUESTED', 'APPROVED', 'IN_PROGRESS'];
 const APPROVED_EDIT_REQUEST_STATUSES = ['APPROVED', 'IN_PROGRESS'];
 
 const COMMENT_REQUIRED = new Set<DocumentStatus>([
-  DocumentStatus.ADJUSTMENTS_REQUESTED,
-  DocumentStatus.REJECTED,
   DocumentStatus.CANCELLED,
   DocumentStatus.ARCHIVED,
   DocumentStatus.OBSOLETE,
+  DocumentStatus.PERIODIC_REVIEW,
 ]);
 
-const TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> = {
-  [DocumentStatus.DRAFT]: [DocumentStatus.IN_DEVELOPMENT, DocumentStatus.WAITING_REVIEW, DocumentStatus.CANCELLED],
-  [DocumentStatus.IN_DEVELOPMENT]: [DocumentStatus.WAITING_REVIEW, DocumentStatus.CANCELLED],
-  [DocumentStatus.WAITING_REVIEW]: [DocumentStatus.IN_REVIEW, DocumentStatus.ADJUSTMENTS_REQUESTED, DocumentStatus.CANCELLED],
-  [DocumentStatus.REVIEW]: [DocumentStatus.ADJUSTMENTS_REQUESTED, DocumentStatus.REVIEWED, DocumentStatus.REJECTED],
-  [DocumentStatus.IN_REVIEW]: [DocumentStatus.ADJUSTMENTS_REQUESTED, DocumentStatus.REVIEWED, DocumentStatus.REJECTED],
-  [DocumentStatus.ADJUSTMENTS_REQUESTED]: [DocumentStatus.IN_DEVELOPMENT, DocumentStatus.WAITING_REVIEW, DocumentStatus.CANCELLED],
-  [DocumentStatus.REVIEWED]: [DocumentStatus.WAITING_APPROVAL, DocumentStatus.IN_APPROVAL],
-  [DocumentStatus.WAITING_APPROVAL]: [DocumentStatus.IN_APPROVAL, DocumentStatus.REJECTED],
-  [DocumentStatus.IN_APPROVAL]: [DocumentStatus.APPROVED, DocumentStatus.REJECTED],
-  [DocumentStatus.REJECTED]: [DocumentStatus.IN_DEVELOPMENT, DocumentStatus.WAITING_REVIEW, DocumentStatus.CANCELLED],
-  [DocumentStatus.APPROVED]: [DocumentStatus.SCHEDULED_PUBLICATION, DocumentStatus.PUBLISHED],
-  [DocumentStatus.SCHEDULED_PUBLICATION]: [DocumentStatus.PUBLISHED, DocumentStatus.CANCELLED],
-  [DocumentStatus.PUBLISHED]: [
-    DocumentStatus.NEAR_EXPIRATION,
-    DocumentStatus.EXPIRED,
-    DocumentStatus.PERIODIC_REVIEW,
-    DocumentStatus.OBSOLETE,
-    DocumentStatus.ARCHIVED,
-  ],
-  [DocumentStatus.NEAR_EXPIRATION]: [DocumentStatus.PERIODIC_REVIEW, DocumentStatus.EXPIRED, DocumentStatus.OBSOLETE],
+/** Transições manuais (as de revisão/aprovação passam pelo fluxo assinado). */
+const MANUAL_TRANSITIONS: Partial<Record<DocumentStatus, DocumentStatus[]>> = {
+  [DocumentStatus.DRAFT]: [DocumentStatus.CANCELLED],
+  [DocumentStatus.IN_DEVELOPMENT]: [DocumentStatus.CANCELLED],
+  [DocumentStatus.ADJUSTMENTS_REQUESTED]: [DocumentStatus.CANCELLED],
+  [DocumentStatus.REJECTED]: [DocumentStatus.CANCELLED],
+  [DocumentStatus.SCHEDULED_PUBLICATION]: [DocumentStatus.APPROVED],
+  [DocumentStatus.PUBLISHED]: [DocumentStatus.PERIODIC_REVIEW, DocumentStatus.OBSOLETE],
+  [DocumentStatus.NEAR_EXPIRATION]: [DocumentStatus.PERIODIC_REVIEW, DocumentStatus.OBSOLETE],
   [DocumentStatus.EXPIRED]: [DocumentStatus.PERIODIC_REVIEW, DocumentStatus.OBSOLETE, DocumentStatus.ARCHIVED],
-  [DocumentStatus.PERIODIC_REVIEW]: [DocumentStatus.IN_DEVELOPMENT, DocumentStatus.REPLACED, DocumentStatus.OBSOLETE],
+  [DocumentStatus.PERIODIC_REVIEW]: [DocumentStatus.OBSOLETE],
   [DocumentStatus.REPLACED]: [DocumentStatus.OBSOLETE, DocumentStatus.ARCHIVED],
   [DocumentStatus.OBSOLETE]: [DocumentStatus.ARCHIVED],
-  [DocumentStatus.ARCHIVED]: [],
-  [DocumentStatus.CANCELLED]: [],
 };
+
+const UPLOAD_PURPOSES = new Set(['MAIN_DOCX', 'MAIN_PDF', 'ATTACHMENT', 'EVIDENCE', 'IMAGE']);
 
 @Injectable()
 export class DocumentsService {
@@ -128,7 +140,14 @@ export class DocumentsService {
     private readonly storage: DocumentStorageService,
     private readonly workItems: WorkItemEventBus,
     private readonly notifications: NotificationsService,
-    private readonly trainingDocuments: TrainingDocumentService,
+    private readonly accessPolicy: DocumentAccessService,
+    private readonly content: DocumentContentService,
+    private readonly render: DocumentRenderService,
+    private readonly workflow: DocumentWorkflowService,
+    private readonly distribution: DocumentDistributionService,
+    private readonly changeRequests: DocumentChangeRequestService,
+    private readonly governance: DocumentGovernanceService,
+    private readonly ai: DocumentAiService,
   ) {}
 
   private include() {
@@ -138,6 +157,7 @@ export class DocumentsService {
       owner: { select: { id: true, name: true, email: true } },
       approver: { select: { id: true, name: true, email: true } },
       createdBy: { select: { id: true, name: true, email: true } },
+      typeConfig: { select: { id: true, name: true, sigla: true, prefix: true, category: true, alertDays: true, defaultValidityDays: true } },
     };
   }
 
@@ -149,28 +169,21 @@ export class DocumentsService {
     if (area) await this.access.assertCanWrite(me.sub, area, MODULE, action);
   }
 
+  /** Leitura: área + classificação (interno/restrito/confidencial). */
   private async assertViewArea(me: AuthPayload, doc: any) {
-    const area = this.areaOf(doc);
-    if (!area) return;
-    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
-    if (permitted && !permitted.includes(area)) {
-      throw new ForbiddenException('Você não tem acesso aos documentos desta área.');
-    }
+    await this.accessPolicy.assertCanView(me, doc);
   }
 
   private enrich(doc: any) {
     const validUntil = doc.validUntil ? new Date(doc.validUntil) : null;
-    const isPublishedLike = [
-      DocumentStatus.PUBLISHED,
-      DocumentStatus.NEAR_EXPIRATION,
-      DocumentStatus.EXPIRED,
-      DocumentStatus.PERIODIC_REVIEW,
-    ].includes(doc.status);
+    const isPublishedLike = PUBLISHED_LIKE.includes(doc.status);
     const isExpired = Boolean(validUntil && validUntil < new Date() && isPublishedLike);
     const daysToExpire = validUntil ? Math.ceil((validUntil.getTime() - Date.now()) / 86_400_000) : null;
     const alertWindow = doc.typeConfig?.alertDays ?? 30;
     const needsReview = Boolean(isPublishedLike && validUntil && !isExpired && daysToExpire !== null && daysToExpire <= alertWindow);
-    return { ...doc, isExpired, needsReview, daysToExpire, areaId: this.areaOf(doc) };
+    const rest = { ...doc };
+    delete rest.searchText; // texto interno de busca não vai para a interface
+    return { ...rest, isExpired, needsReview, daysToExpire, areaId: this.areaOf(doc) };
   }
 
   private parseStatus(value?: string): DocumentStatus | undefined {
@@ -197,6 +210,18 @@ export class DocumentsService {
     return value as DocumentFileKind;
   }
 
+  private parseConfidentiality(value: unknown): DocumentConfidentiality | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (!(Object.values(DocumentConfidentiality) as string[]).includes(String(value))) throw new BadRequestException('Classificação inválida.');
+    return value as DocumentConfidentiality;
+  }
+
+  private parseFormat(value: unknown): DocumentContentFormat | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (!(Object.values(DocumentContentFormat) as string[]).includes(String(value))) throw new BadRequestException('Formato de conteúdo inválido.');
+    return value as DocumentContentFormat;
+  }
+
   private requiredText(value: unknown, field: string) {
     const text = String(value ?? '').trim();
     if (!text) throw new BadRequestException(`${field} é obrigatório.`);
@@ -212,6 +237,11 @@ export class DocumentsService {
   private id(value: unknown): string | null {
     const text = String(value ?? '').trim();
     return text ? text : null;
+  }
+
+  private ids(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.map((item) => String(item ?? '').trim()).filter(Boolean))];
   }
 
   private optionalInt(value: unknown, min = 1): number | null | undefined {
@@ -230,17 +260,6 @@ export class DocumentsService {
     return d;
   }
 
-  private visibilityWhere(permitted: string[] | null) {
-    if (!permitted) return undefined;
-    return {
-      OR: [
-        { orgNodeId: null, indicatorId: null },
-        { orgNodeId: { in: permitted } },
-        { indicator: { ownerNodeId: { in: permitted } } },
-      ],
-    };
-  }
-
   private async loadScoped(id: string, companyId: string, tx: Tx | PrismaService = this.prisma) {
     const doc = await tx.document.findFirst({
       where: { id, companyId, deletedAt: null },
@@ -250,35 +269,31 @@ export class DocumentsService {
     return doc;
   }
 
+  /** Documento visível ao usuário (área + classificação). */
+  async loadVisible(me: AuthPayload, id: string) {
+    const doc = await this.loadScoped(id, me.companyId);
+    await this.assertViewArea(me, doc);
+    return doc;
+  }
+
+  // ---------------------------------------------------------------- listagens
+
   async list(me: AuthPayload, filters: DocFilters = {}) {
     const status = this.parseStatus(filters.status);
     const type = this.parseType(filters.type);
-    const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
-    const and: Prisma.DocumentWhereInput[] = [];
-    const areaFilter = this.visibilityWhere(permitted);
-    if (areaFilter) and.push(areaFilter as Prisma.DocumentWhereInput);
-
+    const and: Prisma.DocumentWhereInput[] = [await this.accessPolicy.visibilityWhere(me)];
     const term = filters.search?.trim();
     if (term) {
-      and.push({
-        OR: [
-          { title: { contains: term, mode: 'insensitive' } },
-          { code: { contains: term, mode: 'insensitive' } },
-          { description: { contains: term, mode: 'insensitive' } },
-          { content: { contains: term, mode: 'insensitive' } },
-          { indicator: { name: { contains: term, mode: 'insensitive' } } },
-        ],
-      });
+      const candidates = await this.content.ftsCandidates(me.companyId, term, 1000);
+      and.push({ id: { in: candidates.map((candidate) => candidate.id) } });
     }
-
     if (filters.expiring === 'expired') {
-      and.push({ validUntil: { lt: new Date() }, status: { in: publishedLikeStatuses() } });
+      and.push({ validUntil: { lt: new Date() }, status: { in: PUBLISHED_LIKE } });
     }
     if (filters.expiring === 'soon') {
       const limit = new Date(Date.now() + 90 * 86_400_000);
-      and.push({ validUntil: { gte: new Date(), lte: limit }, status: { in: publishedLikeStatuses() } });
+      and.push({ validUntil: { gte: new Date(), lte: limit }, status: { in: PUBLISHED_LIKE } });
     }
-
     const items = await this.prisma.document.findMany({
       where: {
         companyId: me.companyId,
@@ -289,76 +304,46 @@ export class DocumentsService {
         ...(filters.indicatorId ? { indicatorId: filters.indicatorId } : {}),
         ...(filters.ownerUserId ? { ownerUserId: filters.ownerUserId } : {}),
         ...(filters.approverUserId ? { approverUserId: filters.approverUserId } : {}),
-        ...(and.length ? { AND: and } : {}),
+        AND: and,
       },
       include: this.include(),
       orderBy: [{ status: 'asc' }, { validUntil: 'asc' }, { number: 'desc' }],
       take: listTake(filters.limit),
     });
-
-    return items.map((doc) => this.enrich(doc));
+    return items.map((doc) => this.enrich({ ...doc, content: undefined, contentJson: undefined, bodyText: undefined }));
   }
 
-  async summary(me: AuthPayload) {
-    const list = await this.list(me);
-    const byStatus = Object.fromEntries(Object.values(DocumentStatus).map((s) => [s, 0])) as Record<DocumentStatus, number>;
-    const byType = Object.fromEntries(Object.values(DocumentType).map((t) => [t, 0])) as Record<DocumentType, number>;
-    for (const doc of list as any[]) {
-      byStatus[doc.status as DocumentStatus]++;
-      byType[doc.type as DocumentType]++;
-    }
-    const expiringSoon = [...list]
-      .filter((doc: any) => doc.needsReview || doc.isExpired)
-      .sort((a: any, b: any) => {
-        const ad = a.validUntil ? new Date(a.validUntil).getTime() : Number.MAX_SAFE_INTEGER;
-        const bd = b.validUntil ? new Date(b.validUntil).getTime() : Number.MAX_SAFE_INTEGER;
-        return ad - bd;
-      })
-      .slice(0, 8)
-      .map((doc: any) => ({
-        id: doc.id,
-        number: doc.number,
-        code: doc.code,
-        title: doc.title,
-        type: doc.type,
-        status: doc.status,
-        validUntil: doc.validUntil,
-        isExpired: doc.isExpired,
-        daysToExpire: doc.daysToExpire,
-        orgNode: doc.orgNode,
-        owner: doc.owner,
-      }));
+  search(me: AuthPayload, query: Record<string, string | undefined>) {
+    return this.content.search(me, query);
+  }
 
+  overview(me: AuthPayload) {
+    return this.content.overview(me);
+  }
+
+  /** Formato legado do resumo, agora calculado no banco (sem teto de lista). */
+  async summary(me: AuthPayload) {
+    const data = await this.content.overview(me);
     return {
-      total: list.length,
-      published: byStatus[DocumentStatus.PUBLISHED] ?? 0,
-      draft:
-        (byStatus[DocumentStatus.DRAFT] ?? 0) +
-        (byStatus[DocumentStatus.IN_DEVELOPMENT] ?? 0) +
-        (byStatus[DocumentStatus.REVIEW] ?? 0) +
-        (byStatus[DocumentStatus.IN_REVIEW] ?? 0),
-      waitingApproval: (byStatus[DocumentStatus.WAITING_APPROVAL] ?? 0) + (byStatus[DocumentStatus.IN_APPROVAL] ?? 0),
-      obsolete: (byStatus[DocumentStatus.OBSOLETE] ?? 0) + (byStatus[DocumentStatus.ARCHIVED] ?? 0),
-      expired: list.filter((doc: any) => doc.isExpired).length,
-      needsReview: list.filter((doc: any) => doc.needsReview).length,
-      byStatus,
-      byType,
-      expiringSoon,
+      total: data.total,
+      published: data.published,
+      draft: data.development + data.review,
+      waitingApproval: data.approval,
+      obsolete: data.obsolete,
+      expired: data.expired,
+      needsReview: data.needsReview,
+      byStatus: data.byStatus,
+      byType: data.byType,
+      expiringSoon: data.expiringSoon,
     };
   }
 
   async dashboard(me: AuthPayload) {
-    const items = (await this.list(me)) as any[];
-    const byArea = new Map<string, number>();
-    for (const doc of items) {
-      const key = doc.orgNode?.name ?? 'Sem área';
-      byArea.set(key, (byArea.get(key) ?? 0) + 1);
-    }
-    return {
-      summary: await this.summary(me),
-      byArea: [...byArea.entries()].map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total),
-      recent: items.slice(0, 10),
-    };
+    const [overview, recent] = await Promise.all([
+      this.content.overview(me),
+      this.content.search(me, { sort: 'recent', pageSize: '10' }),
+    ]);
+    return { summary: overview, recent: recent.items };
   }
 
   async matrix(me: AuthPayload, filters: DocFilters = {}) {
@@ -368,8 +353,9 @@ export class DocumentsService {
       code: doc.code ?? `#${doc.number}`,
       title: doc.title,
       type: doc.type,
+      typeConfig: doc.typeConfig,
       status: doc.status,
-      companyId: doc.companyId,
+      confidentiality: doc.confidentiality,
       orgNode: doc.orgNode,
       indicator: doc.indicator,
       owner: doc.owner,
@@ -377,21 +363,69 @@ export class DocumentsService {
       version: doc.version,
       validFrom: doc.validFrom,
       validUntil: doc.validUntil,
+      publishedAt: doc.publishedAt,
       daysToExpire: doc.daysToExpire,
       isExpired: doc.isExpired,
       needsReview: doc.needsReview,
     }));
   }
 
+  // ------------------------------------------------------------------ detalhe
+
+  /** O que o usuário pode fazer neste documento (a interface só mostra o permitido). */
+  async capabilities(me: AuthPayload, doc: any) {
+    const [manager, canUpdate, canPublishPerm, canDelete, canDownloadDocx, areaWrite] = await Promise.all([
+      this.accessPolicy.isManager(me),
+      this.accessPolicy.has(me, 'doc:update'),
+      this.accessPolicy.has(me, 'doc:publish'),
+      this.accessPolicy.has(me, 'doc:delete'),
+      this.accessPolicy.has(me, 'doc:download_docx'),
+      this.accessPolicy.canWriteArea(me, doc),
+    ]);
+    const author = authorOf(doc);
+    const isAuthor = author === me.sub || doc.createdById === me.sub;
+    const editable = EDITABLE_STATUSES.has(doc.status);
+    const writer = canUpdate && areaWrite;
+    const directEdit = writer && (manager || isAuthor || !doc.ownerUserId);
+    const finalApprover = await this.isFinalApprover(me, doc);
+    return {
+      isAuthor,
+      isManager: manager,
+      canEditMetadata: writer,
+      canEditContent: editable && directEdit,
+      canConfigure: writer && (manager || isAuthor),
+      canSubmit: editable && writer,
+      canPublish: [DocumentStatus.APPROVED, DocumentStatus.SCHEDULED_PUBLICATION].includes(doc.status) && (canPublishPerm || finalApprover),
+      canRevise: PUBLISHED_LIKE.includes(doc.status) && writer,
+      canDelete: canDelete && areaWrite,
+      canDownloadDocx: canDownloadDocx || writer || isAuthor,
+      canManageAccess: manager || (writer && isAuthor),
+      canObsolete: writer && (manager || isAuthor),
+    };
+  }
+
+  private async isFinalApprover(me: AuthPayload, doc: any) {
+    const version = await this.prisma.documentVersion.findFirst({ where: { documentId: doc.id, deletedAt: null }, orderBy: { revisionNumber: 'desc' }, select: { id: true } });
+    if (!version) return false;
+    const step = await this.prisma.documentWorkflowStep.findFirst({ where: { documentId: doc.id, versionId: version.id, role: APPROVAL_ROLE, userId: me.sub, decision: 'APPROVED' } });
+    return Boolean(step);
+  }
+
   async getById(me: AuthPayload, id: string) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertViewArea(me, doc);
-    const [versions, files, statusHistory, approvals, reviewRequests, editRequests, comments, auditLogs, externalMetadata, tagRelations, readConfirmations] =
+    const doc = await this.loadVisible(me, id);
+    const [versions, files, statusHistory, approvals, reviewRequests, editRequests, comments, auditLogs, externalMetadata, tagRelations, processLinks, changeRequests] =
       await Promise.all([
-        this.prisma.documentVersion.findMany({ where: { documentId: id, companyId: me.companyId, deletedAt: null }, orderBy: { revisionNumber: 'desc' } }),
-        this.prisma.documentFile.findMany({ where: { documentId: id, companyId: me.companyId, deletedAt: null }, orderBy: { createdAt: 'desc' } }),
+        this.prisma.documentVersion.findMany({
+          where: { documentId: id, companyId: me.companyId, deletedAt: null },
+          orderBy: { revisionNumber: 'desc' },
+          select: {
+            id: true, revisionNumber: true, versionLabel: true, status: true, changeReason: true, changeSummary: true, docxFileId: true, pdfFileId: true,
+            contentHash: true, pdfSource: true, publicationDate: true, expirationDate: true, createdById: true, publishedById: true, createdAt: true, updatedAt: true,
+          },
+        }),
+        this.prisma.documentFile.findMany({ where: { documentId: id, companyId: me.companyId, deletedAt: null }, orderBy: { createdAt: 'desc' }, select: { id: true, kind: true, versionId: true, fileName: true, mimeType: true, sizeBytes: true, hashSha256: true, protected: true, createdAt: true, storageProvider: true } }),
         this.prisma.documentStatusHistory.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: { createdAt: 'desc' }, take: 100 }),
-        this.prisma.documentApproval.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: [{ approvalOrder: 'asc' }, { createdAt: 'asc' }] }),
+        this.prisma.documentApproval.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: [{ createdAt: 'desc' }], take: 200 }),
         this.prisma.documentReviewRequest.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: { createdAt: 'desc' } }),
         this.prisma.documentEditRequest.findMany({
           where: { documentId: id, companyId: me.companyId },
@@ -403,42 +437,50 @@ export class DocumentsService {
           orderBy: { createdAt: 'desc' },
           take: 50,
         }),
-        this.prisma.documentComment.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: { createdAt: 'desc' } }),
-        this.prisma.documentAuditLog.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: { createdAt: 'desc' }, take: 100 }),
+        this.prisma.documentComment.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: { createdAt: 'desc' }, take: 200 }),
+        this.prisma.documentAuditLog.findMany({ where: { documentId: id, companyId: me.companyId }, orderBy: { createdAt: 'desc' }, take: 150 }),
         this.prisma.documentExternalMetadata.findUnique({ where: { documentId: id } }),
         this.prisma.documentTagRelation.findMany({ where: { documentId: id, companyId: me.companyId }, include: { tag: true } }),
-        this.prisma.documentReadConfirmation.findMany({
-          where: { documentId: id, companyId: me.companyId, status: 'CONFIRMED' },
-          orderBy: { confirmedAt: 'desc' },
-          take: 200,
+        this.prisma.processIntegration.findMany({
+          where: { documentId: id, process: { companyId: me.companyId, deletedAt: null } },
+          include: { process: { select: { id: true, code: true, name: true } }, activity: { select: { id: true, name: true } } },
         }),
+        this.changeRequests.list(me.companyId, id),
       ]);
-    // O modelo de confirmação não tem relação com User; resolve os nomes aqui.
-    const readerIds = [...new Set(readConfirmations.map((item) => item.userId))];
-    const readers = readerIds.length
-      ? await this.prisma.user.findMany({ where: { id: { in: readerIds }, companyId: me.companyId }, select: { id: true, name: true, email: true } })
-      : [];
-    const readerById = new Map(readers.map((reader) => [reader.id, reader]));
+    const userIds = [
+      ...new Set([
+        ...comments.map((item) => item.userId),
+        ...approvals.map((item) => item.approverUserId),
+        ...auditLogs.map((item) => item.userId),
+        ...statusHistory.map((item) => item.userId),
+      ].filter(Boolean)),
+    ] as string[];
+    const users = userIds.length ? await this.prisma.user.findMany({ where: { id: { in: userIds }, companyId: me.companyId }, select: { id: true, name: true, email: true } }) : [];
+    const byId = new Map(users.map((user) => [user.id, user]));
+    const [workflow, distribution, capabilities] = await Promise.all([
+      this.workflow.state(me, doc),
+      this.distribution.summary(me.companyId, doc, me.sub),
+      this.capabilities(me, doc),
+    ]);
     return {
       ...this.enrich(doc),
       editor: this.editor.openPayload(id, files.find((file) => file.kind === DocumentFileKind.DOCX)?.id ?? null),
+      converterAvailable: Boolean(this.render.converterUrl()),
       versions,
       files,
-      statusHistory,
-      approvals,
+      statusHistory: statusHistory.map((item) => ({ ...item, user: item.userId ? byId.get(item.userId) ?? null : null })),
+      approvals: approvals.map((item) => ({ ...item, user: item.approverUserId ? byId.get(item.approverUserId) ?? null : null, signatureHash: item.signatureHash ? item.signatureHash.slice(0, 12).toUpperCase() : null })),
       reviewRequests,
       editRequests,
-      comments,
-      auditLogs,
+      comments: comments.map((item) => ({ ...item, user: item.userId ? byId.get(item.userId) ?? null : null })),
+      auditLogs: auditLogs.map((item) => ({ id: item.id, action: item.action, reason: item.reason, result: item.result, createdAt: item.createdAt, user: item.userId ? byId.get(item.userId) ?? null : null })),
       externalMetadata,
       tags: tagRelations.map((relation) => relation.tag),
-      readConfirmations: readConfirmations.map((item) => ({
-        id: item.id,
-        userId: item.userId,
-        versionId: item.versionId,
-        confirmedAt: item.confirmedAt,
-        user: readerById.get(item.userId) ?? null,
-      })),
+      processLinks: processLinks.map((link) => ({ id: link.id, process: link.process, activity: link.activity, label: link.label })),
+      changeRequests,
+      workflow,
+      distribution,
+      capabilities,
     };
   }
 
@@ -447,12 +489,13 @@ export class DocumentsService {
     const permitted = await this.access.listAreaFilter(me.sub, MODULE, 'view');
     const areaWhere = permitted ? { id: { in: permitted } } : {};
     const indicatorWhere = permitted ? { ownerNodeId: { in: permitted } } : {};
-    const [orgNodes, indicators, users, typeConfigs, templates] = await Promise.all([
+    const [orgNodes, allOrgNodes, indicators, users, typeConfigs, templates, groups, processes] = await Promise.all([
       this.prisma.orgNode.findMany({
         where: { companyId: me.companyId, deletedAt: null, active: true, ...areaWhere },
         select: { id: true, name: true, type: true },
         orderBy: [{ type: 'asc' }, { name: 'asc' }],
       }),
+      this.prisma.orgNode.findMany({ where: { companyId: me.companyId, deletedAt: null, active: true }, select: { id: true, name: true, type: true }, orderBy: [{ type: 'asc' }, { name: 'asc' }] }),
       this.prisma.indicator.findMany({
         where: { companyId: me.companyId, deletedAt: null, ...indicatorWhere },
         select: { id: true, name: true, code: true, ownerNodeId: true },
@@ -467,20 +510,37 @@ export class DocumentsService {
       this.prisma.documentTemplate.findMany({
         where: { companyId: me.companyId, deletedAt: null, active: true },
         orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+        select: { id: true, name: true, description: true, typeConfigId: true, version: true, isDefault: true, active: true, fileName: true, content: true, placeholders: true, updatedAt: true },
       }),
+      this.prisma.documentAccessGroup.findMany({ where: { companyId: me.companyId, deletedAt: null, active: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      this.prisma.process.findMany({ where: { companyId: me.companyId, deletedAt: null }, select: { id: true, code: true, name: true, status: true }, orderBy: { name: 'asc' }, take: 500 }),
     ]);
     return {
       orgNodes,
+      allOrgNodes,
       indicators,
       users,
       typeConfigs,
       templates,
+      groups,
+      processes,
       placeholders: defaultPlaceholders(),
       editor: this.editor.status(),
+      converterAvailable: Boolean(this.render.converterUrl()),
+      storage: this.storage.provider,
       statuses: Object.values(DocumentStatus),
       types: Object.values(DocumentType),
+      confidentialities: Object.values(DocumentConfidentiality),
+      contentFormats: Object.values(DocumentContentFormat),
+      permissions: {
+        manage: await this.accessPolicy.isManager(me),
+        publish: await this.accessPolicy.has(me, 'doc:publish'),
+        create: await this.accessPolicy.has(me, 'doc:create'),
+      },
     };
   }
+
+  // --------------------------------------------------------- tipos e modelos
 
   async listTypes(me: AuthPayload) {
     return this.codes.listTypes(me);
@@ -627,8 +687,9 @@ export class DocumentsService {
     const fileName = this.nullableText(body?.fileName) ?? `${name}.docx`;
     const buffer = decodeBase64(this.requiredText(body?.contentBase64, 'Arquivo do modelo'));
     if (!buffer.length) throw new BadRequestException('Arquivo vazio.');
-    if (buffer.length > MAX_FILE_BYTES) throw new BadRequestException('Arquivo excede o limite de 8 MB.');
+    if (buffer.length > MAX_BASE64_BYTES) throw new BadRequestException('Arquivo excede o limite de 8 MB.');
     if (!isDocxBuffer(buffer)) throw new BadRequestException('Arquivo inválido: envie um .docx (Word/LibreOffice) válido.');
+    if (docxHasMacros(buffer)) throw new BadRequestException('Arquivos com macros não são aceitos. Salve como .docx comum e envie de novo.');
     const typeConfigId = await this.validateTemplateType(me.companyId, this.id(body?.typeConfigId));
     const extracted = extractDocxText(buffer);
     const placeholders = detectPlaceholders(extracted);
@@ -683,6 +744,7 @@ export class DocumentsService {
       name: entry.name,
       description: entry.description,
       category: entry.category,
+      sigla: entry.sigla,
       preview: entry.content,
       installed: names.has(entry.name.toLowerCase()),
     }));
@@ -780,32 +842,21 @@ export class DocumentsService {
     return this.prisma.$transaction(async (tx) => this.codes.nextCode(tx, me.companyId, typeConfigId, type));
   }
 
-  private statusTimestamps(status: DocumentStatus, before?: { approvedAt: Date | null; publishedAt: Date | null }) {
-    const now = new Date();
-    const approvedStates = new Set<DocumentStatus>([
-      DocumentStatus.APPROVED,
-      DocumentStatus.SCHEDULED_PUBLICATION,
-      DocumentStatus.PUBLISHED,
-      DocumentStatus.NEAR_EXPIRATION,
-      DocumentStatus.EXPIRED,
-      DocumentStatus.PERIODIC_REVIEW,
-      DocumentStatus.REPLACED,
-      DocumentStatus.OBSOLETE,
-      DocumentStatus.ARCHIVED,
+  // ----------------------------------------------------------------- criação
+
+  /** Pessoas, áreas e grupos informados existem nesta empresa. */
+  private async validateAudience(companyId: string, input: { userIds?: string[]; orgNodeIds?: string[]; groupIds?: string[] }) {
+    const userIds = input.userIds ?? [];
+    const orgNodeIds = input.orgNodeIds ?? [];
+    const groupIds = input.groupIds ?? [];
+    const [users, nodes, groups] = await Promise.all([
+      userIds.length ? this.prisma.user.count({ where: { id: { in: userIds }, companyId, deletedAt: null, active: true } }) : 0,
+      orgNodeIds.length ? this.prisma.orgNode.count({ where: { id: { in: orgNodeIds }, companyId, deletedAt: null } }) : 0,
+      groupIds.length ? this.prisma.documentAccessGroup.count({ where: { id: { in: groupIds }, companyId, deletedAt: null } }) : 0,
     ]);
-    const publishedStates = new Set<DocumentStatus>([
-      DocumentStatus.PUBLISHED,
-      DocumentStatus.NEAR_EXPIRATION,
-      DocumentStatus.EXPIRED,
-      DocumentStatus.PERIODIC_REVIEW,
-      DocumentStatus.REPLACED,
-      DocumentStatus.OBSOLETE,
-      DocumentStatus.ARCHIVED,
-    ]);
-    return {
-      approvedAt: approvedStates.has(status) ? before?.approvedAt ?? now : before?.approvedAt ?? null,
-      publishedAt: publishedStates.has(status) ? before?.publishedAt ?? now : before?.publishedAt ?? null,
-    };
+    if (users !== userIds.length || nodes !== orgNodeIds.length || groups !== groupIds.length) {
+      throw new BadRequestException('Há pessoas, áreas ou grupos inativos ou de outra empresa.');
+    }
   }
 
   async create(me: AuthPayload, body: any) {
@@ -814,13 +865,33 @@ export class DocumentsService {
     if (body?.status && this.parseStatus(body.status) !== DocumentStatus.DRAFT) {
       throw new BadRequestException(DIRECT_STATUS_MESSAGE);
     }
+    const confidentiality = this.parseConfidentiality(body?.confidentiality) ?? DocumentConfidentiality.INTERNAL;
+    const format = this.parseFormat(body?.contentFormat) ?? DocumentContentFormat.STRUCTURED;
     const links = await this.validateLinks(me.companyId, {
       orgNodeId: this.id(body?.orgNodeId),
       indicatorId: this.id(body?.indicatorId),
       ownerUserId: this.id(body?.ownerUserId),
-      approverUserId: this.id(body?.approverUserId),
+      approverUserId: null,
     });
     await this.assertWriteArea(me, links.area, 'create');
+
+    // Participantes e público validados antes de criar (nada fica pela metade).
+    const reviewerIds = this.ids(body?.reviewerIds);
+    const approverIds = this.ids(body?.approverIds ?? (body?.approverUserId ? [body.approverUserId] : []));
+    const author = links.ids.ownerUserId ?? me.sub;
+    if ([...reviewerIds, ...approverIds].includes(author)) {
+      throw new BadRequestException('Quem elabora o documento não pode revisá-lo nem aprová-lo. Escolha outras pessoas.');
+    }
+    if (reviewerIds.some((userId) => approverIds.includes(userId))) {
+      throw new BadRequestException('A mesma pessoa não pode ser revisora e aprovadora da mesma revisão.');
+    }
+    const distribution = body?.distribution ?? null;
+    const accessList = body?.access ?? null;
+    await this.validateAudience(me.companyId, {
+      userIds: [...reviewerIds, ...approverIds, ...this.ids(distribution?.userIds), ...this.ids(accessList?.userIds)],
+      orgNodeIds: [...this.ids(distribution?.orgNodeIds), ...this.ids(accessList?.orgNodeIds)],
+      groupIds: [...this.ids(distribution?.groupIds), ...this.ids(accessList?.groupIds)],
+    });
     await this.codes.ensureDefaultTypes(me.companyId, me.sub);
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -840,12 +911,13 @@ export class DocumentsService {
 
       // Modelo: explicito (templateId) ou o padrao do tipo documental.
       const explicitContent = this.nullableText(body?.content);
+      const explicitJson = isDocNode(body?.contentJson) ? (body.contentJson as DocNode) : null;
       const templateId = this.id(body?.templateId);
       let template: any = null;
       if (templateId) {
         template = await tx.documentTemplate.findFirst({ where: { id: templateId, companyId: me.companyId, deletedAt: null, active: true } });
         if (!template) throw new NotFoundException('Modelo não encontrado.');
-      } else if (!explicitContent) {
+      } else if (!explicitContent && !explicitJson) {
         template = await tx.documentTemplate.findFirst({
           where: codeResult.typeConfig.defaultTemplateId
             ? { id: codeResult.typeConfig.defaultTemplateId, companyId: me.companyId, deletedAt: null, active: true }
@@ -854,19 +926,21 @@ export class DocumentsService {
       }
 
       let content = explicitContent ?? generatedDocumentBody(title, codeResult.code, 'Rev. 00');
+      let contentJson: DocNode | null = explicitJson;
       let templateDocx: Buffer | null = null;
+      let values: Record<string, string> = {};
       if (template) {
-        const values = await this.buildPlaceholderValuesTx(tx, me, {
+        values = await this.buildPlaceholderValuesTx(tx, me, {
           code: codeResult.code,
           title,
           typeName: codeResult.typeConfig.name ?? codeResult.typeConfig.category,
           orgNodeId: links.ids.orgNodeId,
           ownerUserId: links.ids.ownerUserId,
-          approverUserId: links.ids.approverUserId,
+          approverUserId: approverIds[0] ?? null,
           validUntil,
         });
         if (!explicitContent && template.content) content = applyTextPlaceholders(template.content, values);
-        if (template.storageKey) {
+        if (format === DocumentContentFormat.DOCX && template.storageKey) {
           try {
             const raw = await this.storage.readBinary(template.storageKey);
             if (isDocxBuffer(raw)) templateDocx = applyDocxPlaceholders(raw, values);
@@ -874,6 +948,9 @@ export class DocumentsService {
             templateDocx = null; // arquivo do modelo indisponivel: cai no texto
           }
         }
+      }
+      if (format === DocumentContentFormat.STRUCTURED && !contentJson) {
+        contentJson = template?.content ? applyDocPlaceholders(markdownToDoc(template.content), values) : markdownToDoc(explicitContent ?? '');
       }
 
       const last = await tx.document.findFirst({
@@ -889,9 +966,13 @@ export class DocumentsService {
           title,
           description: this.nullableText(body?.description) ?? null,
           type: codeResult.typeConfig.category,
+          typeConfigId: codeResult.typeConfig.id,
           status: DocumentStatus.DRAFT,
           version: 1,
-          content,
+          content: format === DocumentContentFormat.STRUCTURED ? null : content,
+          contentFormat: format,
+          contentJson: contentJson ? (contentJson as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+          confidentiality,
           externalUrl: this.nullableText(body?.externalUrl) ?? null,
           changeNote: this.nullableText(body?.changeNote) ?? 'Criação inicial',
           validFrom,
@@ -901,6 +982,7 @@ export class DocumentsService {
           publishedAt: null,
           createdById: me.sub,
           ...links.ids,
+          approverUserId: approverIds[0] ?? null,
         },
         include: this.include(),
       });
@@ -917,31 +999,33 @@ export class DocumentsService {
           createdById: me.sub,
         },
       });
-      // Semente do DOCX editavel: binario real do modelo (com placeholders
-      // resolvidos) quando existir; senao, texto que o WOPI converte on-the-fly.
-      let stored: Awaited<ReturnType<DocumentStorageService['putText']>>;
-      let fileContentText: string | null;
-      if (templateDocx) {
-        stored = await this.storage.putBinary(me.companyId, `documents/${doc.id}/rev-00`, `${doc.code ?? doc.number}-rev-00.docx`, templateDocx, DOCX_MIME);
-        fileContentText = null;
-      } else {
-        const text = template ? content : renderDocxText(doc, version.versionLabel);
-        stored = await this.storage.putText(me.companyId, `documents/${doc.id}/rev-00`, `${doc.code ?? doc.number}-rev-00.docx`, text, DOCX_MIME);
-        fileContentText = text;
+      // Word: semente do DOCX editavel (binario real do modelo ou texto que
+      // o WOPI converte on-the-fly). Editor visual e PDF anexado não precisam.
+      if (format === DocumentContentFormat.DOCX || format === DocumentContentFormat.TEXT) {
+        let stored: StoredDocumentFile;
+        let fileContentText: string | null;
+        if (templateDocx) {
+          stored = await this.storage.putBinary(me.companyId, `documents/${doc.id}/rev-00`, `${doc.code ?? doc.number}-rev-00.docx`, templateDocx, DOCX_MIME);
+          fileContentText = null;
+        } else {
+          const text = template ? content : renderDocxText(doc, version.versionLabel);
+          stored = await this.storage.putText(me.companyId, `documents/${doc.id}/rev-00`, `${doc.code ?? doc.number}-rev-00.docx`, text, DOCX_MIME);
+          fileContentText = text;
+        }
+        const file = await tx.documentFile.create({
+          data: {
+            companyId: me.companyId,
+            documentId: doc.id,
+            versionId: version.id,
+            kind: DocumentFileKind.DOCX,
+            protected: false,
+            createdById: me.sub,
+            contentText: fileContentText,
+            ...stored,
+          },
+        });
+        await tx.documentVersion.update({ where: { id: version.id }, data: { docxFileId: file.id } });
       }
-      const file = await tx.documentFile.create({
-        data: {
-          companyId: me.companyId,
-          documentId: doc.id,
-          versionId: version.id,
-          kind: DocumentFileKind.DOCX,
-          protected: false,
-          createdById: me.sub,
-          contentText: fileContentText,
-          ...stored,
-        },
-      });
-      await tx.documentVersion.update({ where: { id: version.id }, data: { docxFileId: file.id } });
       await this.recordStatusTx(tx, me, doc.id, null, DocumentStatus.DRAFT, 'Documento criado', { versionId: version.id });
       await this.auditTx(
         tx,
@@ -949,11 +1033,18 @@ export class DocumentsService {
         doc.id,
         'CREATE',
         null,
-        { code: doc.code, title: doc.title, type: doc.type, templateId: template?.id ?? null },
+        { code: doc.code, title: doc.title, type: doc.type, templateId: template?.id ?? null, format, confidentiality },
         'Criação do documento',
       );
       return doc;
     });
+
+    if (reviewerIds.length || approverIds.length) {
+      await this.workflow.setParticipants(me, created, { reviewerIds, approverIds, mode: body?.workflowMode, reviewDays: body?.reviewDays, approvalDays: body?.approvalDays });
+    }
+    if (distribution) await this.distribution.setDistribution(me, created, distribution);
+    if (accessList && confidentiality !== DocumentConfidentiality.INTERNAL) await this.governance.setAccess(me, created, { ...accessList, confidentiality });
+    await this.content.syncText(created.id);
 
     await this.traceability.record({
       companyId: me.companyId,
@@ -972,7 +1063,7 @@ export class DocumentsService {
   }
 
   async update(me: AuthPayload, id: string, patch: any) {
-    const before = await this.loadScoped(id, me.companyId);
+    const before = await this.loadVisible(me, id);
     await this.assertWriteArea(me, this.areaOf(before), 'edit');
     if ('status' in (patch ?? {}) && this.parseStatus(patch.status) !== before.status) {
       throw new BadRequestException(DIRECT_STATUS_MESSAGE);
@@ -983,9 +1074,15 @@ export class DocumentsService {
       orgNodeId: 'orgNodeId' in (patch ?? {}) ? this.id(patch.orgNodeId) : before.orgNodeId,
       indicatorId: 'indicatorId' in (patch ?? {}) ? this.id(patch.indicatorId) : before.indicatorId,
       ownerUserId: 'ownerUserId' in (patch ?? {}) ? this.id(patch.ownerUserId) : before.ownerUserId,
-      approverUserId: 'approverUserId' in (patch ?? {}) ? this.id(patch.approverUserId) : before.approverUserId,
+      approverUserId: before.approverUserId,
     });
     await this.assertWriteArea(me, links.area, 'edit');
+    if (links.ids.ownerUserId !== before.ownerUserId && links.ids.ownerUserId) {
+      const config = await this.workflow.config(me.companyId, before);
+      if ([...config.reviewers, ...config.approvers].includes(links.ids.ownerUserId)) {
+        throw new BadRequestException('O novo responsável já é revisor ou aprovador deste documento. Ajuste os participantes primeiro.');
+      }
+    }
 
     const data: any = { ...links.ids };
     if ('title' in (patch ?? {})) data.title = this.requiredText(patch.title, 'Título');
@@ -1007,10 +1104,12 @@ export class DocumentsService {
     if ('reviewIntervalMonths' in (patch ?? {})) data.reviewIntervalMonths = this.optionalInt(patch.reviewIntervalMonths);
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await assertDocumentUnchanged(tx, me.companyId, before);
       const doc = await tx.document.update({ where: { id }, data, include: this.include() });
-      await this.auditTx(tx, me, doc.id, 'UPDATE_METADATA', before, data, this.nullableText(patch?.reason) ?? 'Atualização de metadados');
+      await this.auditTx(tx, me, doc.id, 'UPDATE_METADATA', { title: before.title, code: before.code, ownerUserId: before.ownerUserId, validUntil: before.validUntil }, data, this.nullableText(patch?.reason) ?? 'Atualização de metadados');
       return doc;
     });
+    await this.content.syncText(updated.id);
 
     await this.traceability.record({
       companyId: me.companyId,
@@ -1030,11 +1129,15 @@ export class DocumentsService {
   }
 
   async remove(me: AuthPayload, id: string) {
-    const doc = await this.loadScoped(id, me.companyId);
+    const doc = await this.loadVisible(me, id);
     await this.assertWriteArea(me, this.areaOf(doc), 'delete');
+    if (PUBLISHED_LIKE.includes(doc.status)) {
+      throw new ConflictException('Documento vigente não pode ser excluído. Torne-o obsoleto para retirá-lo de uso.');
+    }
     const removed = await this.prisma.$transaction(async (tx) => {
+      await assertDocumentUnchanged(tx, me.companyId, doc);
       const item = await tx.document.update({ where: { id }, data: { deletedAt: new Date() }, include: this.include() });
-      await this.auditTx(tx, me, doc.id, 'SOFT_DELETE', doc, { deletedAt: item.deletedAt }, 'Exclusão lógica');
+      await this.auditTx(tx, me, doc.id, 'SOFT_DELETE', { status: doc.status }, { deletedAt: item.deletedAt }, 'Exclusão lógica');
       return item;
     });
     await this.traceability.record({
@@ -1052,30 +1155,145 @@ export class DocumentsService {
     return this.enrich(removed);
   }
 
-  async transition(me: AuthPayload, id: string, to: DocumentStatus, body: any = {}) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertWriteArea(me, this.areaOf(doc), 'edit');
-    const comment = this.nullableText(body?.comment);
-    if (COMMENT_REQUIRED.has(to) && !comment) throw new BadRequestException('Comentário obrigatório para esta transição.');
-    if (!TRANSITIONS[doc.status]?.includes(to)) {
-      throw new ConflictException(`Transição de ${doc.status} para ${to} não permitida.`);
-    }
-    if (to === DocumentStatus.PUBLISHED) return this.publish(me, id, body);
+  // -------------------------------------------------------- conteúdo (editor)
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const stamps = this.statusTimestamps(to, doc);
+  private async assertCanEditContent(me: AuthPayload, doc: any) {
+    if (!EDITABLE_STATUSES.has(doc.status)) {
+      throw new ConflictException('Documento bloqueado para edição. Crie uma nova revisão para alterar uma versão aprovada ou publicada.');
+    }
+    const caps = await this.capabilities(me, doc);
+    if (!caps.canEditContent) {
+      const approved = await this.findApprovedEditRequest(me, doc.id);
+      if (!approved) throw new ForbiddenException('Só o responsável edita o conteúdo. Peça a liberação de edição.');
+    }
+  }
+
+  /** Salva o conteúdo do editor visual (autosave). */
+  async saveContent(me: AuthPayload, id: string, body: any = {}) {
+    const doc = await this.loadVisible(me, id);
+    await this.assertCanEditContent(me, doc);
+    if (!isDocNode(body?.contentJson)) throw new BadRequestException('Conteúdo do editor inválido.');
+    const json = JSON.stringify(body.contentJson);
+    if (Buffer.byteLength(json, 'utf8') > MAX_CONTENT_JSON_BYTES) throw new BadRequestException('O documento passou de 20 MB. Reduza o tamanho ou a quantidade das imagens.');
+    const checksum = sha256(json);
+    const saved = await this.prisma.$transaction(async (tx) => {
+      await assertDocumentUnchanged(tx, me.companyId, doc);
       const version = await this.ensureLatestVersionTx(tx, doc, me.sub);
       const item = await tx.document.update({
         where: { id },
-        data: { status: to, approvedAt: stamps.approvedAt, publishedAt: stamps.publishedAt },
-        include: this.include(),
+        data: {
+          contentJson: body.contentJson as Prisma.InputJsonValue,
+          contentFormat: DocumentContentFormat.STRUCTURED,
+          changeNote: this.nullableText(body?.changeNote) ?? doc.changeNote,
+          ...(doc.status === DocumentStatus.DRAFT ? { status: DocumentStatus.IN_DEVELOPMENT } : {}),
+        },
       });
-      await tx.documentVersion.update({ where: { id: version.id }, data: { status: to } });
-      await this.recordWorkflowArtifactsTx(tx, me, doc, version.id, to, body, comment);
+      if (doc.status === DocumentStatus.DRAFT) {
+        await tx.documentVersion.update({ where: { id: version.id }, data: { status: DocumentStatus.IN_DEVELOPMENT } });
+      }
+      await tx.documentAutosaveCheckpoint.create({
+        data: { companyId: me.companyId, documentId: id, versionId: version.id, userId: me.sub, content: json.length <= 2_000_000 ? json : null, checksum },
+      });
+      return item;
+    });
+    await this.content.syncText(id);
+    return { savedAt: new Date().toISOString(), checksum, status: saved.status };
+  }
+
+  /** Troca o formato principal (editor visual ⇄ Word ⇄ PDF anexado). */
+  async changeFormat(me: AuthPayload, id: string, body: any = {}) {
+    const doc = await this.loadVisible(me, id);
+    await this.assertCanEditContent(me, doc);
+    const to = this.parseFormat(body?.format);
+    if (!to || to === DocumentContentFormat.TEXT) throw new BadRequestException('Escolha editor visual, Word ou PDF anexado.');
+    if (to === doc.contentFormat) return { format: to, html: null };
+    let html: string | null = null;
+    const version = await this.ensureLatestVersion(doc, me.sub);
+    if (to === DocumentContentFormat.STRUCTURED) {
+      // Do Word para o editor: o HTML volta para o editor montar o documento;
+      // o texto já vira um documento inicial, caso a pessoa não salve.
+      let initial: DocNode | null = null;
+      if (doc.contentFormat === DocumentContentFormat.DOCX) {
+        const docx = await this.render.latestDocx(doc, version);
+        if (docx) {
+          html = (await docxToHtml(docx.buffer)).html;
+          initial = markdownToDoc(await docxToText(docx.buffer));
+        }
+      }
+      if (!initial) initial = isDocNode(doc.contentJson) ? (doc.contentJson as DocNode) : markdownToDoc(doc.content ?? doc.bodyText ?? '');
+      await this.prisma.$transaction(async (tx) => {
+        await assertDocumentUnchanged(tx, me.companyId, doc);
+        await tx.document.update({ where: { id }, data: { contentFormat: to, contentJson: initial as unknown as Prisma.InputJsonValue } });
+      });
+    } else if (to === DocumentContentFormat.DOCX) {
+      // Do editor para o Word: gera um .docx real com o conteúdo atual.
+      const source = isDocNode(doc.contentJson) ? (doc.contentJson as DocNode) : markdownToDoc(doc.content ?? '');
+      const buffer = buildDocxFromDoc(source as any);
+      const stored = await this.storage.putBinary(me.companyId, `documents/${doc.id}/editor`, `${doc.code ?? doc.number}-${version.versionLabel.replace(/\W+/g, '')}.docx`, buffer, DOCX_MIME);
+      await this.prisma.$transaction(async (tx) => {
+        await assertDocumentUnchanged(tx, me.companyId, doc);
+        const file = await tx.documentFile.create({
+          data: { companyId: me.companyId, documentId: doc.id, versionId: version.id, kind: DocumentFileKind.DOCX, protected: false, createdById: me.sub, contentText: null, ...stored },
+        });
+        await tx.documentVersion.update({ where: { id: version.id }, data: { docxFileId: file.id } });
+        await tx.document.update({ where: { id }, data: { contentFormat: to } });
+      });
+    } else {
+      await this.prisma.$transaction(async (tx) => {
+        await assertDocumentUnchanged(tx, me.companyId, doc);
+        await tx.document.update({ where: { id }, data: { contentFormat: to } });
+      });
+    }
+    await this.audit(me, id, 'CONTENT_FORMAT', { format: doc.contentFormat }, { format: to }, 'Troca do formato principal');
+    await this.content.syncText(id);
+    return { format: to, html };
+  }
+
+  /** Converte um .docx enviado em HTML para importar no editor visual. */
+  async convertDocxForEditor(buffer: Buffer) {
+    if (!buffer?.length) throw new BadRequestException('Arquivo vazio.');
+    if (buffer.length > MAX_UPLOAD_BYTES) throw new BadRequestException('Arquivo excede o limite de 20 MB.');
+    if (!isDocxBuffer(buffer)) throw new BadRequestException('Envie um arquivo .docx válido.');
+    if (docxHasMacros(buffer)) throw new BadRequestException('Arquivos com macros não são aceitos.');
+    return docxToHtml(buffer);
+  }
+
+  // -------------------------------------------------------------- fluxo/status
+
+  /** Transições manuais: cancelar rascunho, revisão periódica, obsoleto, arquivar. */
+  async transition(me: AuthPayload, id: string, to: DocumentStatus, body: any = {}) {
+    const doc = await this.loadVisible(me, id);
+    await this.assertWriteArea(me, this.areaOf(doc), 'edit');
+    const caps = await this.capabilities(me, doc);
+    if ((to === DocumentStatus.OBSOLETE || to === DocumentStatus.ARCHIVED) && !caps.canObsolete) {
+      throw new ForbiddenException('Só o responsável ou o gestor do GED retira o documento de uso.');
+    }
+    const comment = this.nullableText(body?.comment);
+    if (COMMENT_REQUIRED.has(to) && !comment) throw new BadRequestException('Comentário obrigatório para esta transição.');
+    if (!MANUAL_TRANSITIONS[doc.status as DocumentStatus]?.includes(to)) {
+      throw new ConflictException(`Transição de ${DOCUMENT_STATUS_LABEL[doc.status] ?? doc.status} para ${DOCUMENT_STATUS_LABEL[to] ?? to} não permitida.`);
+    }
+    const retentionUntil = to === DocumentStatus.OBSOLETE || to === DocumentStatus.ARCHIVED
+      ? doc.retentionUntil ?? (await this.governance.retentionUntil(me.companyId, doc.typeConfigId))
+      : doc.retentionUntil;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await assertDocumentUnchanged(tx, me.companyId, doc);
+      const version = await this.ensureLatestVersionTx(tx, doc, me.sub);
+      const item = await tx.document.update({ where: { id }, data: { status: to, retentionUntil }, include: this.include() });
+      await tx.documentVersion.update({ where: { id: version.id }, data: { status: to === DocumentStatus.PERIODIC_REVIEW ? version.status : to } });
+      if (to === DocumentStatus.APPROVED) {
+        await tx.documentVersion.update({ where: { id: version.id }, data: { status: DocumentStatus.APPROVED, publicationDate: null } });
+      }
       await this.recordStatusTx(tx, me, doc.id, doc.status, to, comment, { versionId: version.id });
       await this.auditTx(tx, me, doc.id, 'STATUS_CHANGE', { status: doc.status }, { status: to }, comment ?? 'Transição de status');
       return item;
     });
+    if (to === DocumentStatus.OBSOLETE || to === DocumentStatus.ARCHIVED) {
+      // Leituras pendentes da revisão retirada de uso perdem o sentido.
+      await this.prisma.documentReadConfirmation.updateMany({ where: { companyId: me.companyId, documentId: id, status: 'PENDING' }, data: { status: 'CANCELLED' } });
+      this.workItems.markDirty(me.companyId, [me.sub], 'document-retired');
+    }
 
     await this.traceability.record({
       companyId: me.companyId,
@@ -1093,23 +1311,139 @@ export class DocumentsService {
     return this.getById(me, updated.id);
   }
 
-  async publish(me: AuthPayload, id: string, body: any = {}) {
-    const doc = await this.loadScoped(id, me.companyId);
+  async setParticipants(me: AuthPayload, id: string, body: any) {
+    const doc = await this.loadVisible(me, id);
+    const caps = await this.capabilities(me, doc);
+    if (!caps.canConfigure) throw new ForbiddenException('Só o responsável ou o gestor do GED define revisores e aprovadores.');
+    await this.workflow.setParticipants(me, doc, body);
+    return this.getById(me, id);
+  }
+
+  async submit(me: AuthPayload, id: string, body: any = {}) {
+    const doc = await this.loadVisible(me, id);
     await this.assertWriteArea(me, this.areaOf(doc), 'edit');
+    const caps = await this.capabilities(me, doc);
+    if (!caps.canSubmit) throw new ForbiddenException('Você não pode enviar este documento para análise.');
+    if (doc.contentFormat === DocumentContentFormat.FILE) {
+      const pdf = await this.prisma.documentFile.findFirst({ where: { documentId: id, companyId: me.companyId, kind: DocumentFileKind.ATTACHMENT, mimeType: PDF_MIME, protected: true, deletedAt: null } });
+      if (!pdf) throw new BadRequestException('Anexe o PDF do documento antes de enviar.');
+    }
+    const result = await this.workflow.submit(me, doc, body);
+    await this.traceability.record({
+      companyId: me.companyId,
+      indicatorId: doc.indicatorId,
+      userId: me.sub,
+      eventType: TraceEventType.STATUS_CHANGED,
+      entityType: TraceEntityType.DOCUMENT,
+      entityId: doc.id,
+      title: `Documento ${doc.code ?? `#${doc.number}`} enviado para análise`,
+      description: doc.title,
+      statusFrom: doc.status,
+      statusTo: result.status,
+    });
+    return this.getById(me, id);
+  }
+
+  async decide(me: AuthPayload, id: string, body: any = {}, context: { ip?: string; userAgent?: string } = {}) {
+    const doc = await this.loadVisible(me, id);
+    const result = await this.workflow.decide(me, doc, body, context);
+    if (result.approved && body?.publishNow) {
+      const fresh = await this.loadScoped(id, me.companyId);
+      const caps = await this.capabilities(me, fresh);
+      if (caps.canPublish) {
+        await this.publish(me, id, { comment: body?.comment, validUntil: body?.validUntil }, context, { preSigned: true });
+      }
+    }
+    return { ...(await this.getById(me, id)), decision: { signature: result.signature, status: result.status } };
+  }
+
+  async delegate(me: AuthPayload, id: string, body: any) {
+    const doc = await this.loadVisible(me, id);
+    await this.workflow.delegate(me, doc, body);
+    return this.getById(me, id);
+  }
+
+  async cancelFlow(me: AuthPayload, id: string, body: any) {
+    const doc = await this.loadVisible(me, id);
+    const caps = await this.capabilities(me, doc);
+    if (!caps.canConfigure && !caps.isManager) throw new ForbiddenException('Só o responsável ou o gestor do GED retira o documento do fluxo.');
+    await this.workflow.cancel(me, doc, body);
+    return this.getById(me, id);
+  }
+
+  /**
+   * Publicação oficial: gera o PDF fiel (com registro das assinaturas), torna a
+   * revisão vigente, substitui a anterior, distribui a leitura obrigatória e
+   * avisa os envolvidos. Com `publishAt` futuro, apenas agenda.
+   */
+  async publish(me: AuthPayload, id: string, body: any = {}, context: { ip?: string; userAgent?: string } = {}, options: { preSigned?: boolean; system?: boolean } = {}) {
+    const doc = await this.loadScoped(id, me.companyId);
+    if (!options.system) await this.assertViewArea(me, doc);
     if (doc.status !== DocumentStatus.APPROVED && doc.status !== DocumentStatus.SCHEDULED_PUBLICATION) {
       throw new ConflictException('Somente documentos aprovados podem ser publicados.');
     }
+    if (!options.system) {
+      const caps = await this.capabilities(me, doc);
+      if (!caps.canPublish) throw new ForbiddenException('Publica o aprovador final ou quem tem a permissão de publicar documentos.');
+      if (!options.preSigned) await this.workflow.verifySignature(me, body?.password);
+    }
+    const version = await this.ensureLatestVersion(doc, me.sub);
+    const publishAt = this.optionalDate(body?.publishAt, 'Data de publicação');
+    if (publishAt && publishAt.getTime() > Date.now() + 60_000) {
+      await this.prisma.$transaction(async (tx) => {
+        await assertDocumentUnchanged(tx, me.companyId, doc);
+        await tx.document.update({ where: { id }, data: { status: DocumentStatus.SCHEDULED_PUBLICATION } });
+        await tx.documentVersion.update({ where: { id: version.id }, data: { status: DocumentStatus.SCHEDULED_PUBLICATION, publicationDate: publishAt, publishedById: me.sub } });
+        await this.recordStatusTx(tx, me, doc.id, doc.status, DocumentStatus.SCHEDULED_PUBLICATION, `Publicação agendada para ${publishAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`, { versionId: version.id });
+        await this.auditTx(tx, me, doc.id, 'PUBLISH_SCHEDULED', { status: doc.status }, { publishAt }, this.nullableText(body?.comment) ?? 'Publicação agendada');
+      });
+      return this.getById(me, id);
+    }
+
+    const now = new Date();
+    let publicationSignature: Prisma.DocumentApprovalUncheckedCreateInput | null = null;
+    if (!options.system) {
+      const signatureHash = this.workflow.signatureHash([doc.id, version.id, me.sub, 'PUBLISHER', 'APPROVED', version.contentHash ?? '', now.toISOString()]);
+      publicationSignature = {
+        companyId: me.companyId,
+        documentId: doc.id,
+        versionId: version.id,
+        approverUserId: me.sub,
+        approverRole: 'PUBLISHER',
+        approvalOrder: 99,
+        decision: DocumentApprovalDecision.APPROVED,
+        statusFrom: doc.status,
+        statusTo: DocumentStatus.PUBLISHED,
+        comment: this.nullableText(body?.comment) ?? null,
+        decidedAt: now,
+        ip: context.ip ?? null,
+        userAgent: context.userAgent?.slice(0, 500) ?? null,
+        signatureMethod: options.preSigned ? 'APPROVAL_SIGNATURE' : 'PASSWORD',
+        signatureHash,
+        contentHash: version.contentHash,
+      };
+    }
+
+    const validUntil = this.optionalDate(body?.validUntil, 'Validade')
+      ?? (doc.typeConfig?.defaultValidityDays ? addDays(now, doc.typeConfig.defaultValidityDays) : doc.validUntil && doc.validUntil > now ? doc.validUntil : null);
+    const docForPdf = { ...doc, status: DocumentStatus.PUBLISHED, publishedAt: now, validUntil };
+    const signatures = await this.render.signatures(me.companyId, doc.id, version.id);
+    if (publicationSignature) signatures.push({
+      stage: 'Publicação', name: me.name, decision: 'Aprovado',
+      at: formatDateTimeBr(now) ?? '', verification: String(publicationSignature.signatureHash).slice(0, 12).toUpperCase(),
+    });
+    const official = await this.render.officialPdf({ doc: docForPdf, version, signatures });
+    const stored = await this.storage.putBinary(
+      me.companyId,
+      `documents/${doc.id}/${version.versionLabel}`,
+      `${doc.code ?? doc.number}-${version.versionLabel}.pdf`,
+      official.buffer,
+      PDF_MIME,
+    );
+
     const published = await this.prisma.$transaction(async (tx) => {
-      const version = await this.ensureLatestVersionTx(tx, doc, me.sub);
-      const pdfContent = renderPdfText(doc, version.versionLabel, this.nullableText(body?.watermark));
-      // PDF oficial controlado: binario real (abre em qualquer leitor).
-      const stored = await this.storage.putBinary(
-        me.companyId,
-        `documents/${doc.id}/${version.versionLabel}`,
-        `${doc.code ?? doc.number}-${version.versionLabel}.pdf`,
-        buildPdf(pdfContent),
-        PDF_MIME,
-      );
+      await assertDocumentUnchanged(tx, me.companyId, doc);
+      if (publicationSignature) await tx.documentApproval.create({ data: publicationSignature });
       const pdf = await tx.documentFile.create({
         data: {
           companyId: me.companyId,
@@ -1123,7 +1457,7 @@ export class DocumentsService {
         },
       });
       await tx.documentVersion.updateMany({
-        where: { documentId: doc.id, companyId: me.companyId, id: { not: version.id }, status: DocumentStatus.PUBLISHED },
+        where: { documentId: doc.id, companyId: me.companyId, id: { not: version.id }, status: { in: [DocumentStatus.PUBLISHED] } },
         data: { status: DocumentStatus.REPLACED },
       });
       await tx.documentVersion.update({
@@ -1131,66 +1465,179 @@ export class DocumentsService {
         data: {
           status: DocumentStatus.PUBLISHED,
           pdfFileId: pdf.id,
-          publicationDate: new Date(),
-          expirationDate: doc.validUntil,
-          publishedById: me.sub,
+          pdfSource: official.source,
+          publicationDate: now,
+          expirationDate: validUntil,
+          publishedById: version.publishedById ?? me.sub,
         },
       });
-      const stamps = this.statusTimestamps(DocumentStatus.PUBLISHED, doc);
       const item = await tx.document.update({
         where: { id },
-        data: { status: DocumentStatus.PUBLISHED, approvedAt: stamps.approvedAt, publishedAt: stamps.publishedAt },
+        data: {
+          status: DocumentStatus.PUBLISHED,
+          approvedAt: doc.approvedAt ?? now,
+          publishedAt: now,
+          validFrom: doc.validFrom && doc.version === 1 ? doc.validFrom : now,
+          validUntil,
+          retentionUntil: null,
+        },
         include: this.include(),
       });
-      await this.recordStatusTx(tx, me, doc.id, doc.status, DocumentStatus.PUBLISHED, this.nullableText(body?.comment), { versionId: version.id, pdfFileId: pdf.id });
-      await this.auditTx(tx, me, doc.id, 'PUBLISH', { status: doc.status }, { status: DocumentStatus.PUBLISHED, pdfFileId: pdf.id }, this.nullableText(body?.comment) ?? 'Publicação oficial');
+      await this.recordStatusTx(tx, me, doc.id, doc.status, DocumentStatus.PUBLISHED, this.nullableText(body?.comment), { versionId: version.id, pdfFileId: pdf.id, pdfSource: official.source });
+      await this.auditTx(tx, me, doc.id, 'PUBLISH', { status: doc.status }, { status: DocumentStatus.PUBLISHED, pdfFileId: pdf.id, pdfSource: official.source }, this.nullableText(body?.comment) ?? 'Publicação oficial', context);
       return item;
     });
 
-    // Nova revisão publicada: reabre os treinamentos vinculados conforme a ação
-    // configurada em cada um (ciência, reciclagem ou novo treinamento). Nunca
-    // derruba a publicação — o T&D é consequência, não pré-requisito.
-    try {
-      const outcomes = await this.trainingDocuments.applyRevision(me.companyId, doc.id, { actorUserId: me.sub });
-      const reopened = outcomes.reduce((sum, item) => sum + item.reopened, 0);
-      if (reopened > 0) {
-        this.logger.log(`Revisão do documento ${doc.id}: ${reopened} treinamento(s) reaberto(s) para nova capacitação.`);
-      }
-    } catch (error) {
-      this.logger.warn(`Falha ao propagar a revisão do documento ${doc.id} para o T&D: ${(error as Error).message}`);
-    }
+    await this.afterPublish(me, published, version);
+    await this.traceability.record({
+      companyId: me.companyId,
+      indicatorId: published.indicatorId,
+      userId: me.sub,
+      eventType: TraceEventType.STATUS_CHANGED,
+      entityType: TraceEntityType.DOCUMENT,
+      entityId: published.id,
+      title: `Documento ${published.code ?? `#${published.number}`} publicado (${version.versionLabel})`,
+      description: published.title,
+      statusFrom: doc.status,
+      statusTo: DocumentStatus.PUBLISHED,
+    });
+    return options.system ? this.enrich(published) : this.getById(me, published.id);
+  }
 
-    return this.getById(me, published.id);
+  /** Efeitos da publicação (nunca derrubam a publicação em si). */
+  private async afterPublish(me: AuthPayload, doc: any, version: { id: string; versionLabel: string }) {
+    const tasks: Array<Promise<unknown>> = [
+      this.content.syncText(doc.id),
+      this.distribution.syncAssignments(me.companyId, doc.id),
+      this.changeRequests.markImplemented(me.companyId, doc.id, version.id, label(doc)),
+      this.retireReplaced(me, doc),
+      this.notifyPublication(me, doc, version.versionLabel),
+    ];
+    for (const result of await Promise.allSettled(tasks)) {
+      if (result.status === 'rejected') this.logger.warn(`Efeito da publicação falhou (${doc.id}): ${(result.reason as Error)?.message ?? result.reason}`);
+    }
+    const config = await this.workflow.config(me.companyId, doc);
+    this.workItems.markDirty(me.companyId, [authorOf(doc), ...config.reviewers, ...config.approvers, me.sub].filter(Boolean) as string[], 'document-published');
+  }
+
+  /** Documentos marcados como "substituído por este" saem de uso. */
+  private async retireReplaced(me: AuthPayload, doc: any) {
+    const relations = await this.prisma.documentRelation.findMany({ where: { companyId: me.companyId, documentId: doc.id, relatedEntityType: 'DOCUMENT', relationKind: 'REPLACES' } });
+    for (const relation of relations) {
+      const target = await this.prisma.document.findFirst({ where: { id: relation.relatedEntityId, companyId: me.companyId, deletedAt: null } });
+      if (!target || !PUBLISHED_LIKE.includes(target.status)) continue;
+      await this.prisma.$transaction(async (tx) => {
+        await tx.document.update({ where: { id: target.id }, data: { status: DocumentStatus.REPLACED, retentionUntil: await this.governance.retentionUntil(me.companyId, target.typeConfigId) } });
+        await tx.documentReadConfirmation.updateMany({ where: { documentId: target.id, status: 'PENDING' }, data: { status: 'CANCELLED' } });
+        await this.recordStatusTx(tx, me, target.id, target.status, DocumentStatus.REPLACED, `Substituído por ${label(doc)}`, { replacedBy: doc.id });
+      });
+    }
+  }
+
+  private async notifyPublication(me: AuthPayload, doc: any, versionLabel: string) {
+    const links = await this.prisma.processIntegration.findMany({
+      where: { documentId: doc.id, process: { companyId: me.companyId, deletedAt: null } },
+      include: { process: { select: { id: true, name: true, ownerUserId: true } } },
+    });
+    const owners = new Map<string, string[]>();
+    for (const link of links) {
+      if (!link.process.ownerUserId) continue;
+      owners.set(link.process.ownerUserId, [...(owners.get(link.process.ownerUserId) ?? []), link.process.name]);
+    }
+    const author = authorOf(doc);
+    const recipients = new Map<string, string>();
+    if (author && author !== me.sub) recipients.set(author, `A ${versionLabel} de "${doc.title}" foi publicada e já é a versão vigente.`);
+    for (const [userId, processes] of owners) {
+      if (userId === me.sub) continue;
+      recipients.set(userId, `Nova revisão (${versionLabel}) de "${doc.title}", vinculado ao processo ${[...new Set(processes)].join(', ')}. Confira as atividades que dependem dele.`);
+    }
+    for (const [userId, body] of recipients) {
+      try {
+        await this.notifications.create(me.companyId, userId, NotificationKind.MESSAGE, `Documento publicado: ${label(doc)}`.slice(0, 180), body, `/documents/${doc.id}`);
+      } catch {
+        // best-effort
+      }
+    }
+  }
+
+  /** Publica as revisões agendadas cuja data chegou (rotina de manutenção). */
+  async publishScheduled(companyId: string) {
+    const due = await this.prisma.documentVersion.findMany({
+      where: { companyId, status: DocumentStatus.SCHEDULED_PUBLICATION, publicationDate: { lte: new Date() }, document: { status: DocumentStatus.SCHEDULED_PUBLICATION, deletedAt: null } },
+      select: { documentId: true, publishedById: true },
+      take: 50,
+    });
+    let published = 0;
+    for (const item of due) {
+      const actor = item.publishedById ? await this.prisma.user.findFirst({ where: { id: item.publishedById }, select: { id: true, name: true, email: true, role: true } }) : null;
+      const me = { sub: actor?.id ?? null, companyId, name: actor?.name ?? 'Sistema', email: actor?.email ?? '', role: actor?.role ?? 'COLLABORATOR' } as unknown as AuthPayload;
+      try {
+        await this.publish(me, item.documentId, { comment: 'Publicação agendada' }, {}, { system: true });
+        published++;
+      } catch (error) {
+        this.logger.warn(`Publicação agendada falhou (${item.documentId}): ${(error as Error).message}`);
+      }
+    }
+    return published;
   }
 
   async createRevision(me: AuthPayload, id: string, body: any = {}) {
-    const doc = await this.loadScoped(id, me.companyId);
+    const doc = await this.loadVisible(me, id);
     await this.assertWriteArea(me, this.areaOf(doc), 'edit');
+    if (!PUBLISHED_LIKE.includes(doc.status)) throw new ConflictException('Nova revisão só pode partir de um documento vigente.');
     const reason = this.requiredText(body?.reason, 'Motivo da nova revisão');
+    const changeRequestId = this.id(body?.changeRequestId);
     const created = await this.prisma.$transaction(async (tx) => {
-      const latest = await this.ensureLatestVersionTx(tx, doc, me.sub);
-      const nextRevisionNumber = latest.revisionNumber + 1;
-      const versionLabel = `Rev. ${String(nextRevisionNumber).padStart(2, '0')}`;
+      const { document } = await this.newRevisionTx(tx, me, doc, reason, this.nullableText(body?.summary) ?? null, 'NEW_REVISION');
+      return document;
+    });
+    if (changeRequestId) {
+      await this.prisma.documentChangeRequest.updateMany({ where: { id: changeRequestId, companyId: me.companyId, documentId: id, status: 'OPEN' }, data: { status: 'ACCEPTED', decidedById: me.sub, decidedAt: new Date(), decisionNote: reason } });
+    }
+    await this.content.syncText(id);
+    return this.getById(me, created.id);
+  }
+
+  /**
+   * Abre a próxima revisão a partir da vigente: copia o conteúdo (editor visual
+   * ou Word) sem alterar o texto; o motivo fica registrado na própria revisão.
+   */
+  private async newRevisionTx(tx: Tx, me: AuthPayload, doc: any, reason: string, summary: string | null, source: string) {
+    await assertDocumentUnchanged(tx, me.companyId, doc);
+    const latest = await this.ensureLatestVersionTx(tx, doc, me.sub);
+    const nextRevisionNumber = latest.revisionNumber + 1;
+    const versionLabel = `Rev. ${String(nextRevisionNumber).padStart(2, '0')}`;
+    const version = await tx.documentVersion.create({
+      data: {
+        companyId: me.companyId,
+        documentId: doc.id,
+        revisionNumber: nextRevisionNumber,
+        versionLabel,
+        status: DocumentStatus.IN_DEVELOPMENT,
+        changeReason: reason,
+        changeSummary: summary,
+        expirationDate: doc.validUntil,
+        createdById: me.sub,
+      },
+    });
+    let file: any = null;
+    if (doc.contentFormat === DocumentContentFormat.DOCX || doc.contentFormat === DocumentContentFormat.TEXT) {
       const sourceFile = latest.docxFileId
         ? await tx.documentFile.findFirst({ where: { id: latest.docxFileId, companyId: me.companyId, deletedAt: null } })
         : await tx.documentFile.findFirst({ where: { documentId: doc.id, companyId: me.companyId, kind: DocumentFileKind.DOCX, deletedAt: null }, orderBy: { createdAt: 'desc' } });
-      const sourceContent = sourceFile?.contentText ?? doc.content ?? generatedDocumentBody(doc.title, doc.code ?? `#${doc.number}`, versionLabel);
-      const content = `${sourceContent}\n\nHistórico da nova revisão: ${reason}\n`;
-      const version = await tx.documentVersion.create({
-        data: {
-          companyId: me.companyId,
-          documentId: doc.id,
-          revisionNumber: nextRevisionNumber,
-          versionLabel,
-          status: DocumentStatus.IN_DEVELOPMENT,
-          changeReason: reason,
-          changeSummary: this.nullableText(body?.summary),
-          expirationDate: doc.validUntil,
-          createdById: me.sub,
-        },
-      });
-      const stored = await this.storage.putText(me.companyId, `documents/${doc.id}/rev-${nextRevisionNumber}`, `${doc.code ?? doc.number}-${versionLabel}.docx`, content, DOCX_MIME);
-      const file = await tx.documentFile.create({
+      let binarySeed: Buffer | null = null;
+      if (sourceFile && sourceFile.contentText == null && sourceFile.storageKey) {
+        try {
+          binarySeed = await this.storage.readBinary(sourceFile.storageKey);
+        } catch {
+          binarySeed = null;
+        }
+      }
+      const textSeed = sourceFile?.contentText ?? doc.content ?? generatedDocumentBody(doc.title, doc.code ?? `#${doc.number}`, versionLabel);
+      const stored = binarySeed
+        ? await this.storage.putBinary(me.companyId, `documents/${doc.id}/rev-${nextRevisionNumber}`, `${doc.code ?? doc.number}-${versionLabel}.docx`, binarySeed, DOCX_MIME)
+        : await this.storage.putText(me.companyId, `documents/${doc.id}/rev-${nextRevisionNumber}`, `${doc.code ?? doc.number}-${versionLabel}.docx`, textSeed, DOCX_MIME);
+      file = await tx.documentFile.create({
         data: {
           companyId: me.companyId,
           documentId: doc.id,
@@ -1198,26 +1645,47 @@ export class DocumentsService {
           kind: DocumentFileKind.DOCX,
           protected: false,
           createdById: me.sub,
-          contentText: content,
+          contentText: binarySeed ? null : textSeed,
           ...stored,
         },
       });
       await tx.documentVersion.update({ where: { id: version.id }, data: { docxFileId: file.id } });
-      const updated = await tx.document.update({
-        where: { id },
-        data: { version: doc.version + 1, status: DocumentStatus.IN_DEVELOPMENT, content, changeNote: reason },
-        include: this.include(),
-      });
-      await this.recordStatusTx(tx, me, doc.id, doc.status, DocumentStatus.IN_DEVELOPMENT, reason, { versionId: version.id });
-      await this.auditTx(tx, me, doc.id, 'CREATE_REVISION', { latestVersionId: latest.id }, { versionId: version.id, revisionNumber: nextRevisionNumber }, reason);
-      return updated;
+    }
+    if (doc.contentFormat === DocumentContentFormat.FILE) {
+      // PDF anexado: a nova revisão começa com o mesmo arquivo, que pode ser trocado.
+      const previous = await tx.documentFile.findFirst({ where: { documentId: doc.id, companyId: me.companyId, kind: DocumentFileKind.ATTACHMENT, mimeType: PDF_MIME, protected: true, deletedAt: null }, orderBy: { createdAt: 'desc' } });
+      if (previous) {
+        await tx.documentFile.create({
+          data: {
+            companyId: me.companyId, documentId: doc.id, versionId: version.id, kind: DocumentFileKind.ATTACHMENT, storageProvider: previous.storageProvider,
+            storageKey: previous.storageKey, fileName: previous.fileName, mimeType: previous.mimeType, sizeBytes: previous.sizeBytes, hashSha256: previous.hashSha256, protected: true, createdById: me.sub,
+          },
+        });
+      }
+    }
+    const lastStructured = isDocNode(doc.contentJson)
+      ? doc.contentJson
+      : await tx.documentVersion.findFirst({ where: { documentId: doc.id, contentJson: { not: Prisma.DbNull } }, orderBy: { revisionNumber: 'desc' }, select: { contentJson: true } }).then((row) => row?.contentJson ?? null);
+    const document = await tx.document.update({
+      where: { id: doc.id },
+      data: {
+        version: doc.version + 1,
+        status: DocumentStatus.IN_DEVELOPMENT,
+        changeNote: reason,
+        approvedAt: null,
+        ...(doc.contentFormat === DocumentContentFormat.STRUCTURED && lastStructured ? { contentJson: lastStructured as Prisma.InputJsonValue } : {}),
+      },
+      include: this.include(),
     });
-    return this.getById(me, created.id);
+    await this.recordStatusTx(tx, me, doc.id, doc.status, DocumentStatus.IN_DEVELOPMENT, reason, { versionId: version.id, source });
+    await this.auditTx(tx, me, doc.id, source === 'NEW_REVISION' ? 'CREATE_REVISION' : 'CREATE_REVISION_FOR_EDIT_REQUEST', { latestVersionId: latest.id }, { versionId: version.id, revisionNumber: nextRevisionNumber }, reason);
+    return { document, version, file };
   }
 
+  // ------------------------------------------------------- liberação de edição
+
   async requestEdit(me: AuthPayload, id: string, body: any = {}) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertViewArea(me, doc);
+    const doc = await this.loadVisible(me, id);
     const existing = await this.prisma.documentEditRequest.findFirst({
       where: {
         companyId: me.companyId,
@@ -1258,13 +1726,19 @@ export class DocumentsService {
       },
     });
     await this.audit(me, id, 'EDIT_REQUESTED', null, { requestId: request.id, operatorUserId }, reason);
+    if (operatorUserId !== me.sub) {
+      try {
+        await this.notifications.create(me.companyId, operatorUserId, NotificationKind.MESSAGE, `Liberar edição: ${label(doc)}`.slice(0, 180), `${me.name} pediu para editar "${doc.title}". Motivo: ${reason}`, `/documents/${doc.id}`);
+      } catch {
+        // best-effort
+      }
+    }
     this.workItems.markDirty(me.companyId, [operatorUserId, me.sub], 'document-edit-requested');
     return request;
   }
 
   async grantEditRequest(me: AuthPayload, id: string, body: any = {}) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertViewArea(me, doc);
+    const doc = await this.loadVisible(me, id);
     await this.assertCanOperateDocumentEdit(me, doc);
 
     const requesterUserId = this.requiredText(body?.requesterUserId, 'Usuário para edição');
@@ -1294,7 +1768,7 @@ export class DocumentsService {
       let versionId = existing?.versionId ?? null;
       let document = doc;
       if (!EDITABLE_STATUSES.has(document.status as DocumentStatus)) {
-        const revision = await this.createRevisionForEditRequestTx(tx, me, document, note);
+        const revision = await this.newRevisionTx(tx, me, document, note, null, 'EDIT_REQUEST');
         versionId = revision.version.id;
         document = revision.document;
       } else if (!versionId) {
@@ -1365,7 +1839,7 @@ export class DocumentsService {
       let versionId = request.versionId;
       let document = request.document;
       if (!EDITABLE_STATUSES.has(document.status as DocumentStatus)) {
-        const revision = await this.createRevisionForEditRequestTx(tx, me, document, note ?? request.reason ?? 'Liberação de edição online');
+        const revision = await this.newRevisionTx(tx, me, document, note ?? request.reason ?? 'Liberação de edição', null, 'EDIT_REQUEST');
         versionId = revision.version.id;
         document = revision.document;
       } else if (!versionId) {
@@ -1395,7 +1869,7 @@ export class DocumentsService {
         'EDIT_REQUEST_APPROVED',
         { requestId: request.id, status: request.status },
         { requestId: request.id, status: 'APPROVED', versionId },
-        note ?? 'Liberação de edição online',
+        note ?? 'Liberação de edição',
       );
       return updated;
     });
@@ -1454,14 +1928,13 @@ export class DocumentsService {
     return completed;
   }
 
+  /** Conteúdo em texto simples (documentos legados). */
   async autosave(me: AuthPayload, id: string, body: any = {}) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertWriteArea(me, this.areaOf(doc), 'edit');
-    if (!EDITABLE_STATUSES.has(doc.status)) {
-      throw new ConflictException('Documento bloqueado para edição. Crie uma nova revisão para alterar uma versão publicada/aprovada.');
-    }
+    const doc = await this.loadVisible(me, id);
+    await this.assertCanEditContent(me, doc);
     const content = this.requiredText(body?.content, 'Conteúdo');
     const saved = await this.prisma.$transaction(async (tx) => {
+      await assertDocumentUnchanged(tx, me.companyId, doc);
       const version = await this.ensureLatestVersionTx(tx, doc, me.sub);
       const checksum = sha256(content);
       const item = await tx.document.update({ where: { id }, data: { content, changeNote: this.nullableText(body?.changeNote) ?? doc.changeNote }, include: this.include() });
@@ -1471,16 +1944,24 @@ export class DocumentsService {
       await this.auditTx(tx, me, id, 'AUTOSAVE', { checksum: sha256(doc.content ?? '') }, { checksum }, 'Autosave');
       return item;
     });
+    await this.content.syncText(id);
     return { savedAt: new Date().toISOString(), checksum: sha256(content), document: this.enrich(saved) };
   }
 
-  async openEditor(me: AuthPayload, id: string) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertViewArea(me, doc);
+  // ---------------------------------------------------- editores de Word
+
+  /** Edição direta: responsável/criador/gestor com escrita; os demais pedem liberação. */
+  private async editAuthorization(me: AuthPayload, doc: any) {
     const approvedRequest = await this.findApprovedEditRequest(me, doc.id);
-    if (!approvedRequest) {
-      throw new ForbiddenException('Edição online precisa de liberação do operador.');
-    }
+    if (approvedRequest) return { approvedRequest, direct: false };
+    const caps = await this.capabilities(me, doc);
+    if (caps.canEditContent) return { approvedRequest: null, direct: true };
+    throw new ForbiddenException('A edição precisa de liberação do responsável pelo documento.');
+  }
+
+  async openEditor(me: AuthPayload, id: string) {
+    const doc = await this.loadVisible(me, id);
+    const { approvedRequest } = await this.editAuthorization(me, doc);
 
     // Sem provedor online configurado: mantém o fluxo manual (download/upload).
     if (!this.editor.isOnline()) {
@@ -1501,13 +1982,13 @@ export class DocumentsService {
 
     let editableDoc = doc;
     if (approvedRequest && !EDITABLE_STATUSES.has(doc.status)) {
-      const updated = await this.prisma.$transaction(async (tx) => {
-        const revision = await this.createRevisionForEditRequestTx(tx, me, doc, approvedRequest.reason ?? 'Liberação de edição online');
+      editableDoc = await this.prisma.$transaction(async (tx) => {
+        const revision = await this.newRevisionTx(tx, me, doc, approvedRequest.reason ?? 'Liberação de edição online', null, 'EDIT_REQUEST');
         await tx.documentEditRequest.update({ where: { id: approvedRequest.id }, data: { versionId: revision.version.id } });
         return revision.document;
       });
-      editableDoc = updated;
     }
+    if (!EDITABLE_STATUSES.has(editableDoc.status)) throw new ConflictException('Crie uma nova revisão para editar um documento vigente.');
     const file = await this.ensureEditableDocxFile(me, editableDoc);
     const session = await this.editor.buildSession({
       documentId: id,
@@ -1529,6 +2010,9 @@ export class DocumentsService {
         metadata: jsonOrNull({ fileId: file.id, mode: session.mode, online: Boolean(session.editorUrl), editRequestId: approvedRequest?.id ?? null }),
       },
     });
+    if (editableDoc.contentFormat !== DocumentContentFormat.DOCX) {
+      await this.prisma.document.update({ where: { id }, data: { contentFormat: DocumentContentFormat.DOCX } });
+    }
     if (approvedRequest?.status === 'APPROVED') {
       await this.prisma.documentEditRequest.update({ where: { id: approvedRequest.id }, data: { status: 'IN_PROGRESS' } });
       this.workItems.markDirty(me.companyId, [approvedRequest.requesterUserId, approvedRequest.operatorUserId], 'document-edit-started');
@@ -1537,14 +2021,13 @@ export class DocumentsService {
   }
 
   async openViewer(me: AuthPayload, id: string) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertViewArea(me, doc);
+    const doc = await this.loadVisible(me, id);
 
     const latestDocx = await this.prisma.documentFile.findFirst({
       where: { companyId: me.companyId, documentId: id, kind: DocumentFileKind.DOCX, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
-    const file = latestDocx ?? await this.ensureEditableDocxFile(me, doc);
+    const file = latestDocx ?? (await this.ensureEditableDocxFile(me, doc));
     const session = await this.editor.buildSession({
       documentId: id,
       fileId: file.id,
@@ -1570,22 +2053,18 @@ export class DocumentsService {
   }
 
   async openWordDesktopEditor(me: AuthPayload, id: string) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertViewArea(me, doc);
-    const approvedRequest = await this.findApprovedEditRequest(me, doc.id);
-    if (!approvedRequest) {
-      throw new ForbiddenException('Edição no Word instalado precisa de liberação do operador.');
-    }
+    const doc = await this.loadVisible(me, id);
+    const { approvedRequest } = await this.editAuthorization(me, doc);
 
     let editableDoc = doc;
-    if (!EDITABLE_STATUSES.has(doc.status)) {
-      const updated = await this.prisma.$transaction(async (tx) => {
-        const revision = await this.createRevisionForEditRequestTx(tx, me, doc, approvedRequest.reason ?? 'Liberação de edição no Word instalado');
+    if (approvedRequest && !EDITABLE_STATUSES.has(doc.status)) {
+      editableDoc = await this.prisma.$transaction(async (tx) => {
+        const revision = await this.newRevisionTx(tx, me, doc, approvedRequest.reason ?? 'Liberação de edição no Word instalado', null, 'EDIT_REQUEST');
         await tx.documentEditRequest.update({ where: { id: approvedRequest.id }, data: { versionId: revision.version.id } });
         return revision.document;
       });
-      editableDoc = updated;
     }
+    if (!EDITABLE_STATUSES.has(editableDoc.status)) throw new ConflictException('Crie uma nova revisão para editar um documento vigente.');
 
     const file = await this.ensureEditableDocxFile(me, editableDoc);
     const session = this.editor.buildDesktopSession({
@@ -1606,33 +2085,23 @@ export class DocumentsService {
         userId: me.sub,
         provider: 'word_desktop',
         status: 'OPEN',
-        metadata: jsonOrNull({ fileId: file.id, mode: session.mode, dav: Boolean(session.davUrl), editRequestId: approvedRequest.id }),
+        metadata: jsonOrNull({ fileId: file.id, mode: session.mode, dav: Boolean(session.davUrl), editRequestId: approvedRequest?.id ?? null }),
       },
     });
-    if (approvedRequest.status === 'APPROVED') {
+    if (editableDoc.contentFormat !== DocumentContentFormat.DOCX) {
+      await this.prisma.document.update({ where: { id }, data: { contentFormat: DocumentContentFormat.DOCX } });
+    }
+    if (approvedRequest?.status === 'APPROVED') {
       await this.prisma.documentEditRequest.update({ where: { id: approvedRequest.id }, data: { status: 'IN_PROGRESS' } });
       this.workItems.markDirty(me.companyId, [approvedRequest.requesterUserId, approvedRequest.operatorUserId], 'document-edit-started-word');
     }
     return session;
   }
 
-  /** Indica se o usuário pode editar o documento (status editável + escopo de área). */
-  private async canWriteDoc(me: AuthPayload, doc: any): Promise<boolean> {
-    if (!EDITABLE_STATUSES.has(doc.status)) return false;
-    const area = this.areaOf(doc);
-    if (!area) return true;
-    try {
-      await this.access.assertCanWrite(me.sub, area, MODULE, 'edit');
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   /**
-   * Garante um DOCX binario real (OOXML) para o editor online. Se o documento
-   * só tinha conteúdo textual (fundação GED) ou não tinha DOCX, gera um .docx
-   * válido semeado com o texto atual e o vincula a revisão corrente.
+   * Garante um DOCX binario real (OOXML) para o editor de Word. Se o documento
+   * só tinha conteúdo textual ou do editor visual, gera um .docx válido com o
+   * conteúdo atual e o vincula à revisão corrente.
    */
   private async ensureEditableDocxFile(me: AuthPayload, doc: any) {
     const existing = await this.prisma.documentFile.findFirst({
@@ -1641,36 +2110,31 @@ export class DocumentsService {
     });
     // DOCX binario real = sem contentText e com chave de storage.
     if (existing && existing.contentText == null && existing.storageKey) return existing;
-
-    const seedText = doc.content ?? existing?.contentText ?? '';
-    const buffer = buildDocx(seedText);
-    const version = await this.ensureLatestVersion(doc, me.sub);
-    const stored = await this.storage.putBinary(
-      me.companyId,
-      `documents/${doc.id}/editor`,
-      `${doc.code ?? doc.number}.docx`,
-      buffer,
-      DOCX_MIME,
-    );
+    const buffer = isDocNode(doc.contentJson) ? buildDocxFromDoc(doc.contentJson as any) : buildDocx(doc.content ?? existing?.contentText ?? '');
+    const stored = await this.storage.putBinary(me.companyId, `documents/${doc.id}/editor`, `${doc.code ?? doc.number}.docx`, buffer, DOCX_MIME);
     return this.prisma.$transaction(async (tx) => {
+      await assertDocumentUnchanged(tx, me.companyId, doc);
+      const version = await this.ensureLatestVersionTx(tx, doc, me.sub);
       const item = await tx.documentFile.create({
         data: {
           companyId: me.companyId,
           documentId: doc.id,
           versionId: version.id,
           kind: DocumentFileKind.DOCX,
+          protected: false,
           createdById: me.sub,
           contentText: null,
           ...stored,
         },
       });
       await tx.documentVersion.update({ where: { id: version.id }, data: { docxFileId: item.id } });
-      await this.auditTx(tx, me, doc.id, 'EDITOR_SEED', null, { fileId: item.id }, 'Geração de DOCX editável para o editor online');
+      await tx.document.update({ where: { id: doc.id }, data: { updatedAt: new Date() } });
+      await this.auditTx(tx, me, doc.id, 'EDITOR_SEED', null, { fileId: item.id }, 'Geração de DOCX editável para o editor de Word');
       return item;
     });
   }
 
-  // --------------------------- Host WOPI (editor online) --------------------
+  // --------------------------- Host WOPI (editor online) e WebDAV (Word local)
   // Endpoints públicos validados pelo access_token assinado (sem JWT de usuário).
 
   private async wopiResolveFile(token: WopiTokenPayload) {
@@ -1727,8 +2191,11 @@ export class DocumentsService {
     if (!token.canWrite || !EDITABLE_STATUSES.has(doc.status)) {
       throw new ConflictException('Documento bloqueado para edição.');
     }
+    if (!isDocxBuffer(content)) throw new ConflictException('O arquivo salvo não é um .docx válido.');
+    if (docxHasMacros(content)) throw new ConflictException('Arquivos com macros não são aceitos.');
     const stored = await this.storage.putBinary(token.companyId, `documents/${doc.id}/editor`, file.fileName, content, DOCX_MIME);
     await this.prisma.$transaction(async (tx) => {
+      await assertDocumentUnchanged(tx, token.companyId, doc);
       await tx.documentFile.update({
         where: { id: file.id },
         data: {
@@ -1762,72 +2229,111 @@ export class DocumentsService {
         },
         data: { status: 'IN_PROGRESS' },
       });
+      await tx.document.update({ where: { id: doc.id }, data: { contentFormat: DocumentContentFormat.DOCX, updatedAt: new Date() } });
     });
+    await this.content.syncText(doc.id);
     this.workItems.markDirty(token.companyId, [token.userId], 'document-editor-save');
     return { version: stored.hashSha256 };
   }
 
-  async uploadFile(me: AuthPayload, id: string, body: any) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertWriteArea(me, this.areaOf(doc), 'edit');
-    const kind = this.parseFileKind(body?.kind);
-    if (kind === DocumentFileKind.DOCX && !EDITABLE_STATUSES.has(doc.status)) {
-      throw new ConflictException('DOCX editável só pode ser substituído em rascunho/elaboração/ajustes.');
-    }
-    const fileName = this.requiredText(body?.fileName, 'Nome do arquivo');
-    const mimeType = this.nullableText(body?.mimeType) ?? mimeFor(kind);
-    const latest = await this.ensureLatestVersion(doc, me.sub);
+  // ------------------------------------------------------------------ arquivos
 
-    // Upload binario (base64) preserva o arquivo original; o modo texto segue
-    // aceito por retrocompatibilidade.
+  /** Upload legado (base64 no JSON). */
+  async uploadFile(me: AuthPayload, id: string, body: any) {
     const base64 = this.nullableText(body?.contentBase64);
-    let stored: Awaited<ReturnType<DocumentStorageService['putText']>>;
-    let contentText: string | null = null;
-    if (base64) {
-      const buffer = decodeBase64(base64);
-      if (!buffer.length) throw new BadRequestException('Arquivo vazio.');
-      if (buffer.length > MAX_FILE_BYTES) throw new BadRequestException('Arquivo excede o limite de 8 MB.');
-      if (kind === DocumentFileKind.DOCX && !isDocxBuffer(buffer)) {
-        throw new BadRequestException('Arquivo inválido: envie um .docx (Word/LibreOffice) válido.');
-      }
-      if (kind === DocumentFileKind.PDF && buffer.subarray(0, 5).toString('latin1') !== '%PDF-') {
-        throw new BadRequestException('Arquivo inválido: envie um PDF válido.');
-      }
-      stored = await this.storage.putBinary(me.companyId, `documents/${doc.id}/uploads`, fileName, buffer, mimeType);
-    } else {
-      contentText = this.requiredText(body?.content, 'Conteúdo do arquivo');
-      stored = await this.storage.putText(me.companyId, `documents/${doc.id}/uploads`, fileName, contentText, mimeType);
+    const kind = this.parseFileKind(body?.kind);
+    if (!base64) {
+      // Modo texto: mantido por retrocompatibilidade.
+      const doc = await this.loadVisible(me, id);
+      await this.assertWriteArea(me, this.areaOf(doc), 'edit');
+      const fileName = this.requiredText(body?.fileName, 'Nome do arquivo');
+      const contentText = this.requiredText(body?.content, 'Conteúdo do arquivo');
+      const latest = await this.ensureLatestVersion(doc, me.sub);
+      const stored = await this.storage.putText(me.companyId, `documents/${doc.id}/uploads`, fileName, contentText, this.nullableText(body?.mimeType) ?? mimeFor(kind));
+      return this.prisma.documentFile.create({ data: { companyId: me.companyId, documentId: doc.id, versionId: latest.id, kind, protected: false, createdById: me.sub, contentText, ...stored } });
     }
+    const buffer = decodeBase64(base64);
+    if (buffer.length > MAX_BASE64_BYTES) throw new BadRequestException('Arquivo excede o limite de 8 MB. Use o envio de arquivo.');
+    const purpose = kind === DocumentFileKind.DOCX ? 'MAIN_DOCX' : kind === DocumentFileKind.PDF ? 'MAIN_PDF' : kind;
+    return this.uploadBuffer(me, id, { purpose, fileName: this.requiredText(body?.fileName, 'Nome do arquivo'), mimeType: this.nullableText(body?.mimeType), buffer, reason: this.nullableText(body?.reason) });
+  }
+
+  /** Upload por arquivo (multipart), validado pelo conteúdo e guardado no banco. */
+  async uploadBuffer(me: AuthPayload, id: string, input: UploadInput) {
+    const doc = await this.loadVisible(me, id);
+    await this.assertWriteArea(me, this.areaOf(doc), 'edit');
+    const purpose = String(input.purpose ?? 'ATTACHMENT').toUpperCase();
+    if (!UPLOAD_PURPOSES.has(purpose)) throw new BadRequestException('Finalidade do arquivo inválida.');
+    const buffer = input.buffer;
+    if (!buffer?.length) throw new BadRequestException('Arquivo vazio.');
+    if (buffer.length > MAX_UPLOAD_BYTES) throw new BadRequestException('Arquivo excede o limite de 20 MB.');
+    const fileName = this.requiredText(input.fileName, 'Nome do arquivo');
+    const isPdf = buffer.subarray(0, 5).toString('latin1') === '%PDF-';
+    const isPng = buffer.length > 8 && buffer.readUInt32BE(0) === 0x89504e47;
+    const isJpeg = buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    let kind: DocumentFileKind = DocumentFileKind.ATTACHMENT;
+    let mimeType = input.mimeType || 'application/octet-stream';
+    if (purpose === 'MAIN_DOCX') {
+      if (!EDITABLE_STATUSES.has(doc.status)) throw new ConflictException('O Word editável só pode ser trocado em elaboração ou ajustes.');
+      await this.assertCanEditContent(me, doc);
+      if (!isDocxBuffer(buffer)) throw new BadRequestException('Arquivo inválido: envie um .docx (Word/LibreOffice) válido.');
+      if (docxHasMacros(buffer)) throw new BadRequestException('Arquivos com macros não são aceitos. Salve como .docx comum e envie de novo.');
+      kind = DocumentFileKind.DOCX;
+      mimeType = DOCX_MIME;
+    } else if (purpose === 'MAIN_PDF') {
+      if (!EDITABLE_STATUSES.has(doc.status)) throw new ConflictException('O PDF principal só pode ser trocado em elaboração ou ajustes.');
+      await this.assertCanEditContent(me, doc);
+      if (!isPdf) throw new BadRequestException('Arquivo inválido: envie um PDF válido.');
+      kind = DocumentFileKind.ATTACHMENT;
+      mimeType = PDF_MIME;
+    } else if (purpose === 'IMAGE') {
+      if (!isPng && !isJpeg) throw new BadRequestException('Envie uma imagem PNG ou JPEG.');
+      kind = DocumentFileKind.IMAGE;
+      mimeType = isPng ? 'image/png' : 'image/jpeg';
+    } else {
+      const allowed = isPdf || isPng || isJpeg || isDocxBuffer(buffer) || /\.(txt|csv|xlsx|pptx)$/i.test(fileName);
+      if (!allowed) throw new BadRequestException('Tipo de arquivo não aceito. Envie PDF, imagem, Word, planilha ou texto.');
+      if (isDocxBuffer(buffer) && docxHasMacros(buffer)) throw new BadRequestException('Arquivos com macros não são aceitos.');
+      kind = purpose === 'EVIDENCE' ? DocumentFileKind.EVIDENCE : DocumentFileKind.ATTACHMENT;
+      if (isPdf) mimeType = PDF_MIME;
+      else if (isPng) mimeType = 'image/png';
+      else if (isJpeg) mimeType = 'image/jpeg';
+    }
+    const latest = await this.ensureLatestVersion(doc, me.sub);
+    const stored = await this.storage.putBinary(me.companyId, `documents/${doc.id}/uploads`, fileName, buffer, mimeType);
+    // O PDF principal ("PDF pronto") fica marcado como protegido para não se
+    // confundir com anexos em PDF comuns.
+    const isMainPdf = purpose === 'MAIN_PDF';
     const file = await this.prisma.$transaction(async (tx) => {
+      await assertDocumentUnchanged(tx, me.companyId, doc);
       const item = await tx.documentFile.create({
-        data: {
-          companyId: me.companyId,
-          documentId: doc.id,
-          versionId: latest.id,
-          kind,
-          protected: kind === DocumentFileKind.PDF,
-          createdById: me.sub,
-          contentText,
-          ...stored,
-        },
+        data: { companyId: me.companyId, documentId: doc.id, versionId: latest.id, kind, protected: isMainPdf, createdById: me.sub, contentText: null, ...stored },
       });
-      if (kind === DocumentFileKind.DOCX) await tx.documentVersion.update({ where: { id: latest.id }, data: { docxFileId: item.id } });
-      if (kind === DocumentFileKind.PDF) await tx.documentVersion.update({ where: { id: latest.id }, data: { pdfFileId: item.id } });
-      await this.auditTx(tx, me, doc.id, 'UPLOAD_FILE', null, { fileId: item.id, kind }, this.nullableText(body?.reason) ?? 'Upload de arquivo');
+      if (purpose === 'MAIN_DOCX') {
+        await tx.documentVersion.update({ where: { id: latest.id }, data: { docxFileId: item.id } });
+        await tx.document.update({ where: { id: doc.id }, data: { contentFormat: DocumentContentFormat.DOCX } });
+      }
+      if (isMainPdf) {
+        await tx.documentFile.updateMany({ where: { documentId: doc.id, versionId: latest.id, kind: DocumentFileKind.ATTACHMENT, mimeType: PDF_MIME, protected: true, id: { not: item.id }, deletedAt: null }, data: { deletedAt: new Date() } });
+        await tx.document.update({ where: { id: doc.id }, data: { contentFormat: DocumentContentFormat.FILE } });
+      }
+      await this.auditTx(tx, me, doc.id, 'UPLOAD_FILE', null, { fileId: item.id, kind, purpose, size: buffer.length }, input.reason ?? 'Upload de arquivo');
       return item;
     });
+    if (purpose === 'MAIN_DOCX' || purpose === 'MAIN_PDF') await this.content.syncText(doc.id);
     return file;
   }
 
-  async downloadFile(me: AuthPayload, id: string, fileId: string, context?: { ip?: string; userAgent?: string }) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertViewArea(me, doc);
+  async downloadFile(me: AuthPayload, id: string, fileId: string, context?: { ip?: string; userAgent?: string }, options: { inline?: boolean } = {}) {
+    const doc = await this.loadVisible(me, id);
     const file = await this.prisma.documentFile.findFirst({ where: { id: fileId, documentId: id, companyId: me.companyId, deletedAt: null } });
     if (!file) throw new NotFoundException('Arquivo não encontrado.');
-    // Arquivos legados guardam o texto em contentText; arquivos binarios
-    // (ex.: DOCX salvo por editor WOPI) ficam apenas no storage. Para DOCX e
-    // PDF legados, converte o texto em arquivo real para o download abrir
-    // corretamente no Word/leitor de PDF.
+    if (file.kind === DocumentFileKind.DOCX) {
+      const caps = await this.capabilities(me, doc);
+      if (!caps.canDownloadDocx) throw new ForbiddenException('O Word editável é restrito a quem trabalha no documento. Baixe o PDF oficial.');
+    }
+    // Arquivos legados guardam o texto em contentText; arquivos binarios ficam
+    // no storage. Para DOCX e PDF legados, converte o texto em arquivo real.
     let content: Buffer;
     if (file.contentText != null && file.kind === DocumentFileKind.DOCX) {
       content = buildDocx(file.contentText);
@@ -1838,26 +2344,131 @@ export class DocumentsService {
     } else {
       content = await this.storage.readBinary(file.storageKey);
     }
+    const isPdf = (file.mimeType ?? '').includes('pdf') || file.kind === DocumentFileKind.PDF;
+    if (isPdf && !options.inline) content = await this.render.downloadCopy(content, me.name || me.email || 'Usuário');
     await this.prisma.$transaction(async (tx) => {
-      await tx.documentDownloadLog.create({
-        data: {
-          companyId: me.companyId,
-          documentId: id,
-          versionId: file.versionId,
-          fileId: file.id,
-          userId: me.sub,
-          ip: context?.ip,
-          userAgent: context?.userAgent,
-        },
-      });
-      await this.auditTx(tx, me, id, 'DOWNLOAD', null, { fileId: file.id, kind: file.kind }, 'Download controlado', context);
+      if (options.inline) {
+        await tx.documentViewLog.create({ data: { companyId: me.companyId, documentId: id, versionId: file.versionId, fileId: file.id, userId: me.sub, origin: 'VIEWER', ip: context?.ip, userAgent: context?.userAgent?.slice(0, 500) } });
+      } else {
+        await tx.documentDownloadLog.create({
+          data: { companyId: me.companyId, documentId: id, versionId: file.versionId, fileId: file.id, userId: me.sub, ip: context?.ip, userAgent: context?.userAgent?.slice(0, 500) },
+        });
+        await this.auditTx(tx, me, id, 'DOWNLOAD', null, { fileId: file.id, kind: file.kind }, 'Download controlado', context);
+      }
     });
     return { file, content, mimeType: file.mimeType ?? mimeFor(file.kind) };
   }
 
+  /** PDF oficial da revisão vigente (ou da revisão em análise, para quem participa). */
+  async officialPdf(me: AuthPayload, id: string, context: { ip?: string; userAgent?: string } = {}, options: { inline?: boolean } = {}) {
+    const doc = await this.loadVisible(me, id);
+    const version = await this.prisma.documentVersion.findFirst({
+      where: { documentId: id, companyId: me.companyId, deletedAt: null, pdfFileId: { not: null } },
+      orderBy: { revisionNumber: 'desc' },
+    });
+    if (!version?.pdfFileId) throw new NotFoundException('Este documento ainda não tem PDF oficial publicado.');
+    return this.downloadFile(me, doc.id, version.pdfFileId, context, options);
+  }
+
+  /** Prévia em PDF do conteúdo atual (sem valor oficial). */
+  async previewPdf(me: AuthPayload, id: string) {
+    const doc = await this.loadVisible(me, id);
+    const version = await this.ensureLatestVersion(doc, me.sub);
+    const signatures = await this.render.signatures(me.companyId, doc.id, version.id);
+    const result = await this.render.officialPdf({ doc: { ...doc, status: doc.status }, version: { ...version, contentJson: null }, signatures });
+    const content = await this.render.downloadCopy(result.buffer, `PRÉVIA · ${me.name || 'Usuário'}`);
+    return { content, fileName: `${doc.code ?? doc.number}-previa.pdf`, mimeType: PDF_MIME };
+  }
+
+  async exportDocx(me: AuthPayload, id: string, context: { ip?: string; userAgent?: string } = {}) {
+    const doc = await this.loadVisible(me, id);
+    const caps = await this.capabilities(me, doc);
+    if (!caps.canDownloadDocx) throw new ForbiddenException('O Word editável é restrito a quem trabalha no documento. Baixe o PDF oficial.');
+    const version = await this.ensureLatestVersion(doc, me.sub);
+    const result = await this.render.exportDocx(doc, version);
+    await this.prisma.documentDownloadLog.create({ data: { companyId: me.companyId, documentId: id, versionId: version.id, userId: me.sub, action: 'EXPORT_DOCX', ip: context.ip, userAgent: context.userAgent?.slice(0, 500) } });
+    return { ...result, mimeType: DOCX_MIME };
+  }
+
+  /** Modo leitura: revisão vigente para o chão de fábrica (QR Code). */
+  async reader(me: AuthPayload, id: string, context: { ip?: string; userAgent?: string } = {}) {
+    const doc = await this.loadVisible(me, id);
+    const version = await this.distribution.currentPublishedVersion(me.companyId, id);
+    const participant = (await this.capabilities(me, doc)).canEditMetadata;
+    if (!version && !participant) throw new NotFoundException('Este documento ainda não tem revisão vigente.');
+    const source = version ?? (await this.ensureLatestVersion(doc, me.sub));
+    const structured = isDocNode(source.contentJson) ? source.contentJson : doc.contentFormat === DocumentContentFormat.STRUCTURED && !version ? doc.contentJson : null;
+    await this.prisma.documentViewLog.create({ data: { companyId: me.companyId, documentId: id, versionId: source.id, userId: me.sub, origin: 'READER', ip: context.ip, userAgent: context.userAgent?.slice(0, 500) } });
+    const distribution = await this.distribution.summary(me.companyId, doc, me.sub);
+    return {
+      id: doc.id,
+      code: doc.code,
+      number: doc.number,
+      title: doc.title,
+      description: doc.description,
+      status: doc.status,
+      confidentiality: doc.confidentiality,
+      contentFormat: doc.contentFormat,
+      typeConfig: doc.typeConfig,
+      orgNode: doc.orgNode,
+      owner: doc.owner,
+      validUntil: doc.validUntil,
+      publishedAt: doc.publishedAt,
+      current: Boolean(version),
+      version: { id: source.id, label: source.versionLabel, publicationDate: source.publicationDate, changeSummary: source.changeSummary, pdfFileId: source.pdfFileId },
+      contentJson: structured,
+      bodyText: structured ? null : source.bodyText ?? doc.bodyText ?? doc.content,
+      readRequired: doc.readRequired,
+      myRead: distribution.mine,
+    };
+  }
+
+  /** Texto de duas revisões para a comparação (a do meio pode ser a em elaboração). */
+  async compare(me: AuthPayload, id: string, fromId?: string, toId?: string) {
+    const doc = await this.loadVisible(me, id);
+    const versions = await this.prisma.documentVersion.findMany({ where: { documentId: id, companyId: me.companyId, deletedAt: null }, orderBy: { revisionNumber: 'desc' } });
+    if (!versions.length) throw new NotFoundException('Documento sem revisões.');
+    const textOf = async (version: (typeof versions)[number], isLatest: boolean) => {
+      if (version.bodyText) return version.bodyText;
+      if (isLatest) return this.content.currentBodyText(doc);
+      if (isDocNode(version.contentJson)) return docToPlainText(version.contentJson as DocNode);
+      return '';
+    };
+    const to = toId ? versions.find((item) => item.id === toId) : versions[0];
+    const from = fromId ? versions.find((item) => item.id === fromId) : versions.find((item) => to && item.revisionNumber < to.revisionNumber);
+    if (!to) throw new NotFoundException('Revisão não encontrada.');
+    return {
+      from: from ? { id: from.id, label: from.versionLabel, text: await textOf(from, from.id === versions[0].id) } : null,
+      to: { id: to.id, label: to.versionLabel, text: await textOf(to, to.id === versions[0].id), changeSummary: to.changeSummary },
+      versions: versions.map((item) => ({ id: item.id, label: item.versionLabel, status: item.status, publicationDate: item.publicationDate })),
+    };
+  }
+
+  async aiSummary(me: AuthPayload, id: string, body: any = {}) {
+    const doc = await this.loadVisible(me, id);
+    const data = await this.compare(me, id, this.id(body?.fromId) ?? undefined, this.id(body?.toId) ?? undefined);
+    if (!data.from) return { summary: 'Esta é a primeira revisão do documento: não há revisão anterior para comparar.', usedAi: false, stats: { inserted: 0, deleted: 0, unchanged: 0 } };
+    return this.ai.summarizeChanges(doc, data.from.text, data.to.text, { from: data.from.label, to: data.to.label });
+  }
+
+  async aiCheck(me: AuthPayload, id: string) {
+    const doc = await this.loadVisible(me, id);
+    const json = isDocNode(doc.contentJson) ? (doc.contentJson as DocNode) : markdownToDoc(await this.content.currentBodyText(doc));
+    const text = docToPlainText(json);
+    return this.ai.qualityCheck(doc, doc.typeConfig?.sigla ?? null, json, text);
+  }
+
+  async aiDraft(me: AuthPayload, body: any) {
+    if (!(await this.accessPolicy.has(me, 'doc:create'))) throw new ForbiddenException('Você não pode criar documentos.');
+    return this.ai.draftFromProcess(me, body);
+  }
+
+  // --------------------------------------------------------- leitura/comentário
+
   async addComment(me: AuthPayload, id: string, body: any) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertViewArea(me, doc);
+    const doc = await this.loadVisible(me, id);
+    const mentionIds = this.ids(body?.mentionUserIds).slice(0, 20);
+    if (mentionIds.length) await this.validateAudience(me.companyId, { userIds: mentionIds });
     const comment = await this.prisma.documentComment.create({
       data: {
         companyId: me.companyId,
@@ -1865,49 +2476,41 @@ export class DocumentsService {
         versionId: this.id(body?.versionId),
         parentId: this.id(body?.parentId),
         userId: me.sub,
-        body: this.requiredText(body?.body, 'Comentário'),
+        body: this.requiredText(body?.body, 'Comentário').slice(0, 5000),
       },
     });
-    await this.audit(me, id, 'COMMENT', null, { commentId: comment.id }, 'Comentário interno');
+    if (mentionIds.length) {
+      await this.prisma.documentCommentMention.createMany({ data: mentionIds.map((userId) => ({ commentId: comment.id, userId })), skipDuplicates: true });
+      for (const userId of mentionIds.filter((item) => item !== me.sub)) {
+        try {
+          await this.notifications.create(me.companyId, userId, NotificationKind.MENTION, `${me.name} mencionou você em ${label(doc)}`.slice(0, 180), comment.body.slice(0, 300), `/documents/${doc.id}`);
+        } catch {
+          // best-effort
+        }
+      }
+    }
+    await this.audit(me, id, 'COMMENT', null, { commentId: comment.id, mentions: mentionIds.length }, 'Comentário interno');
     return comment;
   }
 
-  async confirmRead(me: AuthPayload, id: string, body: any = {}) {
-    const doc = await this.loadScoped(id, me.companyId);
-    await this.assertViewArea(me, doc);
-    const version = await this.ensureLatestVersion(doc, me.sub);
-    // Idempotente por usuário+revisão: reconfirmar não duplica o registro.
-    const existing = await this.prisma.documentReadConfirmation.findFirst({
-      where: { companyId: me.companyId, documentId: id, versionId: version.id, userId: me.sub, status: 'CONFIRMED' },
-    });
-    if (existing) return existing;
-    return this.prisma.documentReadConfirmation.create({
-      data: {
-        companyId: me.companyId,
-        documentId: id,
-        versionId: version.id,
-        distributionId: this.id(body?.distributionId),
-        userId: me.sub,
-        confirmedAt: new Date(),
-        status: 'CONFIRMED',
-      },
-    });
+  async confirmRead(me: AuthPayload, id: string, _body: any = {}, context: { ip?: string; userAgent?: string } = {}) {
+    const doc = await this.loadVisible(me, id);
+    return this.distribution.confirm(me, doc, context);
   }
+
+  // ---------------------------------------------------------------- vencimento
 
   async runExpirationJob(me: AuthPayload) {
     return this.expirationSweep(me.companyId, me.sub);
   }
 
   /**
-   * Rotina de vencimento (acionável manualmente ou pelo MaintenanceScheduler):
-   * move PUBLISHED -> NEAR_EXPIRATION -> EXPIRED conforme a validade e
-   * notifica responsável e aprovador a cada transição. `actorUserId` null =
-   * execução automática do sistema (histórico/auditoria ficam sem usuário).
+   * Rotina de vencimento (manual ou pela manutenção): PUBLISHED ->
+   * NEAR_EXPIRATION (dentro do prazo de alerta do tipo) -> EXPIRED, avisando
+   * responsável e aprovador. `actorUserId` null = execução automática.
    */
   async expirationSweep(companyId: string, actorUserId: string | null = null) {
     const now = new Date();
-    const limit30 = addDays(now, 30);
-    // Ator para trilha de status/auditoria; userId é nullable em ambas as tabelas.
     const actor = { companyId, sub: actorUserId } as unknown as AuthPayload;
     const docs = await this.prisma.document.findMany({
       where: {
@@ -1917,12 +2520,13 @@ export class DocumentsService {
         validUntil: { not: null },
       },
       include: this.include(),
-      take: 500,
+      take: 1000,
     });
     let processed = 0;
     for (const doc of docs) {
       const validUntil = doc.validUntil!;
-      const to = validUntil < now ? DocumentStatus.EXPIRED : validUntil <= limit30 ? DocumentStatus.NEAR_EXPIRATION : null;
+      const alertDays = doc.typeConfig?.alertDays ?? 30;
+      const to = validUntil < now ? DocumentStatus.EXPIRED : validUntil <= addDays(now, alertDays) ? DocumentStatus.NEAR_EXPIRATION : null;
       if (!to || doc.status === to) continue;
       await this.prisma.$transaction(async (tx) => {
         await tx.document.update({ where: { id: doc.id }, data: { status: to } });
@@ -1938,16 +2542,16 @@ export class DocumentsService {
   /** Avisa responsável e aprovador na transição de vencimento (best-effort). */
   private async notifyExpiration(doc: any, to: DocumentStatus, validUntil: Date) {
     const code = doc.code ?? `#${doc.number}`;
-    const date = validUntil.toLocaleDateString('pt-BR');
+    const date = validUntil.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     const title = to === DocumentStatus.EXPIRED ? `Documento vencido: ${code}` : `Documento próximo do vencimento: ${code}`;
     const body =
       to === DocumentStatus.EXPIRED
         ? `"${doc.title}" venceu em ${date}. Inicie a revisão periódica ou torne-o obsoleto.`
         : `"${doc.title}" vence em ${date}. Planeje a revisão periódica.`;
-    const recipients = [...new Set([doc.ownerUserId, doc.approverUserId].filter(Boolean))] as string[];
+    const recipients = [...new Set([doc.ownerUserId, doc.createdById, doc.approverUserId].filter(Boolean))] as string[];
     for (const userId of recipients) {
       try {
-        await this.notifications.create(doc.companyId, userId, NotificationKind.MESSAGE, title, body, `/documents?focus=${doc.id}`);
+        await this.notifications.create(doc.companyId, userId, NotificationKind.MESSAGE, title, body, `/documents/${doc.id}`);
       } catch {
         // Notificação é best-effort: a transição de status não pode falhar por causa dela.
       }
@@ -1955,26 +2559,30 @@ export class DocumentsService {
   }
 
   async diagnostics(me: AuthPayload) {
-    const [documents, withoutFiles, pendingPdfs, files] = await Promise.all([
+    const [documents, withoutFiles, pendingPdfs, files, usage] = await Promise.all([
       this.prisma.document.count({ where: { companyId: me.companyId, deletedAt: null } }),
       this.prisma.document.count({
-        where: { companyId: me.companyId, deletedAt: null, files: { none: { deletedAt: null } } },
+        where: { companyId: me.companyId, deletedAt: null, contentFormat: { in: [DocumentContentFormat.DOCX, DocumentContentFormat.FILE] }, files: { none: { deletedAt: null } } },
       }),
       this.prisma.documentVersion.count({
         where: { companyId: me.companyId, deletedAt: null, status: DocumentStatus.PUBLISHED, pdfFileId: null },
       }),
       this.prisma.documentFile.count({ where: { companyId: me.companyId, deletedAt: null } }),
+      this.storage.usage(me.companyId),
     ]);
     return {
       documents,
       files,
       withoutFiles,
       pendingPdfs,
-      storage: { provider: process.env.DOCUMENT_STORAGE_PROVIDER ?? 'LOCAL', configured: true },
+      storage: { ...usage, configured: true },
       editor: this.editor.status(),
+      converter: { available: Boolean(this.render.converterUrl()) },
       generatedAt: new Date(),
     };
   }
+
+  // ------------------------------------------------------------ edição: apoio
 
   private async loadEditRequest(companyId: string, requestId: string) {
     const request = await this.prisma.documentEditRequest.findFirst({
@@ -1992,7 +2600,7 @@ export class DocumentsService {
 
   private async resolveEditOperator(me: AuthPayload, doc: any, explicitUserId: unknown): Promise<string> {
     const requested = this.id(explicitUserId);
-    const candidate = requested ?? [doc.ownerUserId, doc.approverUserId, doc.createdById, me.sub].find(Boolean);
+    const candidate = requested ?? [doc.ownerUserId, doc.createdById, doc.approverUserId, me.sub].find(Boolean);
     if (!candidate) throw new BadRequestException('Defina um operador para liberar a edição.');
     const user = await this.prisma.user.findFirst({
       where: { id: candidate, companyId: me.companyId, deletedAt: null, active: true, status: 'ACTIVE' },
@@ -2003,13 +2611,13 @@ export class DocumentsService {
   }
 
   private async assertCanOperateDocumentEdit(me: AuthPayload, doc: any) {
-    if (doc.ownerUserId === me.sub || doc.approverUserId === me.sub || doc.createdById === me.sub) return;
-    if (['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(String(me.role))) return;
+    if (doc.ownerUserId === me.sub || doc.createdById === me.sub) return;
+    if (await this.accessPolicy.isManager(me)) return;
     const area = this.areaOf(doc);
     if (area) {
       try {
         await this.access.assertCanWrite(me.sub, area, MODULE, 'edit');
-        return;
+        if (await this.accessPolicy.has(me, 'doc:update')) return;
       } catch {
         // segue para Forbidden abaixo
       }
@@ -2035,67 +2643,10 @@ export class DocumentsService {
     });
   }
 
-  private async createRevisionForEditRequestTx(tx: Tx, me: AuthPayload, doc: any, reason: string) {
-    const latest = await this.ensureLatestVersionTx(tx, doc, me.sub);
-    const nextRevisionNumber = latest.revisionNumber + 1;
-    const versionLabel = `Rev. ${String(nextRevisionNumber).padStart(2, '0')}`;
-    const sourceFile = latest.docxFileId
-      ? await tx.documentFile.findFirst({ where: { id: latest.docxFileId, companyId: me.companyId, deletedAt: null } })
-      : await tx.documentFile.findFirst({ where: { documentId: doc.id, companyId: me.companyId, kind: DocumentFileKind.DOCX, deletedAt: null }, orderBy: { createdAt: 'desc' } });
-    const sourceContent = sourceFile?.contentText ?? doc.content ?? generatedDocumentBody(doc.title, doc.code ?? `#${doc.number}`, versionLabel);
-    const content = `${sourceContent}\n\nHistórico da revisão liberada: ${reason}\n`;
-    const version = await tx.documentVersion.create({
-      data: {
-        companyId: me.companyId,
-        documentId: doc.id,
-        revisionNumber: nextRevisionNumber,
-        versionLabel,
-        status: DocumentStatus.IN_DEVELOPMENT,
-        changeReason: reason,
-        expirationDate: doc.validUntil,
-        createdById: me.sub,
-      },
-    });
-    // Arquivo binario (editado no Word/Collabora): copia o DOCX real para a
-    // nova revisao, preservando a formatacao. Senao, segue o caminho textual.
-    let binarySeed: Buffer | null = null;
-    if (sourceFile && sourceFile.contentText == null && sourceFile.storageKey) {
-      try {
-        binarySeed = await this.storage.readBinary(sourceFile.storageKey);
-      } catch {
-        binarySeed = null;
-      }
-    }
-    const stored = binarySeed
-      ? await this.storage.putBinary(me.companyId, `documents/${doc.id}/rev-${nextRevisionNumber}`, `${doc.code ?? doc.number}-${versionLabel}.docx`, binarySeed, DOCX_MIME)
-      : await this.storage.putText(me.companyId, `documents/${doc.id}/rev-${nextRevisionNumber}`, `${doc.code ?? doc.number}-${versionLabel}.docx`, content, DOCX_MIME);
-    const file = await tx.documentFile.create({
-      data: {
-        companyId: me.companyId,
-        documentId: doc.id,
-        versionId: version.id,
-        kind: DocumentFileKind.DOCX,
-        protected: false,
-        createdById: me.sub,
-        contentText: binarySeed ? null : content,
-        ...stored,
-      },
-    });
-    await tx.documentVersion.update({ where: { id: version.id }, data: { docxFileId: file.id } });
-    const document = await tx.document.update({
-      where: { id: doc.id },
-      data: { version: doc.version + 1, status: DocumentStatus.IN_DEVELOPMENT, content, changeNote: reason },
-      include: this.include(),
-    });
-    await this.recordStatusTx(tx, me, doc.id, doc.status, DocumentStatus.IN_DEVELOPMENT, reason, { versionId: version.id, source: 'EDIT_REQUEST' });
-    await this.auditTx(tx, me, doc.id, 'CREATE_REVISION_FOR_EDIT_REQUEST', { latestVersionId: latest.id }, { versionId: version.id, revisionNumber: nextRevisionNumber }, reason);
-    return { document, version, file };
-  }
-
   private assertEditableMetadata(doc: any, patch: any) {
     if (EDITABLE_STATUSES.has(doc.status)) return;
     // Bloqueia apenas mudanças reais: o formulário envia todos os campos e
-    // reenviar o valor atual (ex.: só trocar aprovador/validade) é permitido.
+    // reenviar o valor atual (ex.: só trocar validade) é permitido.
     const restricted = ['title', 'code', 'description', 'type', 'content', 'externalUrl'];
     const normalize = (value: unknown) => {
       const text = String(value ?? '').trim();
@@ -2166,63 +2717,6 @@ export class DocumentsService {
     });
   }
 
-  private async recordWorkflowArtifactsTx(
-    tx: Tx,
-    me: AuthPayload,
-    doc: any,
-    versionId: string,
-    to: DocumentStatus,
-    body: any,
-    comment: string | null | undefined,
-  ) {
-    if (to === DocumentStatus.ADJUSTMENTS_REQUESTED) {
-      await tx.documentReviewRequest.create({
-        data: {
-          companyId: me.companyId,
-          documentId: doc.id,
-          versionId,
-          reviewerUserId: me.sub,
-          authorUserId: doc.ownerUserId,
-          comment: comment!,
-          dueAt: this.optionalDate(body?.dueAt, 'Prazo de ajuste') ?? null,
-        },
-      });
-    }
-    if (to === DocumentStatus.WAITING_APPROVAL || to === DocumentStatus.IN_APPROVAL) {
-      await tx.documentApproval.create({
-        data: {
-          companyId: me.companyId,
-          documentId: doc.id,
-          versionId,
-          approverUserId: this.id(body?.approverUserId) ?? doc.approverUserId,
-          approverRole: 'APPROVER',
-          approvalOrder: 1,
-          decision: DocumentApprovalDecision.PENDING,
-          statusFrom: doc.status,
-          statusTo: to,
-          comment,
-        },
-      });
-    }
-    if (to === DocumentStatus.APPROVED || to === DocumentStatus.REJECTED) {
-      await tx.documentApproval.create({
-        data: {
-          companyId: me.companyId,
-          documentId: doc.id,
-          versionId,
-          approverUserId: me.sub,
-          approverRole: 'APPROVER',
-          approvalOrder: 1,
-          decision: to === DocumentStatus.APPROVED ? DocumentApprovalDecision.APPROVED : DocumentApprovalDecision.REJECTED,
-          statusFrom: doc.status,
-          statusTo: to,
-          comment,
-          decidedAt: new Date(),
-        },
-      });
-    }
-  }
-
   private async recordStatusTx(
     tx: Tx,
     me: AuthPayload,
@@ -2285,9 +2779,7 @@ export class DocumentsService {
   }
 }
 
-function publishedLikeStatuses() {
-  return [DocumentStatus.PUBLISHED, DocumentStatus.NEAR_EXPIRATION, DocumentStatus.EXPIRED, DocumentStatus.PERIODIC_REVIEW];
-}
+export { summarize };
 
 function addDays(date: Date, days: number) {
   const result = new Date(date);
@@ -2310,24 +2802,6 @@ function generatedDocumentBody(title: string, code: string, revision: string, de
     '',
     content || 'Conteúdo inicial do documento.',
   ].join('\n');
-}
-
-/** Corpo (markdown enxuto) do PDF oficial controlado; vira PDF real via buildPdf. */
-function renderPdfText(doc: any, revision: string, watermark?: string | null) {
-  const validade = doc.validUntil ? new Date(doc.validUntil).toLocaleDateString('pt-BR') : 'não definida';
-  return [
-    `# ${doc.code ?? `#${doc.number}`} - ${doc.title}`,
-    '',
-    `**Revisão:** ${revision} | **Publicado em:** ${new Date().toLocaleDateString('pt-BR')} | **Validade:** ${validade}`,
-    watermark ? `Marca d'água: ${watermark}` : null,
-    'Documento controlado - cópia impressa não controlada.',
-    '',
-    '---',
-    '',
-    doc.content ?? '',
-  ]
-    .filter((line) => line !== null)
-    .join('\n');
 }
 
 function defaultTemplateContent() {

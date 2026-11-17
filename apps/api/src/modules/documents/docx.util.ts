@@ -444,3 +444,230 @@ export function applyTextPlaceholders(text: string, values: Record<string, strin
   }
   return result;
 }
+
+// ------------------ DOCX a partir do editor visual (Tiptap) -----------------
+
+interface DocxNode {
+  type: string;
+  attrs?: Record<string, any>;
+  content?: DocxNode[];
+  text?: string;
+  marks?: Array<{ type: string }>;
+}
+
+export interface DocxHeaderMeta {
+  companyName?: string | null;
+  code?: string | null;
+  title?: string | null;
+  revision?: string | null;
+  status?: string | null;
+}
+
+interface DocxMedia {
+  rid: string;
+  name: string;
+  data: Buffer;
+  ext: 'png' | 'jpeg';
+}
+
+const MAX_IMAGE_EMU = 5_486_400; // 6 polegadas
+const EMU_PER_PX = 9525;
+
+function imagePixelSize(buffer: Buffer, ext: 'png' | 'jpeg'): { width: number; height: number } | null {
+  if (ext === 'png') {
+    if (buffer.length > 24 && buffer.readUInt32BE(12) === 0x49484452) return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+    return null;
+  }
+  let index = 2;
+  while (index + 9 < buffer.length) {
+    if (buffer[index] !== 0xff) {
+      index++;
+      continue;
+    }
+    const marker = buffer[index + 1];
+    const length = buffer.readUInt16BE(index + 2);
+    if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+      return { height: buffer.readUInt16BE(index + 5), width: buffer.readUInt16BE(index + 7) };
+    }
+    index += 2 + length;
+  }
+  return null;
+}
+
+function markedRunXml(text: string, marks: Set<string>, extra: { bold?: boolean; sizeHalfPoints?: number } = {}): string {
+  if (!text) return '';
+  const props: string[] = [];
+  if (marks.has('code')) props.push('<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/>');
+  if (extra.bold || marks.has('bold')) props.push('<w:b/>');
+  if (marks.has('italic')) props.push('<w:i/>');
+  if (marks.has('strike')) props.push('<w:strike/>');
+  if (marks.has('underline') || marks.has('link')) props.push('<w:u w:val="single"/>');
+  if (marks.has('link')) props.push('<w:color w:val="1D4ED8"/>');
+  if (extra.sizeHalfPoints) props.push(`<w:sz w:val="${extra.sizeHalfPoints}"/><w:szCs w:val="${extra.sizeHalfPoints}"/>`);
+  const rPr = props.length ? `<w:rPr>${props.join('')}</w:rPr>` : '';
+  return text
+    .split('\n')
+    .map((piece, index) => `${index > 0 ? '<w:r><w:br/></w:r>' : ''}<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(piece)}</w:t></w:r>`)
+    .join('');
+}
+
+class DocxBuilder {
+  readonly media: DocxMedia[] = [];
+  private drawingId = 1;
+
+  inline(node: DocxNode | undefined, extra: { bold?: boolean; sizeHalfPoints?: number } = {}): string {
+    let xml = '';
+    for (const child of node?.content ?? []) {
+      if (child.type === 'text') xml += markedRunXml(child.text ?? '', new Set((child.marks ?? []).map((mark) => mark.type)), extra);
+      else if (child.type === 'hardBreak') xml += '<w:r><w:br/></w:r>';
+      else if (child.type === 'image') xml += this.imageRun(child);
+      else if (child.content) xml += this.inline(child, extra);
+    }
+    return xml;
+  }
+
+  imageRun(node: DocxNode): string {
+    const match = /^data:image\/(png|jpe?g);base64,(.+)$/i.exec(String(node.attrs?.src ?? ''));
+    if (!match) return '';
+    const ext: 'png' | 'jpeg' = match[1].toLowerCase() === 'png' ? 'png' : 'jpeg';
+    const data = Buffer.from(match[2], 'base64');
+    const size = imagePixelSize(data, ext);
+    if (!size || !size.width || !size.height) return '';
+    let cx = size.width * EMU_PER_PX;
+    let cy = size.height * EMU_PER_PX;
+    if (cx > MAX_IMAGE_EMU) {
+      cy = Math.round((cy * MAX_IMAGE_EMU) / cx);
+      cx = MAX_IMAGE_EMU;
+    }
+    const id = this.drawingId++;
+    const name = `image${id}.${ext}`;
+    const rid = `rIdImg${id}`;
+    this.media.push({ rid, name, data, ext });
+    const alt = escapeXml(String(node.attrs?.alt ?? `Imagem ${id}`));
+    return (
+      `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/>` +
+      `<wp:docPr id="${id}" name="Imagem ${id}" descr="${alt}"/>` +
+      '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+      `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${id}" name="${name}"/><pic:cNvPicPr/></pic:nvPicPr>` +
+      `<pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+      `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>` +
+      '</a:graphicData></a:graphic></wp:inline></w:drawing></w:r>'
+    );
+  }
+
+  paragraph(node: DocxNode, options: { indentTwips?: number; prefix?: string; bold?: boolean } = {}): string {
+    const pPr = options.indentTwips ? `<w:pPr><w:ind w:left="${options.indentTwips}" w:hanging="280"/></w:pPr>` : '';
+    const prefix = options.prefix ? markedRunXml(`${options.prefix}\u00a0`, new Set()) : '';
+    const body = this.inline(node, { bold: options.bold });
+    return `<w:p>${pPr}${prefix}${body || '<w:r><w:t xml:space="preserve"></w:t></w:r>'}</w:p>`;
+  }
+
+  list(node: DocxNode, depth: number): string {
+    const ordered = node.type === 'orderedList';
+    let number = Number(node.attrs?.start ?? 1) || 1;
+    let xml = '';
+    for (const item of node.content ?? []) {
+      const prefix = ordered ? `${number++}.` : depth % 2 === 0 ? '•' : '–';
+      let first = true;
+      for (const child of item.content ?? []) {
+        if (child.type === 'paragraph') {
+          xml += this.paragraph(child, { indentTwips: 360 + depth * 360, prefix: first ? prefix : undefined });
+          first = false;
+        } else if (child.type === 'bulletList' || child.type === 'orderedList') {
+          xml += this.list(child, depth + 1);
+        } else {
+          xml += this.block(child, depth + 1);
+        }
+      }
+    }
+    return xml;
+  }
+
+  table(node: DocxNode): string {
+    const rows = (node.content ?? [])
+      .map((row) => {
+        const cells = (row.content ?? [])
+          .map((cell) => {
+            const header = cell.type === 'tableHeader';
+            const span = Math.max(1, Number(cell.attrs?.colspan ?? 1) || 1);
+            const tcPr = `<w:tcPr>${span > 1 ? `<w:gridSpan w:val="${span}"/>` : ''}${header ? '<w:shd w:val="clear" w:color="auto" w:fill="EDF2F7"/>' : ''}</w:tcPr>`;
+            const paragraphs = (cell.content ?? []).map((child) => (child.type === 'paragraph' ? this.paragraph(child, { bold: header }) : this.block(child, 0))).join('');
+            return `<w:tc>${tcPr}${paragraphs || '<w:p/>'}</w:tc>`;
+          })
+          .join('');
+        return `<w:tr>${cells}</w:tr>`;
+      })
+      .join('');
+    return `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/>${TABLE_BORDERS}</w:tblPr>${rows}</w:tbl><w:p/>`;
+  }
+
+  block(node: DocxNode, depth = 0): string {
+    switch (node.type) {
+      case 'heading': {
+        const level = Math.min(3, Math.max(1, Number(node.attrs?.level ?? 1)));
+        const size = level === 1 ? 30 : level === 2 ? 26 : 23;
+        return `<w:p><w:pPr><w:keepNext/><w:spacing w:before="${level === 1 ? 280 : 200}" w:after="100"/></w:pPr>${this.inline(node, { bold: true, sizeHalfPoints: size })}</w:p>`;
+      }
+      case 'paragraph':
+        return this.paragraph(node, depth ? { indentTwips: 360 + (depth - 1) * 360 } : {});
+      case 'bulletList':
+      case 'orderedList':
+        return this.list(node, depth);
+      case 'table':
+        return this.table(node);
+      case 'image':
+        return `<w:p><w:pPr><w:jc w:val="center"/></w:pPr>${this.imageRun(node)}</w:p>`;
+      case 'horizontalRule':
+        return '<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="999999"/></w:pBdr></w:pPr></w:p>';
+      case 'blockquote':
+        return (node.content ?? []).map((child) => `<w:p><w:pPr><w:ind w:left="567"/></w:pPr>${this.inline(child)}</w:p>`).join('');
+      case 'codeBlock':
+        return `<w:p>${markedRunXml((node.content ?? []).map((child) => child.text ?? '').join(''), new Set(['code']))}</w:p>`;
+      default:
+        return (node.content ?? []).map((child) => this.block(child, depth)).join('');
+    }
+  }
+
+  header(meta: DocxHeaderMeta): string {
+    const row = (left: string, right: string, bold = false) =>
+      `<w:tr><w:tc><w:p>${markedRunXml(left, new Set(), { bold })}</w:p></w:tc><w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr>${markedRunXml(right, new Set(), { bold })}</w:p></w:tc></w:tr>`;
+    return (
+      `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>${TABLE_BORDERS}</w:tblPr>` +
+      row(meta.companyName ?? '', meta.code ?? '', true) +
+      row(meta.title ?? '', [meta.revision, meta.status].filter(Boolean).join(' · ')) +
+      '</w:tbl><w:p/>'
+    );
+  }
+}
+
+/** Gera um .docx real a partir do documento do editor visual (com fotos). */
+export function buildDocxFromDoc(doc: DocxNode, meta?: DocxHeaderMeta): Buffer {
+  const builder = new DocxBuilder();
+  const body = (meta ? builder.header(meta) : '') + (doc.content ?? []).map((node) => builder.block(node)).join('');
+  const documentXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">' +
+    `<w:body>${body || '<w:p/>'}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1417" w:right="1417" w:bottom="1417" w:left="1417" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const contentTypes =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+    '<Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/>' +
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';
+  const documentRels =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    builder.media.map((item) => `<Relationship Id="${item.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${item.name}"/>`).join('') +
+    '</Relationships>';
+  return buildZip([
+    { name: '[Content_Types].xml', data: Buffer.from(contentTypes, 'utf8') },
+    { name: '_rels/.rels', data: Buffer.from(ROOT_RELS, 'utf8') },
+    { name: 'word/document.xml', data: Buffer.from(documentXml, 'utf8') },
+    { name: 'word/_rels/document.xml.rels', data: Buffer.from(documentRels, 'utf8') },
+    ...builder.media.map((item) => ({ name: `word/media/${item.name}`, data: item.data })),
+  ]);
+}
+
+/** true quando o DOCX traz macros (VBA) — recusado no upload por segurança. */
+export function docxHasMacros(buffer: Buffer): boolean {
+  const entries = readZipEntries(buffer);
+  return Boolean(entries?.some((entry) => /vbaProject\.bin$/i.test(entry.name) || (/\.bin$/i.test(entry.name) && entry.name.includes('activeX'))));
+}

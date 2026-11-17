@@ -17,6 +17,10 @@ function makePrisma(over: { actions?: unknown[]; actionTasks?: unknown[] } = {})
     meeting: empty(),
     document: empty(),
     documentEditRequest: empty(),
+    documentWorkflowStep: empty(),
+    documentWorkflow: empty(),
+    documentReadConfirmation: empty(),
+    documentChangeRequest: empty(),
     audit: empty(),
     auditFinding: empty(),
     formSubmission: empty(),
@@ -35,6 +39,26 @@ function makePrisma(over: { actions?: unknown[]; actionTasks?: unknown[] } = {})
 }
 
 describe('WorkItemAggregationService', () => {
+  it('GED: só a etapa sequencial ativa aparece; leitura e pedido de alteração têm seus links', async () => {
+    const prisma = makePrisma();
+    const document = { id: 'd1', code: 'POP-001', title: 'Procedimento', status: 'WAITING_REVIEW', version: 1, orgNodeId: null, createdAt: new Date(), updatedAt: new Date() };
+    const step = { id: 's2', documentId: 'd1', versionId: 'v1', role: 'REVIEW', stepOrder: 2, document, dueAt: null };
+    prisma.documentWorkflowStep.findMany.mockImplementation(async ({ where }: any) => where.userId ? [step] : [{ ...step, id: 's1', stepOrder: 1 }, step]);
+    prisma.documentWorkflow.findMany.mockResolvedValue([{ documentId: 'd1', mode: 'SEQUENTIAL' }]);
+    prisma.documentReadConfirmation.findMany.mockResolvedValue([{ id: 'read1', document: { ...document, status: 'PUBLISHED' }, dueAt: null }]);
+    prisma.documentChangeRequest.findMany.mockResolvedValue([{ id: 'request1', document, reason: 'Atualizar o procedimento' }]);
+    const svc = new WorkItemAggregationService(prisma, new WorkItemPriorityService());
+    const waiting = await (svc as any).collectDocuments(me);
+    expect(waiting.map((item: any) => item.sourceEntityType)).toEqual(['DOCUMENT_READ', 'DOCUMENT_CHANGE_REQUEST']);
+    expect(waiting[0].availableActions[0].href).toBe('/documents/d1/leitor');
+    expect(waiting[1].availableActions[0].href).toBe('/documents/d1?tab=solicitacoes');
+    prisma.documentWorkflow.findMany.mockResolvedValue([{ documentId: 'd1', mode: 'PARALLEL' }]);
+    const parallel = await (svc as any).collectDocuments(me);
+    expect(parallel[0].title).toBe('Revisar: POP-001 · Procedimento');
+    expect(parallel[0].availableActions[0].href).toBe('/documents/d1?tab=fluxo');
+    expect(parallel[0].requiresDecision).toBe(true);
+  });
+
   it('agrega uma ação atrasada como OVERDUE_ACTION, faz upsert e poda os obsoletos', async () => {
     const past = new Date(Date.now() - 5 * 86_400_000);
     const prisma = makePrisma({

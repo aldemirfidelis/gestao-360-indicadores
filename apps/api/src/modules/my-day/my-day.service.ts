@@ -296,7 +296,7 @@ export class MyDayService implements OnModuleInit {
         this.prisma.workItemIndex.count({ where: { ...base, dueAt: { gte: dayStart, lte: dayEnd } } }),
         this.prisma.workItemIndex.count({ where: { ...base, itemType: 'APPROVAL' } }),
         this.prisma.workItemIndex.count({ where: { ...base, itemType: 'RISK_CRITICAL' } }),
-        this.prisma.workItemIndex.count({ where: { ...base, itemType: { in: ['DOCUMENT_REVIEW', 'DOCUMENT_EDIT', 'DOCUMENT_EDIT_APPROVAL'] } } }),
+        this.prisma.workItemIndex.count({ where: { ...base, itemType: { in: ['DOCUMENT_REVIEW', 'DOCUMENT_READ', 'DOCUMENT_EDIT', 'DOCUMENT_EDIT_APPROVAL'] } } }),
         this.prisma.workItemIndex.count({ where: { ...base, itemType: 'MEETING' } }),
         this.prisma.notification.count({ where: { companyId: me.companyId, userId: me.sub, readAt: null } }),
         this.prisma.workItemIndex.count({ where: { ...base, itemType: 'INDICATOR_OFF_TARGET' } }),
@@ -433,7 +433,7 @@ export class MyDayService implements OnModuleInit {
       default: break; // priorities / all
     }
     if (followFilter && followFilter.length === 0) return { rows: [], total: 0, page: 1, pageSize: Math.min(100, Math.max(5, Number(query.pageSize) || 25)) };
-    if (query.itemType === 'DOCUMENTS') where.itemType = { in: ['DOCUMENT_REVIEW', 'DOCUMENT_EDIT', 'DOCUMENT_EDIT_APPROVAL'] };
+    if (query.itemType === 'DOCUMENTS') where.itemType = { in: ['DOCUMENT_REVIEW', 'DOCUMENT_READ', 'DOCUMENT_EDIT', 'DOCUMENT_EDIT_APPROVAL'] };
     else if (query.itemType) where.itemType = query.itemType;
     if (query.priority) where.priority = query.priority;
     if (query.q?.trim()) {

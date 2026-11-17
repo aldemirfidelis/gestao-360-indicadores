@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GeminiService } from './gemini.service';
 import { AuthPayload } from '../auth/auth.types';
 import { AccessService } from '../access/access.service';
+import type { DocumentAccessService } from '../documents/document-access.service';
+import type { DocumentContentService } from '../documents/document-content.service';
 
 export interface HelpMessage {
   role: 'user' | 'assistant' | 'model';
@@ -53,6 +55,9 @@ export class AssistantService {
     private readonly prisma: PrismaService,
     private readonly gemini: GeminiService,
     private readonly access: AccessService,
+    // GED ativo: busca de texto completo, com confidenciais sempre fora da IA.
+    @Optional() @Inject('parked.documents.content') private readonly documentContent?: DocumentContentService,
+    @Optional() @Inject('parked.documents.access') private readonly documentAccess?: DocumentAccessService,
   ) {}
 
   async getHelpResponse(payload: HelpRequest, user: AuthPayload) {
@@ -91,9 +96,9 @@ export class AssistantService {
     }
 
     if (companyDocs.length > 0) {
-      contextText += 'DOCUMENTOS E PROCEDIMENTOS INTERNOS PUBLICADOS DA EMPRESA DO USUÁRIO:\n';
+      contextText += 'DOCUMENTOS E PROCEDIMENTOS INTERNOS VIGENTES DA EMPRESA DO USUÁRIO (ao usar, cite o código e a revisão):\n';
       companyDocs.forEach((doc) => {
-        contextText += `---\nTítulo: Documento #${doc.number} (${doc.code || 'Sem código'}) - ${doc.title}\nDescrição: ${doc.description || ''}\nConteúdo: ${(doc.content || '').slice(0, 8_000)}\n---\n`;
+        contextText += `---\nDocumento: ${doc.code || `DOC-${doc.number}`} - ${doc.title} (revisão vigente: ${doc.revision ?? 'atual'})\nDescrição: ${doc.description || ''}\nConteúdo: ${(doc.bodyText || doc.content || '').slice(0, 8_000)}\n---\n`;
         sources.push({
           title: doc.code ? `${doc.code} - ${doc.title}` : `DOC-${doc.number} - ${doc.title}`,
           id: doc.id,
@@ -243,6 +248,32 @@ ${historyText}
     const companyId = user.companyId;
     if (!companyId || !this.can(permissions, 'doc:view', 'doc:manage')) return [];
 
+    // GED ativo: texto completo (sem acento), revisão vigente e sem confidenciais.
+    if (this.documentContent && this.documentAccess) {
+      const term = [module, ...words].filter(Boolean).join(' ');
+      const candidates = term ? await this.documentContent.ftsCandidates(companyId, term, 40) : [];
+      if (!candidates.length) return [];
+      const rank = new Map(candidates.map((candidate) => [candidate.id, candidate.rank]));
+      const visibility = await this.documentAccess.visibilityWhere(user, { forAi: true });
+      const docs = await this.prisma.document.findMany({
+        where: {
+          id: { in: [...rank.keys()] },
+          companyId,
+          deletedAt: null,
+          status: { in: ['PUBLISHED', 'NEAR_EXPIRATION', 'PERIODIC_REVIEW'] },
+          AND: [visibility],
+        },
+        select: {
+          id: true, title: true, code: true, number: true, description: true, content: true, bodyText: true,
+          versions: { where: { status: 'PUBLISHED', deletedAt: null }, orderBy: { revisionNumber: 'desc' }, take: 1, select: { versionLabel: true, bodyText: true } },
+        },
+      });
+      return docs
+        .sort((a, b) => (rank.get(b.id) ?? 0) - (rank.get(a.id) ?? 0))
+        .slice(0, 4)
+        .map((doc) => ({ ...doc, revision: doc.versions[0]?.versionLabel ?? null, bodyText: doc.versions[0]?.bodyText ?? doc.bodyText }));
+    }
+
     const permittedAreas = await this.access.listAreaFilter(user.sub, 'documents', 'view');
     const orDocConditions: Prisma.DocumentWhereInput[] = [];
     if (module) {
@@ -275,8 +306,8 @@ ${historyText}
         OR: orDocConditions.length > 0 ? orDocConditions : undefined,
       },
       take: 3,
-      select: { id: true, title: true, code: true, number: true, description: true, content: true },
-    });
+      select: { id: true, title: true, code: true, number: true, description: true, content: true, bodyText: true },
+    }).then((docs) => docs.map((doc) => ({ ...doc, revision: null as string | null })));
   }
 
   // ==================== Dados ao vivo (registros da empresa) ====================

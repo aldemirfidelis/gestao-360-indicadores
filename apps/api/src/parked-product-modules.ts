@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Carregamento adiado: módulos suspensos só são importados depois de verificar o escopo do produto. */
 import { Module, type DynamicModule } from '@nestjs/common';
 import { isProductModuleActive, PRODUCT_SCOPE } from '@g360/shared';
 
@@ -11,7 +12,12 @@ export function parkedProductModules(): DynamicModule[] {
     require(`./modules/${folder}/${folder}.module`)[name],
   );
   const providers = [];
-  if (isProductModuleActive('documents')) providers.push({ provide: 'parked.documents', useExisting: require('./modules/documents/documents.service').DocumentsService });
+  if (isProductModuleActive('documents')) {
+    providers.push({ provide: 'parked.documents', useExisting: require('./modules/documents/documents.service').DocumentsService });
+    providers.push({ provide: 'parked.documents.maintenance', useExisting: require('./modules/documents/document-maintenance.service').DocumentMaintenanceService });
+    providers.push({ provide: 'parked.documents.content', useExisting: require('./modules/documents/document-content.service').DocumentContentService });
+    providers.push({ provide: 'parked.documents.access', useExisting: require('./modules/documents/document-access.service').DocumentAccessService });
+  }
   if (isProductModuleActive('automations')) providers.push({ provide: 'parked.approvals', useExisting: require('./modules/automations/services/workflow-approval.service').WorkflowApprovalService });
   return imports.length ? [{ module: ParkedProductModule, global: true, imports, providers, exports: providers.map((p) => p.provide) }] : [];
 }

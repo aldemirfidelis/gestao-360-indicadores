@@ -90,7 +90,20 @@ describe('vínculos: produto, permissões e escopo', () => {
   });
   it('rejeita módulos suspensos mesmo para super admin e tipos arbitrários', async () => {
     const { service, context } = linksService();
-    expect(service.canRead({ ...context, admin: true }, 'DOCUMENT')).toBe(false);
+    expect(service.canRead({ ...context, admin: true }, 'RISK')).toBe(false);
     await expect(service.query(context, 'constructor' as any)).rejects.toBeInstanceOf(BadRequestException);
+  });
+  it('documentos (GED reativado) exigem o módulo e a permissão de leitura do GED', () => {
+    const { service, context } = linksService();
+    expect(service.canRead({ ...context, modules: new Set(['documents']), permissions: new Set(['doc:view']) }, 'DOCUMENT')).toBe(true);
+    expect(service.canRead({ ...context, modules: new Set(['documents']), permissions: new Set(['processes:manage']) }, 'DOCUMENT')).toBe(false);
+    expect(service.canRead({ ...context, modules: new Set(['projects']), permissions: new Set(['doc:view']) }, 'DOCUMENT')).toBe(false);
+  });
+  it('não oferece documentos restritos ou confidenciais no seletor de vínculos', async () => {
+    const prisma: any = { document: { findMany: vi.fn().mockResolvedValue([]) } };
+    const access: any = { listAreaFilter: vi.fn().mockResolvedValue(null) };
+    const service = new ProcessLinksService(prisma, access, {} as any, {} as any);
+    await service.query({ user: me, admin: false, modules: new Set(['documents']), permissions: new Set(['doc:view']) } as any, 'DOCUMENT', undefined, 'higien');
+    expect(prisma.document.findMany.mock.calls[0][0].where).toEqual(expect.objectContaining({ companyId: me.companyId, deletedAt: null, confidentiality: 'INTERNAL' }));
   });
 });

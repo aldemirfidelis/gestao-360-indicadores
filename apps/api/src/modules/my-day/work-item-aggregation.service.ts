@@ -49,8 +49,11 @@ const ACTIVE_ACTION_STATUS = [
 ];
 const OPEN_RISK_STATUS = ['IDENTIFIED', 'ANALYZING', 'MITIGATING', 'MONITORING'];
 const OPEN_NC_STATUS = ['OPEN', 'TRIAGE', 'ANALYSIS', 'ACTION', 'VERIFICATION'];
-const DOC_APPROVAL_STATUS = ['WAITING_APPROVAL', 'IN_APPROVAL'];
-const DOC_REVIEW_STATUS = ['WAITING_REVIEW', 'ADJUSTMENTS_REQUESTED', 'PERIODIC_REVIEW', 'NEAR_EXPIRATION', 'EXPIRED'];
+// GED: fases do fluxo assinado e situações em que o responsável precisa agir.
+const DOC_REVIEW_PHASE = ['WAITING_REVIEW', 'IN_REVIEW', 'REVIEW'];
+const DOC_APPROVAL_PHASE = ['WAITING_APPROVAL', 'IN_APPROVAL'];
+const DOC_OWNER_STATUS = ['ADJUSTMENTS_REQUESTED', 'REJECTED', 'APPROVED', 'PERIODIC_REVIEW', 'NEAR_EXPIRATION', 'EXPIRED'];
+const DOC_PUBLISHED_LIKE = ['PUBLISHED', 'NEAR_EXPIRATION', 'EXPIRED', 'PERIODIC_REVIEW'];
 
 /**
  * Camada central de leitura/agregação da Central "Meu Dia".
@@ -486,16 +489,17 @@ export class WorkItemAggregationService {
   }
 
   private async collectDocuments(me: AuthPayload): Promise<WorkItemDraft[]> {
-    const [rows, editRequests] = await Promise.all([
+    const docSelect = { id: true, code: true, title: true, status: true, version: true, orgNodeId: true, createdAt: true, updatedAt: true } as const;
+    const [rows, editRequests, steps, reads, changeRequests] = await Promise.all([
+      // Responsável/elaborador: ajustar, publicar ou revisar periodicamente.
       this.prisma.document.findMany({
         where: {
           companyId: me.companyId, deletedAt: null,
-          OR: [
-            { approverUserId: me.sub, status: { in: DOC_APPROVAL_STATUS as any } },
-            { ownerUserId: me.sub, status: { in: DOC_REVIEW_STATUS as any } },
-          ],
+          status: { in: DOC_OWNER_STATUS as any },
+          OR: [{ ownerUserId: me.sub }, { ownerUserId: null, createdById: me.sub }],
         },
-        select: { id: true, code: true, title: true, status: true, version: true, orgNodeId: true, approverUserId: true, createdAt: true, updatedAt: true },
+        select: { ...docSelect, validUntil: true },
+        take: 200,
       }),
       this.prisma.documentEditRequest.findMany({
         where: {
@@ -511,26 +515,118 @@ export class WorkItemAggregationService {
           operator: { select: { id: true, name: true, email: true } },
         },
       }),
+      // Etapas de revisão/aprovação designadas ao usuário.
+      this.prisma.documentWorkflowStep.findMany({
+        where: { companyId: me.companyId, userId: me.sub, decision: 'PENDING', document: { deletedAt: null, status: { in: [...DOC_REVIEW_PHASE, ...DOC_APPROVAL_PHASE] as any } } },
+        include: { document: { select: docSelect } },
+        take: 200,
+      }),
+      // Leituras obrigatórias em aberto.
+      this.prisma.documentReadConfirmation.findMany({
+        where: { companyId: me.companyId, userId: me.sub, status: 'PENDING', document: { deletedAt: null, status: { in: DOC_PUBLISHED_LIKE as any } } },
+        include: { document: { select: docSelect } },
+        take: 200,
+      }),
+      // Pedidos de alteração para o responsável avaliar.
+      this.prisma.documentChangeRequest.findMany({
+        where: { companyId: me.companyId, ownerUserId: me.sub, status: 'OPEN', document: { deletedAt: null } },
+        include: { document: { select: docSelect } },
+        take: 100,
+      }),
     ]);
-    const documentTasks = rows.map((d) => {
-      const isApproval = d.approverUserId === me.sub && (DOC_APPROVAL_STATUS as string[]).includes(d.status as string);
+
+    // Fluxo sequencial: só a menor ordem pendente de cada revisão está ativa.
+    const docIds = [...new Set(steps.map((step) => step.documentId))];
+    const siblings = docIds.length
+      ? await this.prisma.documentWorkflowStep.findMany({ where: { documentId: { in: docIds }, decision: 'PENDING' }, select: { id: true, documentId: true, versionId: true, role: true, stepOrder: true } })
+      : [];
+    const flows = docIds.length ? await this.prisma.documentWorkflow.findMany({ where: { documentId: { in: docIds }, active: true, deletedAt: null }, select: { documentId: true, mode: true } }) : [];
+    const modeByDoc = new Map(flows.map((flow) => [flow.documentId, flow.mode]));
+    const activeSteps = steps.filter((step) => {
+      const phase = (DOC_REVIEW_PHASE as string[]).includes(step.document.status as string) ? 'REVIEW' : 'APPROVAL';
+      if (step.role !== phase) return false;
+      if (modeByDoc.get(step.documentId) === 'PARALLEL') return true;
+      const pending = siblings.filter((item) => item.documentId === step.documentId && item.versionId === step.versionId && item.role === phase);
+      return step.stepOrder === Math.min(...pending.map((item) => item.stepOrder));
+    });
+    const docLabel = (d: { code: string | null; title: string }) => `${d.code ? d.code + ' · ' : ''}${d.title}`;
+    const now = Date.now();
+
+    const stepTasks: WorkItemDraft[] = activeSteps.map((step) => {
+      const d = step.document;
+      const isApproval = step.role === 'APPROVAL';
+      return {
+        sourceModule: 'documents',
+        sourceEntityType: 'DOCUMENT',
+        sourceEntityId: d.id,
+        itemType: 'DOCUMENT_REVIEW',
+        title: `${isApproval ? 'Aprovar' : 'Revisar'}: ${docLabel(d)}`,
+        summary: `Documento v${d.version} · ${isApproval ? 'aprovação' : 'revisão'} com assinatura`,
+        status: d.status as string,
+        criticality: step.dueAt && step.dueAt.getTime() < now ? 'HIGH' : 'MEDIUM',
+        dueAt: step.dueAt,
+        assignedUserId: me.sub,
+        orgNodeId: d.orgNodeId,
+        requiresDecision: true,
+        recommendedAction: isApproval ? 'Aprovar ou reprovar o documento (assinatura com senha)' : 'Revisar o documento e aprovar ou pedir ajustes',
+        availableActions: [
+          { key: 'open', label: isApproval ? 'Abrir para aprovar' : 'Abrir para revisar', href: `/documents/${d.id}?tab=fluxo` },
+          { key: 'impact', label: 'Abrir análise de impacto', inline: true },
+          { key: 'vision360', label: 'Abrir Visão 360°', inline: true },
+        ],
+        context: { code: d.code, version: d.version, status: d.status, stepId: step.id, role: step.role },
+        sourceCreatedAt: step.createdAt,
+        sourceUpdatedAt: step.updatedAt,
+      };
+    });
+
+    const readTasks: WorkItemDraft[] = reads.map((read) => {
+      const d = read.document;
+      const overdue = Boolean(read.dueAt && read.dueAt.getTime() < now);
+      return {
+        sourceModule: 'documents',
+        sourceEntityType: 'DOCUMENT_READ',
+        sourceEntityId: read.id,
+        itemType: 'DOCUMENT_READ',
+        title: `Ler: ${docLabel(d)}`,
+        summary: overdue ? 'Leitura obrigatória atrasada' : 'Leitura obrigatória da revisão vigente',
+        status: 'OPEN',
+        criticality: overdue ? 'HIGH' : 'MEDIUM',
+        dueAt: read.dueAt,
+        assignedUserId: me.sub,
+        orgNodeId: d.orgNodeId,
+        requiresDecision: false,
+        recommendedAction: 'Ler o documento e confirmar a leitura',
+        availableActions: [{ key: 'open', label: 'Ler e confirmar', href: `/documents/${d.id}/leitor` }],
+        context: { code: d.code, version: d.version, documentId: d.id },
+        sourceCreatedAt: read.readAt,
+        sourceUpdatedAt: d.updatedAt,
+      };
+    });
+
+    const ownerTasks: WorkItemDraft[] = rows.map((d) => {
+      const action = d.status === 'APPROVED'
+        ? 'Publicar o documento aprovado'
+        : d.status === 'PERIODIC_REVIEW' || d.status === 'EXPIRED' || d.status === 'NEAR_EXPIRATION'
+          ? 'Fazer a revisão periódica (nova revisão ou confirmar vigência)'
+          : 'Ajustar o documento e reenviar';
       const expired = d.status === 'EXPIRED' || d.status === 'NEAR_EXPIRATION';
       return {
         sourceModule: 'documents',
         sourceEntityType: 'DOCUMENT',
         sourceEntityId: d.id,
         itemType: 'DOCUMENT_REVIEW',
-        title: `${d.code ? d.code + ' · ' : ''}${d.title}`,
-        summary: `Documento v${d.version} · ${d.status}`,
+        title: docLabel(d),
+        summary: `Documento v${d.version} · ${action.toLowerCase()}`,
         status: d.status as string,
-        criticality: expired ? 'HIGH' : 'MEDIUM',
-        dueAt: null,
+        criticality: expired || d.status === 'REJECTED' ? 'HIGH' : 'MEDIUM',
+        dueAt: expired ? d.validUntil : null,
         assignedUserId: me.sub,
         orgNodeId: d.orgNodeId,
-        requiresDecision: isApproval,
-        recommendedAction: isApproval ? 'Aprovar ou reprovar o documento' : 'Revisar o documento',
+        requiresDecision: false,
+        recommendedAction: action,
         availableActions: [
-          { key: 'open', label: 'Abrir documento', href: `/documents?id=${d.id}` },
+          { key: 'open', label: 'Abrir documento', href: `/documents/${d.id}` },
           { key: 'impact', label: 'Abrir análise de impacto', inline: true },
           { key: 'vision360', label: 'Abrir Visão 360°', inline: true },
         ],
@@ -539,6 +635,28 @@ export class WorkItemAggregationService {
         sourceUpdatedAt: d.updatedAt,
       };
     });
+
+    const changeTasks: WorkItemDraft[] = changeRequests.map((request) => ({
+      sourceModule: 'documents',
+      sourceEntityType: 'DOCUMENT_CHANGE_REQUEST',
+      sourceEntityId: request.id,
+      itemType: 'DOCUMENT_REVIEW',
+      title: `Pedido de alteração: ${docLabel(request.document)}`,
+      summary: request.reason.slice(0, 200),
+      status: 'OPEN',
+      criticality: 'MEDIUM',
+      dueAt: null,
+      assignedUserId: me.sub,
+      orgNodeId: request.document.orgNodeId,
+      requiresDecision: true,
+      recommendedAction: 'Avaliar o pedido de alteração',
+      availableActions: [{ key: 'open', label: 'Avaliar pedido', href: `/documents/${request.document.id}?tab=solicitacoes` }],
+      context: { code: request.document.code, documentId: request.document.id },
+      sourceCreatedAt: request.createdAt,
+      sourceUpdatedAt: request.updatedAt,
+    }));
+
+    const documentTasks = [...stepTasks, ...readTasks, ...ownerTasks, ...changeTasks];
     const editTasks = editRequests.map((r) => {
       const isOperatorTask = r.operatorUserId === me.sub && r.status === 'REQUESTED';
       const d = r.document;
@@ -546,10 +664,10 @@ export class WorkItemAggregationService {
         ? [
             { key: 'approve', label: 'Liberar edição', kind: 'primary', inline: true },
             { key: 'reject', label: 'Rejeitar', kind: 'danger', inline: true, requiresJustification: true },
-            { key: 'open', label: 'Abrir documento', href: `/documents?focus=${d.id}` },
+            { key: 'open', label: 'Abrir documento', href: `/documents/${d.id}` },
           ]
         : [
-            { key: 'open', label: 'Editar documento', href: `/documents?focus=${d.id}&edit=1` },
+            { key: 'open', label: 'Editar documento', href: `/documents/${d.id}?tab=conteudo&edit=1` },
             { key: 'complete', label: 'Concluir edição', inline: true },
           ];
       return {

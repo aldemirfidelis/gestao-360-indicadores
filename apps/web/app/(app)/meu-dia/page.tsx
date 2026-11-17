@@ -65,6 +65,7 @@ const TYPE_META: Record<string, { label: string; icon: typeof Inbox }> = {
   WORKFLOW_TASK: { label: 'Tarefa de fluxo', icon: Workflow },
   APPROVAL: { label: 'Aprovação', icon: Stamp },
   DOCUMENT_REVIEW: { label: 'Documento', icon: FileText },
+  DOCUMENT_READ: { label: 'Leitura obrigatória', icon: FileText },
   PROCESS_REVIEW: { label: 'Revisão de processo', icon: Workflow },
   DOCUMENT_EDIT_APPROVAL: { label: 'Liberar documento', icon: FileText },
   DOCUMENT_EDIT: { label: 'Editar documento', icon: FileText },
@@ -661,20 +662,20 @@ export default function MeuDiaPage() {
             </div>
           </div>)}
 
-          {/* Documentos a revisar — itens reais (DOCUMENT_REVIEW/EDIT) */}
+          {/* Documentos — itens reais (revisão, aprovação, edição e leitura obrigatória) */}
           {isProductModuleActive('documents') && (<div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <FileText className="h-4.5 w-4.5 text-blue-500" />
-                <h3 className="font-bold text-slate-800 text-sm tracking-tight">Documentos a revisar</h3>
+                <h3 className="font-bold text-slate-800 text-sm tracking-tight">Documentos pendentes</h3>
               </div>
-              <span className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer" onClick={() => router.push('/documents')}>Ver todos</span>
+              <span className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer" onClick={() => router.push('/documents?tab=caixa')}>Ver todos</span>
             </div>
             <div className="space-y-3">
               {panelDocs.isPending ? (
                 <div className="h-16 animate-pulse rounded-xl bg-muted/30" />
               ) : (panelDocs.data?.rows ?? []).length === 0 ? (
-                <PanelEmpty>Nenhum documento pendente de revisão.</PanelEmpty>
+                <PanelEmpty>Nenhum documento pendente para você.</PanelEmpty>
               ) : (
                 (panelDocs.data?.rows ?? []).map((it) => <ItemRow key={it.id} it={it} onClick={() => inspectItem(it)} />)
               )}

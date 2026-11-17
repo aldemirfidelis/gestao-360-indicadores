@@ -10,6 +10,7 @@ export type WorkItemType =
   | 'APPROVAL'
   | 'OVERDUE_ACTION'
   | 'DOCUMENT_REVIEW'
+  | 'DOCUMENT_READ'
   | 'PROCESS_REVIEW'
   | 'INDICATOR_OFF_TARGET'
   | 'RISK_CRITICAL'

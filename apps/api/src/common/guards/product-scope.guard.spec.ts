@@ -21,7 +21,10 @@ describe('escopo de produto e demonstração', () => {
   it.each(['/users', '/companies', '/platform/switch', '/database-admin', '/ai'])('bloqueia infraestrutura sensível %s', path => {
     expect(() => guard.canActivate(context(path))).toThrow(ForbiddenException);
   });
-  it.each(['/documents/123', '/risks', '/forms', '/personnel', '/strategy/employees', '/actions/general-approvals', '/communication/conversations', '/communication/me/profile', '/prize/overview', '/platform-admin/prize/eligible/connectors', '/external/v1/prize/events'])('módulo suspenso %s não é acessível nem para super admin', path => {
+  it.each(['/documents/123', '/documents/123/workflow/decide', '/wopi/files/abc', '/dav/files/abc'])('GED reativado: %s responde para clientes', path => {
+    expect(guard.canActivate(context(path, 'GET', false))).toBe(true);
+  });
+  it.each(['/nonconformities/123', '/risks', '/forms', '/personnel', '/strategy/employees', '/actions/general-approvals', '/communication/conversations', '/communication/me/profile', '/prize/overview', '/platform-admin/prize/eligible/connectors', '/external/v1/prize/events'])('módulo suspenso %s não é acessível nem para super admin', path => {
     expect(() => guard.canActivate(context(path, 'GET', false))).toThrow(NotFoundException);
   });
   it('mantém logout e as operações normais de clientes fora da demo', () => {
@@ -29,8 +32,9 @@ describe('escopo de produto e demonstração', () => {
     expect(guard.canActivate(context('/indicators', 'POST', false))).toBe(true);
   });
   it('usa limites de rota, sem confundir prefixos parecidos', () => {
-    expect(isProductRouteActive('/documents/123?view=1')).toBe(false);
-    expect(isProductRouteActive('/documents-other')).toBe(true);
+    expect(isProductRouteActive('/risks/123?view=1')).toBe(false);
+    expect(isProductRouteActive('/risks-other')).toBe(true);
+    expect(isProductRouteActive('/documents/123?view=1')).toBe(true);
     expect(isDemoReadAllowed('/auth/me-other')).toBe(false);
     expect(isDemoReadAllowed('/indicators-other')).toBe(false);
   });

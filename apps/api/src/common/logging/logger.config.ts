@@ -6,6 +6,15 @@ import { PINO_REDACT_PATHS } from './redact';
 const isProd = process.env.NODE_ENV === 'production';
 
 /**
+ * O Word instalado (WebDAV) e o editor online (WOPI) recebem o token de edição
+ * na própria URL; ele nunca deve aparecer no log.
+ */
+export function redactUrlSecrets(url: string | undefined): string | undefined {
+  if (!url) return url;
+  return url.replace(/([?&](?:access_token|token|signature)=)[^&#]*/gi, '$1[redacted]');
+}
+
+/**
  * Configuração do logger estruturado (pino) para toda a API.
  *
  * - JSON em produção; pino-pretty em dev.
@@ -38,7 +47,7 @@ export const loggerParams: Params = {
     redact: { paths: PINO_REDACT_PATHS, censor: '[redacted]' },
     serializers: {
       req(req: { id?: unknown; method?: string; url?: string; remoteAddress?: string }) {
-        return { id: req.id, method: req.method, url: req.url, remoteAddress: req.remoteAddress };
+        return { id: req.id, method: req.method, url: redactUrlSecrets(req.url), remoteAddress: req.remoteAddress };
       },
       res(res: { statusCode?: number }) {
         return { statusCode: res.statusCode };

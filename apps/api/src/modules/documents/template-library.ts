@@ -49,7 +49,7 @@ export const TEMPLATE_LIBRARY: LibraryTemplate[] = [
     name: 'Procedimento Operacional Padrão (POP)',
     description: 'Estrutura completa de POP: objetivo, aplicação, responsabilidades, descrição das atividades, recursos e registros.',
     category: DocumentType.PROCEDURE,
-    sigla: 'PRO',
+    sigla: 'POP',
     content: `${HEADER}# 1. Objetivo
 
 Descrever o padrão para execução de [atividade/processo], garantindo segurança, qualidade e repetibilidade.
@@ -141,6 +141,54 @@ Orientar a execução de [tarefa específica] de forma padronizada.
 # 6. Em Caso de Anormalidade
 
 [Quem acionar e como registrar.]
+${FOOTER}`,
+  },
+  {
+    key: 'norma-interna',
+    name: 'Norma Interna',
+    description: 'Norma da empresa: objetivo, abrangência, definições, requisitos obrigatórios, responsabilidades, verificação e sanções.',
+    category: DocumentType.INTERNAL_STANDARD,
+    sigla: 'NOR',
+    content: `${HEADER}# 1. Objetivo
+
+Estabelecer os requisitos obrigatórios de [tema da norma] em {{company_name}}.
+
+# 2. Abrangência
+
+Esta norma aplica-se a [unidades, áreas, cargos ou terceiros abrangidos].
+
+# 3. Referências
+
+- [Norma técnica, legislação ou política relacionada]
+
+# 4. Definições
+
+- **[Termo]:** [definição]
+
+# 5. Requisitos
+
+## 5.1 [Requisito 1]
+
+[Enunciado verificável do que deve ser cumprido, com critério de aceitação.]
+
+## 5.2 [Requisito 2]
+
+[Enunciado verificável do que deve ser cumprido.]
+
+# 6. Responsabilidades
+
+| Função | Responsabilidade |
+|---|---|
+| [Cargo/função] | [O que garante ou executa] |
+| Gestores | Garantir o cumprimento nas suas áreas |
+
+# 7. Verificação do Cumprimento
+
+[Como e com que frequência o cumprimento é verificado: auditorias, inspeções, indicadores.]
+
+# 8. Descumprimento
+
+[Tratamento dos desvios e medidas aplicáveis.]
 ${FOOTER}`,
   },
   {

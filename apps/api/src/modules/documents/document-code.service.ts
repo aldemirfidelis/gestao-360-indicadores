@@ -12,40 +12,51 @@ const DEFAULT_TYPES: Array<{
   category: DocumentType;
   defaultValidityDays: number;
 }> = [
-  { name: 'Política', sigla: 'POL', prefix: 'POL', category: DocumentType.POLICY, defaultValidityDays: 730 },
   { name: 'Procedimento', sigla: 'PRO', prefix: 'PRO', category: DocumentType.PROCEDURE, defaultValidityDays: 365 },
+  { name: 'Procedimento Operacional Padrão (POP)', sigla: 'POP', prefix: 'POP', category: DocumentType.PROCEDURE, defaultValidityDays: 365 },
   { name: 'Instrução de Trabalho', sigla: 'IT', prefix: 'IT', category: DocumentType.INSTRUCTION, defaultValidityDays: 365 },
-  { name: 'Registro', sigla: 'REG', prefix: 'REG', category: DocumentType.RECORD, defaultValidityDays: 1825 },
-  { name: 'Formulário', sigla: 'FOR', prefix: 'FOR', category: DocumentType.FORM, defaultValidityDays: 365 },
+  { name: 'Norma Interna', sigla: 'NOR', prefix: 'NOR', category: DocumentType.INTERNAL_STANDARD, defaultValidityDays: 730 },
+  { name: 'Política', sigla: 'POL', prefix: 'POL', category: DocumentType.POLICY, defaultValidityDays: 730 },
   { name: 'Manual', sigla: 'MAN', prefix: 'MAN', category: DocumentType.MANUAL, defaultValidityDays: 730 },
+  { name: 'Formulário', sigla: 'FOR', prefix: 'FOR', category: DocumentType.FORM, defaultValidityDays: 365 },
+  { name: 'Registro', sigla: 'REG', prefix: 'REG', category: DocumentType.RECORD, defaultValidityDays: 1825 },
   { name: 'Documento Externo', sigla: 'EXT', prefix: 'EXT', category: DocumentType.EXTERNAL, defaultValidityDays: 365 },
 ];
 
 @Injectable()
 export class DocumentCodeService {
+  private readonly ensured = new Map<string, number>();
+
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Reconciliação ADITIVA dos tipos padrão: cria os que faltam (por sigla) e
+   * nunca altera nem recria tipos que a empresa ajustou ou excluiu.
+   */
   async ensureDefaultTypes(companyId: string, userId?: string) {
-    const existing = await this.prisma.documentTypeConfig.count({ where: { companyId, deletedAt: null } });
-    if (existing > 0) return;
-    await this.prisma.$transaction(
-      DEFAULT_TYPES.map((item) =>
-        this.prisma.documentTypeConfig.create({
-          data: {
-            companyId,
-            name: item.name,
-            sigla: item.sigla,
-            prefix: item.prefix,
-            category: item.category,
-            defaultValidityDays: item.defaultValidityDays,
-            alertDays: 30,
-            codePattern: '{{PREFIX}}-{{SEQ}}',
-            digits: 3,
-            createdById: userId ?? null,
-          },
-        }),
-      ),
-    );
+    const last = this.ensured.get(companyId);
+    if (last && Date.now() - last < 10 * 60_000) return;
+    const existing = await this.prisma.documentTypeConfig.findMany({ where: { companyId }, select: { sigla: true } });
+    const known = new Set(existing.map((item) => item.sigla.toUpperCase()));
+    const missing = DEFAULT_TYPES.filter((item) => !known.has(item.sigla));
+    if (missing.length) {
+      await this.prisma.documentTypeConfig.createMany({
+        data: missing.map((item) => ({
+          companyId,
+          name: item.name,
+          sigla: item.sigla,
+          prefix: item.prefix,
+          category: item.category,
+          defaultValidityDays: item.defaultValidityDays,
+          alertDays: 30,
+          codePattern: '{{PREFIX}}-{{SEQ}}',
+          digits: 3,
+          createdById: userId ?? null,
+        })),
+        skipDuplicates: true,
+      });
+    }
+    this.ensured.set(companyId, Date.now());
   }
 
   async listTypes(me: AuthPayload) {

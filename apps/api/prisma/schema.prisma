@@ -2307,6 +2307,19 @@ enum DocumentApprovalDecision {
   DELEGATED
 }
 
+enum DocumentConfidentiality {
+  INTERNAL // interno: acesso pela area do documento
+  RESTRICTED // restrito: somente pessoas, grupos e areas autorizados
+  CONFIDENTIAL // confidencial: autorizados e sempre fora da IA
+}
+
+enum DocumentContentFormat {
+  TEXT // legado: texto/markdown simples
+  STRUCTURED // editor visual (JSON do Tiptap)
+  DOCX // arquivo Word editado no Word instalado ou Collabora
+  FILE // arquivo anexado (ex.: PDF de norma externa)
+}
+
 model Document {
   id             String     @id @default(uuid())
   companyId      String
@@ -2330,6 +2343,17 @@ model Document {
   status               DocumentStatus @default(DRAFT)
   version              Int            @default(1)
   content              String? // corpo do documento (markdown) p/ documentos nativos
+  typeConfigId         String?
+  typeConfig           DocumentTypeConfig?     @relation("DocumentTypeConfigDocuments", fields: [typeConfigId], references: [id])
+  confidentiality      DocumentConfidentiality @default(INTERNAL)
+  contentFormat        DocumentContentFormat   @default(TEXT)
+  contentJson          Json? // conteudo do editor visual (Tiptap) da revisao em elaboracao
+  bodyText             String? // texto plano da revisao corrente (busca, IA, comparacao)
+  searchText           String? // texto normalizado (sem acento) para busca de texto completo
+  readRequired         Boolean                 @default(false)
+  readDueDays          Int?
+  retentionUntil       DateTime?
+  disposedAt           DateTime?
   externalUrl          String? // referencia para arquivo externo (drive/erp)
   changeNote           String?
   validFrom            DateTime?
@@ -2368,11 +2392,14 @@ model Document {
   tagRelations        DocumentTagRelation[]
 
   processIntegrations ProcessIntegration[]
+  changeRequests      DocumentChangeRequest[]
 
   @@unique([companyId, number])
   @@index([companyId])
   @@index([companyId, status])
+  @@index([companyId, confidentiality])
   @@index([type])
+  @@index([typeConfigId])
   @@index([orgNodeId])
   @@index([indicatorId])
   @@index([ownerUserId])
@@ -2408,6 +2435,8 @@ model DocumentTypeConfig {
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
   deletedAt              DateTime?
+
+  documents Document[] @relation("DocumentTypeConfigDocuments")
 
   @@unique([companyId, sigla])
   @@index([companyId, active])
@@ -2476,6 +2505,10 @@ model DocumentVersion {
   changeSummary   String?
   docxFileId      String?
   pdfFileId       String?
+  contentJson     Json? // conteudo congelado ao enviar para revisao/aprovacao
+  bodyText        String? // texto plano congelado (comparacao entre revisoes)
+  contentHash     String? // SHA-256 do conteudo assinado
+  pdfSource       String? // NATIVE | CONVERTED | TEXT | FILE
   publicationDate DateTime?
   expirationDate  DateTime?
   createdById     String?
@@ -2571,9 +2604,12 @@ model DocumentWorkflowStep {
   decidedAt  DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+  delegatedFromUserId String?
+  remindedAt          DateTime?
 
   @@index([companyId, decision])
   @@index([documentId, stepOrder])
+  @@index([userId, decision])
   @@map("document_workflow_steps")
 }
 
@@ -2595,6 +2631,13 @@ model DocumentApproval {
   evidenceFileId String?
   decidedAt      DateTime?
   createdAt      DateTime                 @default(now())
+  // Assinatura eletronica (reautenticacao com senha) da decisao.
+  stepId              String?
+  signatureMethod     String?
+  signatureHash       String?
+  contentHash         String?
+  userAgent           String?
+  delegatedFromUserId String?
 
   @@index([companyId, decision])
   @@index([documentId, approvalOrder])
@@ -2773,10 +2816,13 @@ model DocumentReadConfirmation {
   readAt         DateTime  @default(now())
   confirmedAt    DateTime?
   quizScore      Float?
-  status         String    @default("READ")
+  status         String    @default("READ") // PENDING (leitura obrigatoria em aberto) | CONFIRMED | READ (legado)
+  dueAt          DateTime?
+  remindedAt     DateTime?
 
   @@index([companyId, status])
   @@index([documentId, userId])
+  @@index([userId, status])
   @@map("document_read_confirmations")
 }
 
@@ -2974,6 +3020,51 @@ model DocumentTagRelation {
   @@unique([documentId, tagId])
   @@index([companyId, tagId])
   @@map("document_tag_relations")
+}
+
+/// Conteudo binario dos arquivos do GED guardado no proprio Postgres
+/// (storageKey "db:<id>"), coberto pelo backup diario do banco.
+model DocumentBlob {
+  id        String   @id @default(uuid())
+  companyId String
+  sha256    String
+  sizeBytes Int
+  mimeType  String?
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([sha256])
+  @@map("document_blobs")
+}
+
+/// Solicitacao de alteracao de um documento vigente (ex.: vinda de um desvio,
+/// plano de acao ou auditoria). Aceita, abre uma nova revisao.
+model DocumentChangeRequest {
+  id                   String    @id @default(uuid())
+  companyId            String
+  documentId           String
+  document             Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionId            String?
+  requesterUserId      String
+  ownerUserId          String?
+  status               String    @default("OPEN") // OPEN | ACCEPTED | REJECTED | IMPLEMENTED | CANCELLED
+  reason               String
+  proposal             String?
+  sourceType           String? // DEVIATION | ACTION | PROCESS | AUDIT | NONCONFORMITY | OTHER
+  sourceId             String?
+  sourceLabel          String?
+  decisionNote         String?
+  decidedById          String?
+  decidedAt            DateTime?
+  implementedVersionId String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([companyId, status])
+  @@index([documentId, status])
+  @@index([ownerUserId, status])
+  @@map("document_change_requests")
 }
 
 // =====================================================

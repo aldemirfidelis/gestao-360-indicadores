@@ -39,6 +39,11 @@ async function bootstrap() {
   expressApp.set?.('trust proxy', 1);
 
   const bodyLimit = process.env.API_BODY_LIMIT ?? '10mb';
+  // O conteúdo do editor visual do GED pode trazer fotos embutidas: só essa
+  // rota aceita corpo maior (registrada antes do parser global).
+  if (isProductModuleActive('documents')) {
+    app.use(new RegExp(`^/${prefix}/documents/[^/]+/content$`), json({ limit: process.env.DOCUMENT_CONTENT_BODY_LIMIT ?? '25mb' }));
+  }
   app.use(json({ limit: bodyLimit }));
   app.use(urlencoded({ limit: bodyLimit, extended: true }));
 

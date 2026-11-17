@@ -7,6 +7,11 @@ import { AuthPayload } from '../auth/auth.types';
 import { titledCreateSchema, titledUpdateSchema } from '@g360/shared';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { DocumentsService } from './documents.service';
+import { contentDisposition } from './document-features.controller';
+
+function context(req: Request) {
+  return { ip: req.ip, userAgent: String(req.headers['user-agent'] ?? '') };
+}
 
 @Controller('documents')
 export class DocumentsController {
@@ -24,8 +29,9 @@ export class DocumentsController {
     @Query('ownerUserId') ownerUserId?: string,
     @Query('approverUserId') approverUserId?: string,
     @Query('expiring') expiring?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.service.list(me, { status, type, search, orgNodeId, indicatorId, ownerUserId, approverUserId, expiring });
+    return this.service.list(me, { status, type, search, orgNodeId, indicatorId, ownerUserId, approverUserId, expiring, limit });
   }
 
   @Get('summary')
@@ -135,7 +141,7 @@ export class DocumentsController {
   ) {
     const result = await this.service.downloadTemplate(me, templateId);
     res.setHeader('content-type', result.mimeType);
-    res.setHeader('content-disposition', `attachment; filename="${result.fileName}"`);
+    res.setHeader('content-disposition', contentDisposition('attachment', result.fileName));
     return new StreamableFile(result.content);
   }
 
@@ -256,9 +262,10 @@ export class DocumentsController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.service.downloadFile(me, id, fileId, { ip: req.ip, userAgent: req.headers['user-agent'] });
+    const result = await this.service.downloadFile(me, id, fileId, context(req));
     res.setHeader('content-type', result.mimeType);
-    res.setHeader('content-disposition', `attachment; filename="${result.file.fileName}"`);
+    res.setHeader('content-disposition', contentDisposition('attachment', result.file.fileName));
+    res.setHeader('cache-control', 'private, no-store');
     return new StreamableFile(result.content);
   }
 
@@ -270,8 +277,8 @@ export class DocumentsController {
 
   @Post(':id/read-confirmations')
   @RequirePermissions('doc:view')
-  confirmRead(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
-    return this.service.confirmRead(me, id, body);
+  confirmRead(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any, @Req() req: Request) {
+    return this.service.confirmRead(me, id, body, context(req));
   }
 
   @Post(':id/new-revision')
@@ -280,58 +287,78 @@ export class DocumentsController {
     return this.service.createRevision(me, id, body);
   }
 
+  // Rotas legadas do fluxo: agora passam pelo fluxo assinado (participantes
+  // designados, segregação de funções e senha na decisão).
   @Post(':id/submit-review')
   @RequirePermissions('doc:update')
   submitReview(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
-    return this.service.transition(me, id, DocumentStatus.WAITING_REVIEW, body);
-  }
-
-  @Post(':id/start-review')
-  @RequirePermissions('doc:update')
-  startReview(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
-    return this.service.transition(me, id, DocumentStatus.IN_REVIEW, body);
-  }
-
-  @Post(':id/request-adjustments')
-  @RequirePermissions('doc:update')
-  requestAdjustments(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
-    return this.service.transition(me, id, DocumentStatus.ADJUSTMENTS_REQUESTED, body);
-  }
-
-  @Post(':id/complete-review')
-  @RequirePermissions('doc:update')
-  completeReview(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
-    return this.service.transition(me, id, DocumentStatus.REVIEWED, body);
+    return this.service.submit(me, id, body);
   }
 
   @Post(':id/send-approval')
   @RequirePermissions('doc:update')
   sendApproval(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
-    return this.service.transition(me, id, DocumentStatus.WAITING_APPROVAL, body);
+    return this.service.submit(me, id, body);
+  }
+
+  @Post(':id/start-review')
+  @RequirePermissions('doc:view')
+  startReview(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getById(me, id);
   }
 
   @Post(':id/start-approval')
-  @RequirePermissions('doc:update')
-  startApproval(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
-    return this.service.transition(me, id, DocumentStatus.IN_APPROVAL, body);
+  @RequirePermissions('doc:view')
+  startApproval(@CurrentUser() me: AuthPayload, @Param('id') id: string) {
+    return this.service.getById(me, id);
+  }
+
+  @Post(':id/request-adjustments')
+  @RequirePermissions('doc:view')
+  requestAdjustments(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any, @Req() req: Request) {
+    return this.service.decide(me, id, { ...body, decision: 'ADJUST' }, context(req));
+  }
+
+  @Post(':id/complete-review')
+  @RequirePermissions('doc:view')
+  completeReview(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any, @Req() req: Request) {
+    return this.service.decide(me, id, { ...body, decision: 'APPROVE' }, context(req));
   }
 
   @Post(':id/approve')
-  @RequirePermissions('doc:update')
-  approve(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
-    return this.service.transition(me, id, DocumentStatus.APPROVED, body);
+  @RequirePermissions('doc:view')
+  approve(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any, @Req() req: Request) {
+    return this.service.decide(me, id, { ...body, decision: 'APPROVE' }, context(req));
   }
 
   @Post(':id/reject')
-  @RequirePermissions('doc:update')
-  reject(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
-    return this.service.transition(me, id, DocumentStatus.REJECTED, body);
+  @RequirePermissions('doc:view')
+  reject(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any, @Req() req: Request) {
+    return this.service.decide(me, id, { ...body, decision: 'REJECT' }, context(req));
   }
 
   @Post(':id/publish')
+  @RequirePermissions('doc:view')
+  publish(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any, @Req() req: Request) {
+    return this.service.publish(me, id, body, context(req));
+  }
+
+  @Post(':id/periodic-review')
   @RequirePermissions('doc:update')
-  publish(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
-    return this.service.publish(me, id, body);
+  periodicReview(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.transition(me, id, DocumentStatus.PERIODIC_REVIEW, body);
+  }
+
+  @Post(':id/unschedule')
+  @RequirePermissions('doc:view')
+  unschedule(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.transition(me, id, DocumentStatus.APPROVED, body);
+  }
+
+  @Post(':id/cancel')
+  @RequirePermissions('doc:update')
+  cancel(@CurrentUser() me: AuthPayload, @Param('id') id: string, @Body() body: any) {
+    return this.service.transition(me, id, DocumentStatus.CANCELLED, body);
   }
 
   @Post(':id/obsolete')

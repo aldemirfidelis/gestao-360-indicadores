@@ -1544,3 +1544,65 @@ Projetos acima.
 - O commit posterior de documentação não exige outro build: a versão publicada
   continua vinculada ao commit de código `05b3da5`, mesmo com HEAD mais recente
   contendo somente o registro operacional.
+
+
+## Documentos / GED (2026-11-16, concluído localmente; não publicado)
+
+- Continuação do trabalho da Ultra IA descrito no anexo Texto colado.txt. Pedido:
+  reativar como Documentos no menu, sem ligação com Treinamento, editor sem
+  licença paga e arquivos no Postgres normal. Implementação anterior preservada
+  e concluída, sem commit, push, deploy ou alteração no banco de produção.
+- Editor visual Tiptap 3.32.2 (MIT), PDF real com pdf-lib 1.17.1 e QR Code com
+  qrcode 1.5.4. Editor visual é o padrão; Word/Collabora/WOPI/WebDAV permanecem
+  opcionais. Sem conversor de Word, PDF de DOCX usa texto extraído com aviso.
+  PDF pronto é conteúdo principal distinto de anexos comuns. Não há OCR de PDF.
+- Fluxo com revisores/aprovadores designados, sequência/paralelo, segregação
+  do elaborador, conteúdo congelado e confirmação de senha. Assinatura eletrônica
+  interna (HMAC/auditoria), sem certificado ICP-Brasil. Publicação, agendamento,
+  revisões, leitura obrigatória, busca, solicitações, relações, impacto,
+  documentos externos, temporalidade e integração com Meu Dia entregues.
+- Correções adicionais da retomada: bloqueio transacional por documento e leitura
+  atualizada das etapas; aprovações simultâneas concluem o fluxo e duplo clique
+  não duplica assinaturas. Conteúdo/formatos/envio/publicação recusam estado
+  alterado durante a operação. Assinatura da publicação só é gravada junto
+  da publicação confirmada. Índice de busca não sobrescreve edição mais recente.
+- Fila do editor aguarda todas as gravações antes de mudar de aba/formato; falha
+  preserva a edição e mantém a aba aberta. Editor remonta por documento. No
+  celular, confirmação de leitura fica acima da navegação inferior. Descarte
+  remove bytes, texto/JSON, índice e checkpoints após o prazo, mantendo auditoria.
+- Storage padrão DATABASE em document_blobs (BYTEA), com metadados em
+  document_files. Chaves legadas em disco continuam sendo lidas; proteção
+  de caminho corrigida para exigir descendente do diretório de storage.
+  Na futura publicação, conferir explicitamente DOCUMENT_STORAGE_PROVIDER=DATABASE
+  no .env; valor LOCAL já existente continua prevalecendo. Preservar o volume
+  antigo e seu backup enquanto houver referências a arquivos locais.
+- Nova migration aditiva 20261116200000_documents_modernization, ainda pendente
+  em produção: formatos/JSON/busca, blobs, assinaturas, prazos e solicitações.
+  Ensaio aplicou todas as 158 migrations do zero em Postgres 17.5 descartável,
+  localhost:54329/g360_documents_review, apenas dados sintéticos. Nenhum seed
+  geral nem dado real foi usado. Diff global apresentou divergências históricas
+  fora do GED (FKs de Segurança e índices/nomes legados); SQL não foi aplicado.
+- Validação: API completa 134 arquivos/1.018 testes; focal GED/Meu Dia 82 testes,
+  assinaturas revalidadas após o último ajuste; Web 116 e shared 51 aprovados.
+  Prisma validate, compilação da API e empacotamento focado (366 arquivos)
+  aprovados. Lint de 54 arquivos API/Web sem erros/avisos. Build Web focado
+  gerou 94 páginas, verificou tipos e rodou via next start. No Windows, a cópia
+  de ensaio usa junction e não gera standalone; Linux/Docker será conferido
+  no pré-deploy autorizado. Fontes da Web comparadas byte a byte com a cópia
+  compilada (26 arquivos alterados).
+- Integração real com Postgres: 14 cenários aprovados, incluindo aprovação
+  concorrente, clique duplicado, snapshot antigo, falha de PDF, isolamento,
+  publicação/bytes no banco, busca, leituras e descarte. Chromium no bundle:
+  nove cenários aprovados com quatro perfis, em desktop/celular, sem erros JS.
+  Empresa sintética recebeu somente liberação explícita de Documentos; os
+  bloqueios de plano/empresa reais permanecem respeitados.
+- Guia docs/GED_DOCUMENTOS.md reescrito. Ensaio portátil em
+  scripts/check-documents.cjs usa dependências/compilados da API e recusa banco
+  fora de localhost/g360_documents_review ou sem DOCUMENTS_REVIEW_ISOLATED=1.
+  Evidências/scripts temporários em test-results/documents-resume/ (ignorado).
+- Preservados os arquivos e o trecho anterior da demonstração corporativa.
+  HEAD continua 99f9dbd; produção permanece no código 05b3da5, sem reexecutar
+  cargas da Pacto. Apresentar o resumo e receber OK específico para publicar
+  esta nova evolução antes de commit/push/deploy/migration, conforme regra
+  operacional e o fluxo local informado no anexo.
+- Serviços temporários Web/API/Postgres encerrados e portas de ensaio conferidas.

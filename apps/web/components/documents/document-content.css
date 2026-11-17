@@ -1,0 +1,134 @@
+/* Conteúdo do editor visual e do modo leitor do GED (ProseMirror/Tiptap). */
+.g360-doc {
+  color: hsl(var(--foreground));
+  font-size: 0.95rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.g360-doc:focus,
+.g360-doc .ProseMirror:focus {
+  outline: none;
+}
+.g360-doc .ProseMirror {
+  min-height: var(--g360-doc-min-height, 18rem);
+}
+.g360-doc h1 {
+  margin: 1.4rem 0 0.6rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: hsl(var(--primary));
+}
+.g360-doc h2 {
+  margin: 1.1rem 0 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+.g360-doc h3 {
+  margin: 0.9rem 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 650;
+}
+.g360-doc p {
+  margin: 0.35rem 0;
+}
+.g360-doc ul,
+.g360-doc ol {
+  margin: 0.4rem 0;
+  padding-left: 1.5rem;
+}
+.g360-doc ul {
+  list-style: disc;
+}
+.g360-doc ol {
+  list-style: decimal;
+}
+.g360-doc li > p {
+  margin: 0.15rem 0;
+}
+.g360-doc blockquote {
+  margin: 0.6rem 0;
+  border-left: 3px solid hsl(var(--border));
+  padding-left: 0.9rem;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+.g360-doc hr {
+  margin: 1rem 0;
+  border: 0;
+  border-top: 1px solid hsl(var(--border));
+}
+.g360-doc a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+}
+.g360-doc code {
+  border-radius: 0.25rem;
+  background: hsl(var(--muted));
+  padding: 0.05rem 0.3rem;
+  font-size: 0.85em;
+}
+.g360-doc img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.75rem auto;
+  border-radius: 0.5rem;
+}
+.g360-doc img.ProseMirror-selectednode {
+  outline: 3px solid hsl(var(--primary) / 0.5);
+}
+.g360-doc .tableWrapper {
+  margin: 0.75rem 0;
+  overflow-x: auto;
+}
+.g360-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.g360-doc th,
+.g360-doc td {
+  position: relative;
+  min-width: 4rem;
+  border: 1px solid hsl(var(--border));
+  padding: 0.35rem 0.5rem;
+  vertical-align: top;
+}
+.g360-doc th {
+  background: hsl(var(--muted));
+  font-weight: 600;
+  text-align: left;
+}
+.g360-doc .selectedCell::after {
+  position: absolute;
+  inset: 0;
+  background: hsl(var(--primary) / 0.12);
+  content: '';
+  pointer-events: none;
+}
+.g360-doc p.is-editor-empty:first-child::before {
+  float: left;
+  height: 0;
+  color: hsl(var(--muted-foreground));
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+/* Leitura no chão de fábrica: a letra segue o tamanho escolhido no leitor. */
+.g360-doc.g360-doc-reader {
+  font-size: inherit;
+  line-height: 1.75;
+}
+.g360-doc.g360-doc-reader h1 {
+  font-size: 1.4em;
+}
+.g360-doc.g360-doc-reader h2 {
+  font-size: 1.2em;
+}
+.g360-doc.g360-doc-reader h3 {
+  font-size: 1.05em;
+}
+@media print {
+  .g360-doc {
+    color: #000;
+  }
+}

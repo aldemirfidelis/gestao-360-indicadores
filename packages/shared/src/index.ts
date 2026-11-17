@@ -8,3 +8,4 @@ export * from './site-analytics';
 export * from './portuguese';
 export * from './project-progress';
 export * from './process-governance';
+export * from './document-content';

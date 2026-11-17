@@ -178,6 +178,7 @@ export const navSections: NavSection[] = [
     { href: '/actions', label: 'Plano de Ação', description: 'Ações, execução, evidências e eficácia', icon: CheckSquare, permissions: ['actions:view'] },
     { href: '/processes', label: 'Processos', description: 'SIPOC, BPMN, responsabilidades RACI e integrações', icon: Workflow, permissions: ['processes:view'] },
     { href: '/projects/cronograma', label: 'Projetos', description: 'Portfólio, Gantt, curva S, tarefas e marcos', icon: FolderKanban, permissions: ['projects:view'] },
+    { href: '/documents', label: 'Documentos', description: 'Procedimentos, POPs, normas, revisões e leitura obrigatória', icon: FileText, permissions: ['doc:view'] },
     { href: '/projects', label: 'Ata da Reunião', description: 'Ações da reunião mensal por área, setor e responsável', icon: GanttChartSquare, permissions: ['projects:view', 'actions:view'], exact: true },
     { href: '/meetings', label: 'Reuniões', description: 'Agenda, atas e decisões', icon: CalendarDays, permissions: ['meetings:view'] },
     { href: '/monthly-results', label: 'Reunião Mensal', description: 'Fechamento de resultados, pauta, ata e acompanhamento semanal', icon: CalendarDays, permissions: ['monthly:view'] },
@@ -189,8 +190,8 @@ export const navSections: NavSection[] = [
     intent: 'management',
     icon: ShieldCheck,
     items: [
-      // Ordenado pelo ciclo do SGQ: documentar -> mapear -> verificar -> tratar -> gerir risco.
-      { href: '/documents', label: 'Documentos', description: 'Políticas, procedimentos, validade e aprovação', icon: FileText, permissions: ['doc:view'] },
+      // Ordenado pelo ciclo do SGQ: mapear -> verificar -> tratar -> gerir risco.
+      // Documentos agora é item direto do menu principal.
       { href: '/forms', label: 'Formulários e Checklists', description: 'Modelos, listas de verificação, inspeções e preenchimentos', icon: FileSpreadsheet, permissions: ['forms:view'] },
       { href: '/audits', label: 'Auditorias', description: 'Auditorias, constatações e geração de NCs', icon: ClipboardCheck, permissions: ['audits:view'] },
       { href: '/nonconformities', label: 'Não Conformidades', description: 'NCs, causa raiz, ação corretiva e eficácia', icon: FileWarning, permissions: ['nc:view'] },

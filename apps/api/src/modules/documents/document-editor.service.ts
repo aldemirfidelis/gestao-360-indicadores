@@ -55,7 +55,9 @@ const DESKTOP_WORD_MESSAGE =
   'Edição no Word instalado indisponível. Configure DOCUMENT_EDITOR_DAV_BASE ou DOCUMENT_EDITOR_WOPI_BASE com a URL pública da API.';
 
 const DISCOVERY_TTL_MS = 60 * 60 * 1000; // 1h
-const DEFAULT_TOKEN_TTL_MS = 10 * 60 * 60 * 1000; // 10h
+// Validade do access_token do editor (vai na URL do Word/Collabora): curta o
+// bastante para limitar vazamento, longa o bastante para uma sessão de edição.
+const DEFAULT_TOKEN_TTL_MS = 4 * 60 * 60 * 1000; // 4h
 
 @Injectable()
 export class DocumentEditorService {
@@ -149,11 +151,11 @@ export class DocumentEditorService {
   // ----------------------------- access_token (WOPI) ------------------------
 
   private secret(): string {
-    return (
-      process.env.DOCUMENT_EDITOR_JWT_SECRET ||
-      process.env.JWT_ACCESS_SECRET ||
-      'g360-dev-editor-secret-change-me'
-    );
+    const configured = process.env.DOCUMENT_EDITOR_JWT_SECRET || process.env.JWT_ACCESS_SECRET;
+    if (configured) return configured;
+    // Em produção nunca assina com um segredo conhecido.
+    if (process.env.NODE_ENV === 'production') throw new Error('DOCUMENT_EDITOR_JWT_SECRET não configurado.');
+    return 'g360-dev-editor-secret-change-me';
   }
 
   private tokenTtlMs(): number {

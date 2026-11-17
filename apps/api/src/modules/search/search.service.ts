@@ -1,14 +1,44 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { extractSnippet } from '@g360/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
 import { AuthPayload } from '../auth/auth.types';
+import type { DocumentAccessService } from '../documents/document-access.service';
+import type { DocumentContentService } from '../documents/document-content.service';
 
 @Injectable()
 export class SearchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    // GED ativo: busca de texto completo nos documentos (área + confidencialidade).
+    @Optional() @Inject('parked.documents.content') private readonly documentContent?: DocumentContentService,
+    @Optional() @Inject('parked.documents.access') private readonly documentAccess?: DocumentAccessService,
   ) {}
+
+  private async searchDocuments(me: AuthPayload, term: string, limit: number) {
+    if (!this.documentContent || !this.documentAccess) return [];
+    if (!(await this.documentAccess.has(me, 'doc:view'))) return [];
+    const candidates = await this.documentContent.ftsCandidates(me.companyId, term, 80);
+    if (!candidates.length) return [];
+    const rank = new Map(candidates.map((candidate) => [candidate.id, candidate.rank]));
+    const visibility = await this.documentAccess.visibilityWhere(me);
+    const docs = await this.prisma.document.findMany({
+      where: { id: { in: [...rank.keys()] }, companyId: me.companyId, deletedAt: null, AND: [visibility] },
+      select: { id: true, code: true, number: true, title: true, status: true, description: true, bodyText: true },
+    });
+    return docs
+      .sort((a, b) => (rank.get(b.id) ?? 0) - (rank.get(a.id) ?? 0))
+      .slice(0, limit)
+      .map((doc) => ({
+        id: doc.id,
+        type: 'document',
+        label: `${doc.code ?? `#${doc.number}`} · ${doc.title}`,
+        description: extractSnippet(doc.bodyText ?? doc.description, term, 60) ?? doc.description ?? 'Documento',
+        href: `/documents/${doc.id}`,
+        status: doc.status,
+      }));
+  }
 
   async global(me: AuthPayload, q: string, limit = 8) {
     const term = q.trim();
@@ -26,7 +56,7 @@ export class SearchService {
       this.access.listAreaFilter(me.sub, 'org', 'view'),
     ]);
 
-    const [indicators, orgNodes, actions, deviations, meetings, users, objectives] = await Promise.all([
+    const [indicators, orgNodes, actions, deviations, meetings, users, objectives, documents] = await Promise.all([
       this.prisma.indicator.findMany({
         where: {
           companyId,
@@ -109,9 +139,11 @@ export class SearchService {
         select: { id: true, name: true, status: true, map: { select: { id: true, name: true } } },
         take: limit,
       }),
+      this.searchDocuments(me, term, limit).catch(() => []),
     ]);
 
     return [
+      ...documents,
       ...indicators.map((i) => ({
         id: i.id,
         type: 'indicator',
