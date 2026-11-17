@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { DocumentConfidentiality, Prisma, UserRoleEnum } from '@prisma/client';
+import { PUBLIC_DEMO_PROFILE } from '@g360/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
 import type { AreaAction } from '../access/access.logic';
@@ -28,6 +29,8 @@ export interface DocumentAccessTarget {
  * - Restrito e Confidencial: além da área, só responsável, autor, aprovador,
  *   participantes do fluxo e quem estiver autorizado (pessoa, grupo de acesso
  *   ou área). Gestores do GED (`doc:manage`) e administradores veem todos.
+ * - O visitante da demonstração pública tem papel COMPANY_ADMIN, mas no GED é
+ *   leitor comum: sem configurações, controle de acesso ou documentos restritos.
  * - Confidencial nunca é enviado para a IA (`forAi`).
  */
 @Injectable()
@@ -103,6 +106,7 @@ export class DocumentAccessService {
   }
 
   async isManager(me: AuthPayload): Promise<boolean> {
+    if (me.accessProfileCode === PUBLIC_DEMO_PROFILE) return false;
     if (me.role === UserRoleEnum.SUPER_ADMIN || me.role === UserRoleEnum.COMPANY_ADMIN) return true;
     return (await this.permissionKeys(me.sub)).has('doc:manage');
   }

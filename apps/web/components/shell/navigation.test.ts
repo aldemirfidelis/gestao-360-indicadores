@@ -43,7 +43,16 @@ describe('granular navigation', () => {
     const other = { role: 'VIEWER', permissions: ['indicators:view'] };
     expect(visibleNavSections(other).flatMap((section) => section.items.map((item) => item.href))).not.toContain('/documents');
     expect(canAccessRoute(other, '/documents/abc')).toBe(false);
-    expect(canAccessRoute({ ...reader, isDemo: true }, '/documents')).toBe(false);
+  });
+  it('demonstração pública apresenta Documentos para consulta', () => {
+    const visitor = { role: 'COMPANY_ADMIN', isDemo: true, permissions: ['myday:view', 'doc:view', 'doc:download_pdf'] };
+    const hrefs = visibleNavSections(visitor).flatMap((section) => section.items.map((item) => item.href));
+    expect(hrefs).toContain('/documents');
+    expect(canAccessRoute(visitor, '/documents/abc')).toBe(true);
+    expect(canAccessRoute(visitor, '/documents/abc/leitor')).toBe(true);
+    // Sem doc:view (perfil antigo da demo) o item continua fora do menu.
+    const withoutDocs = { ...visitor, permissions: ['myday:view'] };
+    expect(visibleNavSections(withoutDocs).flatMap((section) => section.items.map((item) => item.href))).not.toContain('/documents');
   });
   it('visitante demo só encontra os módulos apresentados', () => {
     const user = { role: 'COMPANY_ADMIN', isDemo: true, permissions: ['myday:view', 'indicators:view', 'prize:view', 'settings:manage'] };

@@ -10,6 +10,8 @@ Inclui acervo com busca e filtros, matriz mestra, caixa de pendências, tipos e 
 
 A empresa precisa ter Documentos liberado no plano ou por exceção no Portal Admin, e o usuário precisa das permissões documentais. O módulo pertence a Qualidade e Compliance nos planos correspondentes; a reativação respeita os bloqueios existentes de empresas.
 
+Os perfis de sistema de todas as empresas recebem as permissões documentais padrão a cada boot da API (reconciliação aditiva, a mesma da tela de Usuários; perfis personalizados e concessões individuais não mudam; `COMPANY_PROFILES_BOOTSTRAP_DISABLED=1` desliga). A demonstração pública apresenta Documentos só para consulta: o perfil `DEMO_PUBLIC` tem `doc:view`, `doc:audit`, `doc:download_pdf` e `doc:download_docx` (migration `20261117120000_demo_documents_access`), a escrita continua bloqueada e, no GED, o visitante é leitor comum, sem Configurações, controle de acesso ou documentos restritos.
+
 Os tipos padrão são Procedimento, POP, Instrução de Trabalho, Norma Interna, Política, Manual, Formulário, Registro e Documento Externo. A reconciliação cria apenas tipos ausentes por sigla, preservando os tipos personalizados e as exclusões da empresa. A numeração é reservada por empresa/tipo, por exemplo `POP-001`, com revisão inicial `Rev. 00`.
 
 ## Editor sem licença paga

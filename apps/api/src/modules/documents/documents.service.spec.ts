@@ -214,6 +214,25 @@ describe('DocumentsService - GED', () => {
     expect(where.AND[0]).toEqual({});
   });
 
+  it('list: visitante da demonstração vê só documentos internos, mesmo com papel de administrador', async () => {
+    const visitor: AuthPayload = { ...me, sub: 'visitor', role: UserRoleEnum.COMPANY_ADMIN, accessProfileCode: 'DEMO_PUBLIC' };
+    const demo = makeService({ listAreaFilter: null, permissions: ['doc:view'] });
+    await demo.service.list(visitor);
+    expect(demo.prisma.document.findMany.mock.calls[0][0].where.AND[0].AND[0].OR).toContainEqual({ confidentiality: 'INTERNAL' });
+    // Administrador comum da empresa continua gestor do GED (vê todas as classificações).
+    const admin = makeService({ listAreaFilter: null, permissions: ['doc:view'] });
+    await admin.service.list({ ...visitor, sub: 'admin', accessProfileCode: null });
+    expect(admin.prisma.document.findMany.mock.calls[0][0].where.AND[0]).toEqual({});
+  });
+
+  it('options: visitante da demonstração não recebe Configurações nem criação', async () => {
+    const { service } = makeService({ permissions: ['doc:view', 'doc:download_pdf'] });
+    const admin: AuthPayload = { ...me, sub: 'admin', role: UserRoleEnum.COMPANY_ADMIN };
+    expect((await service.options(admin)).permissions.manage).toBe(true);
+    const visitor: AuthPayload = { ...admin, sub: 'visitor', accessProfileCode: 'DEMO_PUBLIC' };
+    expect((await service.options(visitor)).permissions).toEqual({ manage: false, publish: false, create: false });
+  });
+
   it('list: busca usa o texto completo (sem acento) e mantém a empresa', async () => {
     const { service, prisma } = makeService();
     await service.list(me, { status: 'PUBLISHED', type: 'POLICY', search: 'higienização' });

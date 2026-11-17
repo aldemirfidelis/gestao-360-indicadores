@@ -24,6 +24,12 @@ describe('escopo de produto e demonstração', () => {
   it.each(['/documents/123', '/documents/123/workflow/decide', '/wopi/files/abc', '/dav/files/abc'])('GED reativado: %s responde para clientes', path => {
     expect(guard.canActivate(context(path, 'GET', false))).toBe(true);
   });
+  it.each(['/documents', '/documents/overview', '/documents/123/reader', '/documents/123/official-pdf'])('demo consulta Documentos: %s', path => {
+    expect(guard.canActivate(context(path))).toBe(true);
+  });
+  it.each([['POST', '/documents'], ['PUT', '/documents/123/content'], ['POST', '/documents/123/read'], ['GET', '/wopi/files/abc'], ['GET', '/dav/files/abc']])('demo não escreve no GED nem abre o editor externo: %s %s', (method, path) => {
+    expect(() => guard.canActivate(context(path, method))).toThrow(ForbiddenException);
+  });
   it.each(['/nonconformities/123', '/risks', '/forms', '/personnel', '/strategy/employees', '/actions/general-approvals', '/communication/conversations', '/communication/me/profile', '/prize/overview', '/platform-admin/prize/eligible/connectors', '/external/v1/prize/events'])('módulo suspenso %s não é acessível nem para super admin', path => {
     expect(() => guard.canActivate(context(path, 'GET', false))).toThrow(NotFoundException);
   });

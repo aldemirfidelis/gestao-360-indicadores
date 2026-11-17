@@ -165,6 +165,8 @@ export const DEMO_AREA_LABEL: Record<string, string> = {
   indicators: 'Indicadores',
   deviations: 'Desvios',
   actions: 'Plano de Ação',
+  processes: 'Processos',
+  documents: 'Documentos',
   projects: 'Ata da Reunião',
   meetings: 'Reuniões',
   'monthly-results': 'Reunião Mensal',

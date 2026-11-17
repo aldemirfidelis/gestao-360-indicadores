@@ -1,7 +1,7 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UserCreateInput, isProductPermissionActive } from '@g360/shared';
+import { UserCreateInput, formatQuantity, isProductPermissionActive } from '@g360/shared';
 import { Prisma, UserAccessStatus, UserRoleEnum } from '@prisma/client';
 import { DEFAULT_PROFILES, PERMISSION_CATALOG } from './permission-catalog';
 
@@ -14,10 +14,49 @@ type UserAdminCreateInput = UserCreateInput & {
 };
 
 @Injectable()
-export class UsersService {
+export class UsersService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(UsersService.name);
   private permissionsReady = false;
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * A cada boot, leva os perfis de sistema de todas as empresas ao catálogo
+   * atual. Antes isso só acontecia quando alguém abria Usuários/Perfis na
+   * empresa, então um módulo reativado (ex.: Documentos) não aparecia para os
+   * perfis padrão das empresas antigas até essa visita. Nunca derruba a API.
+   */
+  async onApplicationBootstrap(): Promise<void> {
+    if (process.env.COMPANY_PROFILES_BOOTSTRAP_DISABLED === '1') return;
+    try {
+      const { companies, granted } = await this.reconcileSystemProfilesOfAllCompanies();
+      if (granted > 0) {
+        this.logger.log(`Perfis de sistema reconciliados: ${formatQuantity(granted, 'permissão adicionada', 'permissões adicionadas')} em ${formatQuantity(companies, 'empresa', 'empresas')}.`);
+      }
+    } catch (err) {
+      this.logger.error(`Reconciliação dos perfis de sistema ignorada: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Mesma reconciliação aditiva da tela de Usuários, para todas as empresas
+   * ativas: só acrescenta aos perfis de sistema EXISTENTES as permissões padrão
+   * que faltam. Não cria perfis nem toca perfis personalizados ou concessões
+   * individuais.
+   */
+  async reconcileSystemProfilesOfAllCompanies(): Promise<{ companies: number; granted: number }> {
+    await this.ensurePermissionCatalog();
+    const [companies, permissions] = await Promise.all([
+      this.prisma.company.findMany({ where: { deletedAt: null }, select: { id: true }, orderBy: { createdAt: 'asc' } }),
+      this.prisma.permission.findMany({ select: { id: true, key: true } }),
+    ]);
+    const permissionByKey = new Map(permissions.map((permission) => [permission.key, permission.id]));
+    let granted = 0;
+    for (const company of companies) {
+      granted += await this.grantMissingDefaultPermissions(company.id, permissionByKey);
+    }
+    return { companies: companies.length, granted };
+  }
 
   async list(companyId: string) {
     return this.prisma.user.findMany({
@@ -335,19 +374,30 @@ export class UsersService {
       });
     }
 
-    // Reconciliação ADITIVA dos perfis de sistema com o catálogo: garante que
-    // perfis já provisionados (empresas antigas) recebam permissões novas
-    // adicionadas ao DEFAULT_PROFILES. Só insere o que falta (skipDuplicates) e
-    // nunca remove — grants extras que o admin adicionou continuam intactos.
-    const [profiles, permissions] = await Promise.all([
+    await this.grantMissingDefaultPermissions(companyId);
+  }
+
+  /**
+   * Reconciliação ADITIVA dos perfis de sistema com o catálogo: garante que
+   * perfis já provisionados (empresas antigas) recebam permissões novas
+   * adicionadas ao DEFAULT_PROFILES. Só insere o que falta (skipDuplicates) e
+   * nunca remove — grants extras que o admin adicionou continuam intactos.
+   * Devolve quantas permissões foram acrescentadas.
+   */
+  private async grantMissingDefaultPermissions(companyId: string, knownPermissions?: Map<string, string>): Promise<number> {
+    const defaults = DEFAULT_PROFILES.filter((profile) => profile.role !== UserRoleEnum.SUPER_ADMIN);
+    const [profiles, permissionByKey] = await Promise.all([
       this.prisma.accessProfile.findMany({
         where: { companyId, code: { in: defaults.map((profile) => profile.code) }, system: true, deletedAt: null },
         select: { id: true, code: true, permissions: { select: { permissionId: true } } },
       }),
-      this.prisma.permission.findMany({ select: { id: true, key: true } }),
+      knownPermissions
+        ? Promise.resolve(knownPermissions)
+        : this.prisma.permission
+            .findMany({ select: { id: true, key: true } })
+            .then((rows) => new Map(rows.map((permission) => [permission.key, permission.id]))),
     ]);
     const profileByCode = new Map(profiles.map((profile) => [profile.code, profile]));
-    const permissionByKey = new Map(permissions.map((permission) => [permission.key, permission.id]));
     const entries = defaults.flatMap((profile) => {
       const current = profileByCode.get(profile.code);
       if (!current) return [];
@@ -357,9 +407,9 @@ export class UsersService {
         return permissionId && !already.has(permissionId) ? [{ profileId: current.id, permissionId }] : [];
       });
     });
-    if (entries.length > 0) {
-      await this.prisma.profilePermission.createMany({ data: entries, skipDuplicates: true });
-    }
+    if (entries.length === 0) return 0;
+    const result = await this.prisma.profilePermission.createMany({ data: entries, skipDuplicates: true });
+    return result.count;
   }
 
   private async validateUserLinks(

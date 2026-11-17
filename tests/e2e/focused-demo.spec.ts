@@ -65,10 +65,12 @@ test.describe('produto focado e demonstração pública', () => {
     expect(session.user.email).toBe('visitante@demonstracao.local');
     expect(session.refreshToken).toBe('');
     const headers = { authorization: `Bearer ${session.accessToken}` };
-    for (const [method, route] of [['POST', '/indicators'], ['PATCH', '/auth/me/password'], ['POST', '/platform/switch'], ['POST', '/assistant/help']] as const) {
+    for (const [method, route] of [['POST', '/indicators'], ['POST', '/documents'], ['PATCH', '/auth/me/password'], ['POST', '/platform/switch'], ['POST', '/assistant/help']] as const) {
       const response = await request.fetch(`${apiBaseURL}${route}`, { method, headers, data: {} });
       expect(response.status(), `${method} ${route}`).toBe(403);
     }
+    // Documentos faz parte da demonstração (consulta).
+    expect((await request.get(`${apiBaseURL}/documents/overview`, { headers })).status()).toBe(200);
     const adminLogin = await request.post(`${apiBaseURL}/auth/login`, { data: adminCredentials });
     expect(adminLogin.ok()).toBeTruthy();
     const admin = await adminLogin.json();
@@ -98,10 +100,10 @@ test.describe('produto focado e demonstração pública', () => {
   });
 
   test('rotas de módulos suspensos retornam 404 no Web e na API', async ({ request }) => {
-    for (const route of ['/documents', '/risks', '/forms', '/servico-pessoal', '/carreiras', '/comunicacao']) {
+    for (const route of ['/risks', '/forms', '/servico-pessoal', '/carreiras', '/comunicacao']) {
       expect((await request.get(route)).status(), route).toBe(404);
     }
-    for (const route of ['/documents', '/risks', '/forms', '/personnel', '/communication/conversations']) {
+    for (const route of ['/risks', '/forms', '/personnel', '/communication/conversations']) {
       expect((await request.get(`${apiBaseURL}${route}`)).status(), route).toBe(404);
     }
   });

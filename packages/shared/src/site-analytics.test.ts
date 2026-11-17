@@ -25,6 +25,7 @@ describe('demoAreaOf', () => {
     expect(demoAreaOf('/meu-dia')).toBe('meu-dia');
     expect(demoAreaOf('/indicators/3f2a9c1e-1b2c-4d5e-8f90-123456789abc')).toBe('indicators');
     expect(demoAreaOf('/monthly-results/2026-10')).toBe('monthly-results');
+    expect(demoAreaOf('/documents/3f2a9c1e-1b2c-4d5e-8f90-123456789abc/leitor')).toBe('documents');
   });
 
   it('fora da demonstração não há área', () => {
